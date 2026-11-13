@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Prueba de rodillo</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#181b22; --line:#262a33; --txt:#e8eaee; --mut:#8a909c;
+    --acc:#ff7a1a; --ok:#3ecf8e; --warn:#ffb020; --err:#ff5470;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px;padding-bottom:40px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:14px}
+  .warn{background:#3a2a10;border:1px solid var(--warn);color:#ffd27a;padding:10px 12px;border-radius:10px;margin-bottom:12px;display:none}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  button{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:15px;font-weight:600;cursor:pointer}
+  button.pri{background:var(--acc);border-color:var(--acc);color:#111}
+  button:disabled{opacity:.4}
+  .status{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .pill{font-size:12px;padding:5px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--mut)}
+  .pill.on{color:var(--ok);border-color:var(--ok)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .tile .lab{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  .tile .val{font-size:40px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+  .tile .val small{font-size:15px;color:var(--mut);font-weight:600;margin-left:3px}
+  .tile .src{font-size:11px;color:var(--mut)}
+  .tile.big{grid-column:1/-1}
+  .tile.big .val{font-size:64px;color:var(--acc)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:14px}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  .ctl{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  input[type=number]{width:90px;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px}
+  #log{background:#0a0c10;border:1px solid var(--line);border-radius:10px;padding:10px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;max-height:320px;overflow:auto;color:#b9c0cc}
+</style>
+</head>
+<body>
+<h1>Prueba de rodillo</h1>
+<div class="sub">Paso 0 · Comprobar conexión, datos y control del rodillo</div>
+
+<div class="warn" id="warn"></div>
+
+<div class="row">
+  <button class="pri" id="btnTrainer">Conectar rodillo</button>
+  <button id="btnHR">Conectar pulsómetro</button>
+</div>
+
+<div class="status">
+  <span class="pill" id="pTrainer">Rodillo: —</span>
+  <span class="pill" id="pCtrl">Control: —</span>
+  <span class="pill" id="pHR">Pulso: —</span>
+</div>
+
+<div class="grid">
+  <div class="tile big"><div class="lab">Potencia</div><div class="val" id="vPow">--<small>W</small></div><div class="src" id="sPow"></div></div>
+  <div class="tile"><div class="lab">Cadencia</div><div class="val" id="vCad">--<small>rpm</small></div><div class="src" id="sCad"></div></div>
+  <div class="tile"><div class="lab">Pulso</div><div class="val" id="vHR">--<small>ppm</small></div><div class="src" id="sHR"></div></div>
+  <div class="tile"><div class="lab">Velocidad</div><div class="val" id="vSpd">--<small>km/h</small></div><div class="src" id="sSpd"></div></div>
+  <div class="tile"><div class="lab">Objetivo</div><div class="val" id="vTgt">--</div><div class="src">último comando</div></div>
+</div>
+
+<div class="card">
+  <h2>Control</h2>
+  <div class="ctl">
+    <input type="number" id="inW" value="150" min="0" max="1500" step="5">
+    <button id="btnW" disabled>Fijar vatios (ERG)</button>
+    <button id="btnWm" disabled>−25</button>
+    <button id="btnWp" disabled>+25</button>
+  </div>
+  <div class="ctl">
+    <input type="number" id="inG" value="3" min="-10" max="20" step="0.5">
+    <button id="btnG" disabled>Fijar pendiente %</button>
+    <button id="btnFree" disabled>Libre (0 %)</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Registro técnico</h2>
+  <div class="row"><button id="btnCopy">Copiar registro</button><button id="btnClear">Limpiar</button></div>
+  <div id="log"></div>
+</div>
+
+<script>
+// ---------- UUIDs ----------
+const FEC_SVC = '6e40fec1-b5a3-f393-e0a9-e50e24dcca9e';
+const FEC_RX  = '6e40fec2-b5a3-f393-e0a9-e50e24dcca9e';
+const FEC_TX  = '6e40fec3-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_SVC = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const WAHOO_SVC = 'a026ee0b-0a7d-4ab3-97fa-f1500f9feb8b';
+
+const OPTIONAL = [0x1826,0x1818,0x1816,0x180d,0x180a,0x180f,0x1800,0x1801, FEC_SVC, NUS_SVC, WAHOO_SVC];
+
+const KNOWN = {
+  '1826':'FTMS (Fitness Machine)','1818':'Cycling Power','1816':'Cycling Speed & Cadence','180d':'Heart Rate',
+  '180a':'Device Information','180f':'Battery','1800':'Generic Access','1801':'Generic Attribute',
+  '2ad2':'Indoor Bike Data','2ad9':'FTMS Control Point','2acc':'FTMS Feature','2ada':'FTMS Status',
+  '2ad6':'Supported Resistance Range','2ad8':'Supported Power Range','2a63':'Cycling Power Measurement',
+  '2a65':'Cycling Power Feature','2a5d':'Sensor Location','2a66':'Cycling Power Control Point',
+  '2a5b':'CSC Measurement','2a37':'Heart Rate Measurement','2a19':'Battery Level',
+  '2a29':'Fabricante','2a24':'Modelo','2a25':'Nº serie','2a26':'Firmware','2a27':'Hardware','2a28':'Software'
+};
+KNOWN[FEC_SVC]='FE-C sobre Bluetooth (Tacx)'; KNOWN[FEC_RX]='FE-C RX (datos)'; KNOWN[FEC_TX]='FE-C TX (control)';
+KNOWN[NUS_SVC]='Nordic UART'; KNOWN[WAHOO_SVC]='Wahoo propietario';
+
+function label(uuid){
+  const m = uuid.match(/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i);
+  const key = m ? m[1].toLowerCase() : uuid.toLowerCase();
+  const name = KNOWN[key];
+  return (m ? '0x'+key : uuid) + (name ? ' · '+name : ' · (desconocido)');
+}
+
+// ---------- UI helpers ----------
+const $ = id => document.getElementById(id);
+const logLines = [];
+function log(msg){
+  const t = new Date().toLocaleTimeString('es-ES');
+  logLines.push('['+t+'] '+msg);
+  if (logLines.length > 600) logLines.shift();
+  const el = $('log'); el.textContent = logLines.join('\n'); el.scrollTop = el.scrollHeight;
+}
+function setVal(id, v, srcId, src){
+  const unit = $(id).querySelector('small');
+  $(id).firstChild.nodeValue = v;
+  if (srcId) $(srcId).textContent = src || '';
+}
+function pill(id, text, on){ $(id).textContent = text; $(id).classList.toggle('on', !!on); }
+
+// ---------- Checks ----------
+(function(){
+  const w = $('warn'); const msgs = [];
+  if (!('bluetooth' in navigator)) msgs.push('Este navegador no tiene Web Bluetooth. Usa Chrome en Android, Windows o Mac (no funciona en iPhone/iPad ni dentro de un APK).');
+  if (!window.isSecureContext) msgs.push('La página debe abrirse por https (GitHub Pages). Abriendo el archivo directamente no funciona el Bluetooth.');
+  if (msgs.length){ w.style.display='block'; w.innerHTML = msgs.join('<br><br>'); }
+})();
+
+// ---------- State ----------
+let trainer = null, ftmsCP = null, fecTx = null, ctrlMode = null;
+let wakeLock = null;
+const lastSeen = {pow:0, cad:0, hr:0, spd:0};
+const crank = {cps:null, csc:null};
+
+async function keepAwake(){
+  try { if ('wakeLock' in navigator){ wakeLock = await navigator.wakeLock.request('screen'); log('Pantalla: se mantendrá encendida'); } } catch(e){ log('Wake lock no disponible: '+e.message); }
+}
+document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='visible' && trainer && (!wakeLock || wakeLock.released)) keepAwake(); });
+
+// ---------- Data updates ----------
+function upPow(w, src){ lastSeen.pow=Date.now(); setVal('vPow', Math.round(w), 'sPow', src); }
+function upCad(c, src){ lastSeen.cad=Date.now(); setVal('vCad', Math.round(c), 'sCad', src); }
+function upHR(h, src){ lastSeen.hr=Date.now(); setVal('vHR', Math.round(h), 'sHR', src); }
+function upSpd(s, src){ lastSeen.spd=Date.now(); setVal('vSpd', s.toFixed(1), 'sSpd', src); }
+
+setInterval(()=>{
+  const now = Date.now();
+  if (lastSeen.pow && now-lastSeen.pow>4000) setVal('vPow','--');
+  if (lastSeen.cad && now-lastSeen.cad>4000) setVal('vCad','0');
+  if (lastSeen.hr  && now-lastSeen.hr >5000) setVal('vHR','--');
+}, 1000);
+
+function crankCadence(key, revs, time1024, src){
+  const prev = crank[key];
+  crank[key] = {revs, t:time1024, at:Date.now()};
+  if (!prev) return;
+  const dR = (revs - prev.revs + 65536) % 65536;
+  const dT = ((time1024 - prev.t + 65536) % 65536) / 1024;
+  if (dR>0 && dT>0){ const c = dR/dT*60; if (c<250) upCad(c, src); }
+}
+
+// Cycling Power Measurement 0x2A63
+function onCPS(dv){
+  const flags = dv.getUint16(0,true);
+  upPow(dv.getInt16(2,true), 'Cycling Power');
+  let o = 4;
+  if (flags & 0x01) o += 1;
+  if (flags & 0x04) o += 2;
+  if (flags & 0x10) o += 6;
+  if (flags & 0x20 && dv.byteLength >= o+4) crankCadence('cps', dv.getUint16(o,true), dv.getUint16(o+2,true), 'Cycling Power');
+}
+
+// CSC Measurement 0x2A5B
+function onCSC(dv){
+  const flags = dv.getUint8(0); let o = 1;
+  if (flags & 0x01) o += 6;
+  if (flags & 0x02 && dv.byteLength >= o+4) crankCadence('csc', dv.getUint16(o,true), dv.getUint16(o+2,true), 'CSC');
+}
+
+// FTMS Indoor Bike Data 0x2AD2
+function onFTMS(dv){
+  const f = dv.getUint16(0,true); let o = 2;
+  if (!(f & 0x0001)){ upSpd(dv.getUint16(o,true)/100, 'FTMS'); o+=2; }
+  if (f & 0x0002) o+=2;
+  if (f & 0x0004){ upCad(dv.getUint16(o,true)/2, 'FTMS'); o+=2; }
+  if (f & 0x0008) o+=2;
+  if (f & 0x0010) o+=3;
+  if (f & 0x0020) o+=2;
+  if (f & 0x0040){ upPow(dv.getInt16(o,true), 'FTMS'); o+=2; }
+  if (f & 0x0080) o+=2;
+  if (f & 0x0100) o+=5;
+  if (f & 0x0200){ const h = dv.getUint8(o); if (h) upHR(h,'FTMS'); o+=1; }
+}
+
+function onFTMSCP(dv){
+  const b = [...new Uint8Array(dv.buffer)];
+  if (b[0]===0x80){
+    const res = {1:'OK',2:'no soportado',3:'parámetro inválido',4:'falló',5:'sin control'}[b[2]] || b[2];
+    log('FTMS respuesta a 0x'+b[1].toString(16).padStart(2,'0')+': '+res);
+  } else log('FTMS CP: '+hex(b));
+}
+
+// Heart Rate 0x2A37
+function onHR(dv, src){
+  const f = dv.getUint8(0);
+  const h = (f & 0x01) ? dv.getUint16(1,true) : dv.getUint8(1);
+  if (h) upHR(h, src);
+}
+
+// FE-C over BLE
+const fecSeenPages = new Set();
+function onFEC(dv){
+  const b = [...new Uint8Array(dv.buffer)];
+  let i = 0;
+  while (i < b.length){
+    if (b[i] !== 0xA4){ i++; continue; }
+    const len = b[i+1], id = b[i+2];
+    const msg = b.slice(i, i+len+4);
+    i += len + 4;
+    if ((id===0x4E || id===0x4F) && msg.length>=12){
+      const p = msg.slice(4,12);
+      const page = p[0];
+      if (!fecSeenPages.has(page)){ fecSeenPages.add(page); log('FE-C página recibida: 0x'+page.toString(16)+' → '+hex(p)); }
+      if (page===0x19){
+        if (p[2]!==0xFF) upCad(p[2], 'FE-C');
+        const w = p[5] | ((p[6] & 0x0F) << 8);
+        if (w !== 0xFFF) upPow(w, 'FE-C');
+      } else if (page===0x10){
+        const sp = (p[4] | (p[5]<<8)) / 1000 * 3.6;
+        if (sp>=0 && sp<120) upSpd(sp, 'FE-C');
+        if (p[6]!==0xFF && p[6]>0) upHR(p[6], 'FE-C');
+      } else if (page===0x47){
+        log('FE-C estado de comando: '+hex(p));
+      }
+    } else if (id===0x40){
+      log('FE-C respuesta canal: '+hex(msg));
+    }
+  }
+}
+
+function hex(arr){ return arr.map(x=>x.toString(16).padStart(2,'0')).join(' '); }
+
+// ---------- Connection ----------
+async function trySub(server, svcUuid, chrUuid, fn){
+  try{
+    const svc = await server.getPrimaryService(svcUuid);
+    const ch = await svc.getCharacteristic(chrUuid);
+    ch.addEventListener('characteristicvaluechanged', e => { try{ fn(e.target.value); }catch(err){ log('Error leyendo '+label(ch.uuid)+': '+err.message); } });
+    await ch.startNotifications();
+    log('✓ Recibiendo '+label(ch.uuid));
+    return ch;
+  }catch(e){ return null; }
+}
+
+async function writeChar(ch, bytes){
+  const data = new Uint8Array(bytes);
+  if (ch.properties.write && ch.writeValueWithResponse) return ch.writeValueWithResponse(data);
+  if (ch.writeValueWithoutResponse) return ch.writeValueWithoutResponse(data);
+  return ch.writeValue(data);
+}
+
+async function connectTrainer(){
+  try{
+    const device = await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:OPTIONAL});
+    log('Dispositivo elegido: '+(device.name||'(sin nombre)'));
+    device.addEventListener('gattserverdisconnected', ()=>{
+      log('⚠ Rodillo desconectado'); pill('pTrainer','Rodillo: desconectado'); pill('pCtrl','Control: —');
+      ftmsCP=null; fecTx=null; ctrlMode=null; setCtrlEnabled(false);
+    });
+    const server = await device.gatt.connect();
+    trainer = device;
+    pill('pTrainer','Rodillo: '+(device.name||'conectado'), true);
+    log('Conectado. Servicios accesibles:');
+
+    const services = await server.getPrimaryServices();
+    for (const s of services){
+      log('■ '+label(s.uuid));
+      let chars = [];
+      try{ chars = await s.getCharacteristics(); }catch(e){}
+      for (const c of chars){
+        const p = c.properties;
+        const props = ['read','write','writeWithoutResponse','notify','indicate'].filter(k=>p[k]).join(',');
+        let extra = '';
+        if (p.read && /^00002a2[4-9]/.test(c.uuid)){
+          try{ const v = await c.readValue(); extra = ' = "'+new TextDecoder().decode(v.buffer).replace(/\0/g,'')+'"'; }catch(e){}
+        }
+        log('   · '+label(c.uuid)+' ['+props+']'+extra);
+      }
+    }
+
+    // Datos
+    await trySub(server, 0x1818, 0x2a63, onCPS);
+    await trySub(server, 0x1816, 0x2a5b, onCSC);
+    await trySub(server, 0x1826, 0x2ad2, onFTMS);
+    await trySub(server, 0x180d, 0x2a37, dv=>onHR(dv,'rodillo'));
+
+    // Control FTMS
+    try{
+      const svc = await server.getPrimaryService(0x1826);
+      ftmsCP = await svc.getCharacteristic(0x2ad9);
+      ftmsCP.addEventListener('characteristicvaluechanged', e=>onFTMSCP(e.target.value));
+      await ftmsCP.startNotifications();
+      await writeChar(ftmsCP,[0x00]); log('FTMS: solicitado control');
+      await writeChar(ftmsCP,[0x07]); log('FTMS: start');
+      ctrlMode = 'FTMS';
+    }catch(e){ ftmsCP = null; }
+
+    // Control FE-C
+    try{
+      const svc = await server.getPrimaryService(FEC_SVC);
+      const rx = await svc.getCharacteristic(FEC_RX);
+      rx.addEventListener('characteristicvaluechanged', e=>onFEC(e.target.value));
+      await rx.startNotifications();
+      log('✓ Recibiendo FE-C');
+      fecTx = await svc.getCharacteristic(FEC_TX);
+      if (!ctrlMode) ctrlMode = 'FE-C';
+    }catch(e){ fecTx = null; }
+
+    if (ctrlMode){
+      pill('pCtrl','Control: '+ctrlMode, true); setCtrlEnabled(true);
+      log('➜ Modo de control: '+ctrlMode+(ftmsCP&&fecTx?' (también disponible FE-C)':''));
+    } else {
+      pill('pCtrl','Control: no encontrado');
+      log('➜ No se encontró FTMS ni FE-C. Copia este registro y pásaselo a Claude.');
+    }
+    keepAwake();
+  }catch(e){
+    log('Error: '+e.message);
+  }
+}
+
+async function connectHR(){
+  try{
+    const d = await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
+    const s = await d.gatt.connect();
+    d.addEventListener('gattserverdisconnected', ()=>{ log('⚠ Pulsómetro desconectado'); pill('pHR','Pulso: desconectado'); });
+    const ok = await trySub(s, 0x180d, 0x2a37, dv=>onHR(dv,'pulsómetro'));
+    pill('pHR','Pulso: '+(d.name||'conectado'), !!ok);
+  }catch(e){ log('Pulsómetro: '+e.message); }
+}
+
+// ---------- Control ----------
+function fecMsg(page){
+  const m = [0xA4, 0x09, 0x4F, 0x05, ...page];
+  m.push(m.reduce((a,b)=>a^b,0));
+  return m;
+}
+
+async function setPower(w){
+  w = Math.max(0, Math.min(2000, Math.round(w)));
+  $('inW').value = w;
+  try{
+    if (ctrlMode==='FTMS' && ftmsCP){
+      await writeChar(ftmsCP,[0x05, w & 0xFF, (w>>8) & 0xFF]);
+    } else if (fecTx){
+      const v = w*4;
+      await writeChar(fecTx, fecMsg([0x31,0xFF,0xFF,0xFF,0xFF,0xFF, v & 0xFF, (v>>8) & 0xFF]));
+    } else return;
+    $('vTgt').textContent = w+' W';
+    log('→ ERG '+w+' W ('+ctrlMode+')');
+  }catch(e){ log('Error al fijar vatios: '+e.message); }
+}
+
+async function setGrade(g){
+  g = Math.max(-15, Math.min(20, Number(g)));
+  try{
+    if (ctrlMode==='FTMS' && ftmsCP){
+      const v = Math.round(g*100) & 0xFFFF;
+      await writeChar(ftmsCP,[0x11, 0x00,0x00, v & 0xFF, (v>>8) & 0xFF, 40, 51]);
+    } else if (fecTx){
+      const v = Math.round((g+200)*100);
+      await writeChar(fecTx, fecMsg([0x33,0xFF,0xFF,0xFF,0xFF, v & 0xFF, (v>>8) & 0xFF, 0x50]));
+    } else return;
+    $('vTgt').textContent = g+' %';
+    log('→ Pendiente '+g+' % ('+ctrlMode+')');
+  }catch(e){ log('Error al fijar pendiente: '+e.message); }
+}
+
+function setCtrlEnabled(on){ ['btnW','btnWm','btnWp','btnG','btnFree'].forEach(id=>$(id).disabled=!on); }
+
+// ---------- Events ----------
+$('btnTrainer').onclick = connectTrainer;
+$('btnHR').onclick = connectHR;
+$('btnW').onclick  = ()=>setPower(+$('inW').value);
+$('btnWm').onclick = ()=>setPower(+$('inW').value-25);
+$('btnWp').onclick = ()=>setPower(+$('inW').value+25);
+$('btnG').onclick  = ()=>setGrade(+$('inG').value);
+$('btnFree').onclick = ()=>setGrade(0);
+$('btnCopy').onclick = async ()=>{
+  try{ await navigator.clipboard.writeText(logLines.join('\n')); log('Registro copiado al portapapeles'); }
+  catch(e){ log('No se pudo copiar: selecciona el texto a mano'); }
+};
+$('btnClear').onclick = ()=>{ logLines.length=0; $('log').textContent=''; };
+
+log('Listo. Pedalea un poco para despertar el rodillo y pulsa "Conectar rodillo".');
+</script>
+</body>
