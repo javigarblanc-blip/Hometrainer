@@ -3,405 +3,1026 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f1115">
-<title>Prueba de rodillo</title>
+<meta name="theme-color" content="#0d0f14">
+<title>Hometrainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0f1115; --card:#181b22; --line:#262a33; --txt:#e8eaee; --mut:#8a909c;
-    --acc:#ff7a1a; --ok:#3ecf8e; --warn:#ffb020; --err:#ff5470;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px;padding-bottom:40px}
-  h1{font-size:20px;margin:0 0 4px}
-  .sub{color:var(--mut);font-size:13px;margin-bottom:14px}
-  .warn{background:#3a2a10;border:1px solid var(--warn);color:#ffd27a;padding:10px 12px;border-radius:10px;margin-bottom:12px;display:none}
-  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  button{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:15px;font-weight:600;cursor:pointer}
-  button.pri{background:var(--acc);border-color:var(--acc);color:#111}
-  button:disabled{opacity:.4}
-  .status{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  .pill{font-size:12px;padding:5px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--mut)}
-  .pill.on{color:var(--ok);border-color:var(--ok)}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
-  .tile .lab{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
-  .tile .val{font-size:40px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
-  .tile .val small{font-size:15px;color:var(--mut);font-weight:600;margin-left:3px}
-  .tile .src{font-size:11px;color:var(--mut)}
-  .tile.big{grid-column:1/-1}
-  .tile.big .val{font-size:64px;color:var(--acc)}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:14px}
-  .card h2{font-size:14px;margin:0 0 10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
-  .ctl{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-  input[type=number]{width:90px;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:11px;font-size:16px}
-  #log{background:#0a0c10;border:1px solid var(--line);border-radius:10px;padding:10px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;max-height:320px;overflow:auto;color:#b9c0cc}
+:root{
+  --bg:#0d0f14;--card:#161a22;--card2:#1d222c;--line:#2a303c;--txt:#eef0f4;--mut:#8b93a3;
+  --acc:#ff7a1a;--ok:#3ecf8e;--err:#ff5470;--hr:#ff5c7a;
+  --hf:'Barlow Condensed',system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 system-ui,-apple-system,Roboto,sans-serif}
+body{padding-bottom:calc(78px + env(safe-area-inset-bottom));background:radial-gradient(120% 60% at 50% -10%,#24180f 0%,var(--bg) 60%) fixed}
+.screen{display:none;padding:14px 14px 20px;max-width:720px;margin:0 auto}
+.screen.on{display:block}
+h1{font:800 32px/1.05 var(--hf);margin:8px 0 14px;letter-spacing:.01em}
+h2{font:800 22px/1.1 var(--hf);margin:0 0 10px;letter-spacing:.03em;text-transform:uppercase}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
+.mut{color:var(--mut)} .small{font-size:12px}
+.btn{border:1px solid var(--line);background:var(--card2);color:var(--txt);border-radius:14px;padding:12px 14px;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit}
+.btn.acc{background:var(--acc);border-color:var(--acc);color:#16110c}
+.btn.ghost{background:transparent}
+.btn.red{color:var(--err);border-color:#5a2633}
+.btn.block{width:100%}
+.btn:disabled{opacity:.4}
+.row{display:flex;gap:10px;align-items:center}
+.wrap{flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.big-btn{display:flex;gap:12px;align-items:center;background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:16px 14px;cursor:pointer;text-align:left;color:var(--txt);width:100%;font-family:inherit}
+.big-btn b{font:800 21px/1 var(--hf);display:block;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+.big-btn span{font-size:13px;color:var(--mut)}
+.big-btn svg{flex:none;color:var(--acc)}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border-radius:99px;border:1px solid var(--line);background:var(--card);font-size:13px;color:var(--mut);cursor:pointer;font-family:inherit}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:#555c6b}
+.chip.on{color:var(--txt);border-color:#2f5f49} .chip.on .dot{background:var(--ok)}
+.chip.wait .dot{background:#ffb020}
+.stat b{font:800 32px/1 var(--hf);display:block;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.bar{height:10px;border-radius:6px;background:var(--card2);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#3b8cff,var(--acc));border-radius:6px}
+nav{position:fixed;left:0;right:0;bottom:0;background:rgba(13,15,20,.96);border-top:1px solid var(--line);display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:5}
+nav button{flex:1;background:none;border:0;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;padding:5px 0;cursor:pointer;font-family:inherit}
+nav button.on{color:var(--acc)}
+.wk{cursor:pointer}
+.wk b{font:800 22px/1.1 var(--hf);display:block;letter-spacing:.02em}
+.prof{width:100%;height:46px;display:block;margin-top:10px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.tag{font-size:11px;padding:3px 9px;border-radius:99px;background:var(--card2);color:var(--mut);border:1px solid var(--line)}
+input,select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:11px;font-size:16px;width:100%;font-family:inherit}
+label{display:block;font-size:11px;color:var(--mut);margin:12px 0 5px;text-transform:uppercase;letter-spacing:.06em}
+.warn{background:#33250f;border:1px solid #8a6216;color:#ffd27a;padding:10px 12px;border-radius:12px;margin-bottom:12px;font-size:14px}
+.act{cursor:pointer}
+.act b{font:800 20px/1.1 var(--hf);display:block}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 10px;margin:12px 0}
+.kv div span{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.kv div b{font:800 24px/1.1 var(--hf);font-variant-numeric:tabular-nums}
+.empty{text-align:center;color:var(--mut);padding:30px 10px}
+/* sheet */
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;z-index:30}
+.sheet.on{display:flex}
+.sheet-in{background:var(--card);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;width:100%;max-width:720px;margin:0 auto;max-height:92vh;overflow:auto;padding:18px 16px calc(20px + env(safe-area-inset-bottom));position:relative}
+.sheet-x{position:absolute;right:12px;top:12px;background:var(--card2);border:1px solid var(--line);color:var(--txt);width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer}
+.chart{width:100%;height:150px;display:block;background:var(--bg);border:1px solid var(--line);border-radius:14px}
+/* player */
+#player{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;flex-direction:column;padding:calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));overflow:auto}
+#player.on{display:flex}
+.ptop{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ptop b{font:800 22px/1.1 var(--hf);letter-spacing:.02em}
+.pint{display:flex;justify-content:space-between;align-items:flex-end;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 14px;margin:10px 0 4px}
+.pint .t{font:800 48px/1 var(--hf);font-variant-numeric:tabular-nums}
+.pmain{text-align:center;padding:2px 0 4px}
+.pw{font:800 120px/.95 var(--hf);font-variant-numeric:tabular-nums;transition:color .3s}
+.pw small{font-size:30px;color:var(--mut);margin-left:4px}
+.pstate{font:700 20px var(--hf);color:var(--mut);letter-spacing:.03em;min-height:24px}
+.pstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.pstats .card{margin:0;padding:10px 6px;text-align:center}
+.pstats b{font:800 36px/1 var(--hf);display:block;font-variant-numeric:tabular-nums}
+.pstats span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+#pChart{width:100%;height:120px;display:block;background:var(--card);border:1px solid var(--line);border-radius:14px}
+.pnext{font-size:13px;color:var(--mut);margin:6px 2px 0;min-height:18px}
+.pctl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.pctl .btn{padding:15px 4px;font-size:16px}
+.pctl .full{grid-column:1/-1}
+#toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#262c38;color:var(--txt);padding:11px 16px;border-radius:12px;font-size:14px;z-index:50;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw;text-align:center;border:1px solid var(--line)}
+#toast.on{opacity:1}
 </style>
 </head>
 <body>
-<h1>Prueba de rodillo</h1>
-<div class="sub">Paso 0 · Comprobar conexión, datos y control del rodillo</div>
 
-<div class="warn" id="warn"></div>
+<!-- ================= INICIO ================= -->
+<section class="screen on" id="sHome">
+  <h1 id="hello">Hola</h1>
+  <div id="homeWarn"></div>
+  <div id="recover"></div>
 
-<div class="row">
-  <button class="pri" id="btnTrainer">Conectar rodillo</button>
-  <button id="btnHR">Conectar pulsómetro</button>
-</div>
-
-<div class="status">
-  <span class="pill" id="pTrainer">Rodillo: —</span>
-  <span class="pill" id="pCtrl">Control: —</span>
-  <span class="pill" id="pHR">Pulso: —</span>
-</div>
-
-<div class="grid">
-  <div class="tile big"><div class="lab">Potencia</div><div class="val" id="vPow">--<small>W</small></div><div class="src" id="sPow"></div></div>
-  <div class="tile"><div class="lab">Cadencia</div><div class="val" id="vCad">--<small>rpm</small></div><div class="src" id="sCad"></div></div>
-  <div class="tile"><div class="lab">Pulso</div><div class="val" id="vHR">--<small>ppm</small></div><div class="src" id="sHR"></div></div>
-  <div class="tile"><div class="lab">Velocidad</div><div class="val" id="vSpd">--<small>km/h</small></div><div class="src" id="sSpd"></div></div>
-  <div class="tile"><div class="lab">Objetivo</div><div class="val" id="vTgt">--</div><div class="src">último comando</div></div>
-</div>
-
-<div class="card">
-  <h2>Control</h2>
-  <div class="ctl">
-    <input type="number" id="inW" value="150" min="0" max="1500" step="5">
-    <button id="btnW" disabled>Fijar vatios (ERG)</button>
-    <button id="btnWm" disabled>−25</button>
-    <button id="btnWp" disabled>+25</button>
+  <div class="row wrap" style="margin-bottom:14px">
+    <button class="chip" id="cTrainer" onclick="connectTrainer()"><i class="dot"></i><span>Rodillo</span></button>
+    <button class="chip" id="cHR" onclick="connectHR()"><i class="dot"></i><span>Pulso</span></button>
+    <button class="chip" id="cCad" onclick="connectCad()"><i class="dot"></i><span>Cadencia</span></button>
   </div>
-  <div class="ctl">
-    <input type="number" id="inG" value="3" min="-10" max="20" step="0.5">
-    <button id="btnG" disabled>Fijar pendiente %</button>
-    <button id="btnFree" disabled>Libre (0 %)</button>
+
+  <div class="card">
+    <h2>Hoy</h2>
+    <div class="mut" style="margin:-4px 0 12px">Sin plan para hoy. ¿Qué te apetece?</div>
+    <div class="grid2">
+      <button class="big-btn" onclick="show('sWk')">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM12 17.5V14l-3-3 4-3 2 3h2"/></svg>
+        <div><b>A rodar</b><span>Elegir entreno</span></div>
+      </button>
+      <button class="big-btn" onclick="startSession(null)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 17l5-6 4 4 4-7 5 9"/></svg>
+        <div><b>Libre</b><span>Sin estructura</span></div>
+      </button>
+    </div>
   </div>
+
+  <div class="card">
+    <h2>Esta semana</h2>
+    <div class="grid3">
+      <div class="stat"><b id="wN">0</b><span>Entrenos</span></div>
+      <div class="stat"><b id="wT">0'</b><span>Tiempo</span></div>
+      <div class="stat"><b id="wTSS">0</b><span>TSS</span></div>
+    </div>
+    <div class="bar"><i id="wBar" style="width:0%"></i></div>
+    <div class="small mut" id="wCmp" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card" id="lastCard" style="display:none"></div>
+</section>
+
+<!-- ================= WORKOUTS ================= -->
+<section class="screen" id="sWk">
+  <h1>Workouts</h1>
+  <div class="small mut" style="margin:-8px 0 12px" id="wkFtp"></div>
+  <div id="wkList"></div>
+</section>
+
+<!-- ================= ACTIVIDAD ================= -->
+<section class="screen" id="sAct">
+  <h1>Actividad</h1>
+  <div id="actList"></div>
+</section>
+
+<!-- ================= AJUSTES ================= -->
+<section class="screen" id="sCfg">
+  <h1>Ajustes</h1>
+  <div class="card">
+    <h2>Tú</h2>
+    <div class="grid3">
+      <div><label>FTP (W)</label><input type="number" id="iFtp" inputmode="numeric"></div>
+      <div><label>Peso (kg)</label><input type="number" id="iPeso" inputmode="decimal"></div>
+      <div><label>FC máx</label><input type="number" id="iFc" inputmode="numeric"></div>
+    </div>
+    <label>Nombre (para el saludo)</label><input type="text" id="iName">
+  </div>
+  <div class="card">
+    <h2>Rodillo</h2>
+    <label>Fuente de potencia</label>
+    <select id="iSrc">
+      <option value="cp">Cycling Power (recomendado)</option>
+      <option value="fec">FE-C</option>
+    </select>
+    <div class="small mut" style="margin-top:8px">Calibra el X3 con su app antes de las sesiones importantes, tras 10 minutos de calentamiento y siempre con la misma presión de rueda.</div>
+  </div>
+  <div class="card">
+    <h2>Strava</h2>
+    <div id="stravaState" class="small mut" style="margin-bottom:6px"></div>
+    <label>Client ID</label><input type="text" id="iSid" inputmode="numeric">
+    <label>Client Secret</label><input type="password" id="iSsec">
+    <div class="row" style="margin-top:12px">
+      <button class="btn acc" onclick="stravaConnect()">Conectar Strava</button>
+      <button class="btn ghost" onclick="stravaDisconnect()">Desconectar</button>
+    </div>
+    <div class="small mut" style="margin-top:10px">En strava.com/settings/api, el "Authorization Callback Domain" debe ser <b id="cbDom"></b></div>
+  </div>
+  <div class="card">
+    <h2>Datos</h2>
+    <div class="row wrap">
+      <button class="btn" onclick="exportData()">Exportar copia</button>
+      <button class="btn" onclick="$('impFile').click()">Importar copia</button>
+      <input type="file" id="impFile" accept=".json" style="display:none" onchange="importData(this)">
+    </div>
+    <div class="small mut" style="margin-top:10px" id="ver"></div>
+  </div>
+</section>
+
+<nav>
+  <button class="on" data-s="sHome" onclick="show('sHome')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</button>
+  <button data-s="sWk" onclick="show('sWk')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 20h3v-6H3zM10.5 20h3V8h-3zM18 20h3V4h-3z"/></svg>Workouts</button>
+  <button data-s="sAct" onclick="show('sAct')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Actividad</button>
+  <button data-s="sCfg" onclick="show('sCfg')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</button>
+</nav>
+
+<!-- ================= PLAYER ================= -->
+<div id="player">
+  <div class="ptop">
+    <div style="min-width:0"><b id="pName"></b><div class="small mut" id="pSub"></div></div>
+    <button class="btn ghost" onclick="askEnd()">Terminar</button>
+  </div>
+  <div id="pWarn"></div>
+  <div class="pint">
+    <div><div class="small mut" id="pIntName"></div><div class="t" id="pIntT">--:--</div></div>
+    <div style="text-align:right"><div class="small mut" id="pTgtLab">Objetivo</div><div class="t" id="pTgt" style="color:var(--acc)">--</div></div>
+  </div>
+  <div class="pmain">
+    <div class="pw" id="pPow">0<small>W</small></div>
+    <div class="pstate" id="pState"></div>
+  </div>
+  <div class="pstats">
+    <div class="card"><b id="pHR" style="color:var(--hr)">--</b><span>Pulso</span></div>
+    <div class="card"><b id="pCad">--</b><span id="pCadLab">Cadencia</span></div>
+    <div class="card"><b id="pTime">0:00</b><span>Tiempo</span></div>
+  </div>
+  <div id="pChartBox"></div>
+  <div class="pnext" id="pNext"></div>
+  <div class="pctl" id="pCtl"></div>
 </div>
 
-<div class="card">
-  <h2>Registro técnico</h2>
-  <div class="row"><button id="btnCopy">Copiar registro</button><button id="btnClear">Limpiar</button></div>
-  <div id="log"></div>
+<div class="sheet" id="sheet" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet-in"><button class="sheet-x" onclick="closeSheet()">✕</button><div id="sheetBody"></div></div>
 </div>
+<div id="toast"></div>
 
 <script>
-// ---------- UUIDs ----------
+'use strict';
+const VER = '0.3 · Fase 1';
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const now = () => Date.now();
+
+// ================= STORAGE =================
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ toast('No queda espacio para guardar'); return false; } },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+const S = Object.assign({ftp:200, peso:75, fcmax:180, name:'', src:'cp', sid:'', ssec:'', strava:null}, LS.get('ht_settings', {}));
+const saveS = () => LS.set('ht_settings', S);
+let ACTS = LS.get('ht_acts', []);
+const saveActs = () => LS.set('ht_acts', ACTS);
+
+// ================= UI HELPERS =================
+let toastT;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2600); }
+function show(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.s === id));
+  if (id === 'sHome') renderHome();
+  if (id === 'sWk') renderWorkouts();
+  if (id === 'sAct') renderActs();
+  if (id === 'sCfg') renderCfg();
+  window.scrollTo(0, 0);
+}
+function openSheet(html){ $('sheetBody').innerHTML = html; $('sheet').classList.add('on'); }
+function closeSheet(){ $('sheet').classList.remove('on'); }
+const pad = n => String(n).padStart(2, '0');
+function clock(s){ s = Math.max(0, Math.round(s)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return h ? `${h}:${pad(m)}:${pad(x)}` : `${m}:${pad(x)}`; }
+function dur(s){ const m = Math.round(s/60); if (m < 60) return m + "'"; return Math.floor(m/60) + 'h ' + pad(m%60) + "'"; }
+const fdate = ts => new Date(ts).toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short'});
+const ftime = ts => new Date(ts).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ================= ZONES =================
+const ZH = ['#555', '#7d8799', '#3b8cff', '#2fc98a', '#f5c518', '#ff8a1a', '#ff4d5e'];
+const zone = r => r < .55 ? 1 : r < .76 ? 2 : r < .91 ? 3 : r < 1.06 ? 4 : r < 1.21 ? 5 : 6;
+const zcol = w => ZH[zone(w / S.ftp)];
+
+// ================= WORKOUTS =================
+const M  = (min, p, n) => ({d:Math.round(min*60), p, n});
+const R  = (min, p0, p1, n) => ({d:Math.round(min*60), p0, p1, n});
+const Sx = (sec, p, n) => ({d:sec, p, n});
+const rep = (k, a) => Array.from({length:k}, () => a).flat();
+const WARM = [R(10, .45, .75, 'Calentamiento')];
+const COOL = m => [R(m, .55, .4, 'Vuelta a la calma')];
+const WORKOUTS = [
+  {id:'rec', name:'Recuperación', tipo:'Recuperación', desc:'Rodaje muy suave para soltar piernas.',
+    segs:[R(5,.4,.55,'Calentamiento'), M(20,.55,'Suave'), R(5,.5,.4,'Vuelta a la calma')]},
+  {id:'z2', name:'Fondo Z2 · 45 min', tipo:'Resistencia', desc:'Base aeróbica a ritmo cómodo y constante.',
+    segs:[R(5,.45,.65,'Calentamiento'), M(35,.68,'Z2'), R(5,.6,.45,'Vuelta a la calma')]},
+  {id:'tempo', name:'Tempo 3×10', tipo:'Tempo', desc:'Ritmo sostenido, exigente pero controlado.',
+    segs:[...WARM, ...rep(3,[M(10,.82,'Tempo'), M(4,.55,'Recupera')]), ...COOL(6)]},
+  {id:'ss', name:'Sweet Spot 2×15', tipo:'Sweet Spot', desc:'Mucho beneficio por minuto, justo por debajo del umbral.',
+    segs:[...WARM, M(15,.9,'Sweet Spot'), M(5,.55,'Recupera'), M(15,.9,'Sweet Spot'), ...COOL(5)]},
+  {id:'umbral', name:'Umbral 2×20', tipo:'Umbral', desc:'El clásico para subir el FTP.',
+    segs:[R(12,.45,.8,'Calentamiento'), M(20,.97,'Umbral'), M(5,.55,'Recupera'), M(20,.97,'Umbral'), ...COOL(6)]},
+  {id:'vo2', name:'VO2 5×3', tipo:'VO2max', desc:'Series duras para el motor aeróbico máximo.',
+    segs:[R(12,.45,.8,'Calentamiento'), ...rep(5,[M(3,1.15,'VO2'), M(3,.55,'Recupera')]), ...COOL(8)]},
+  {id:'3030', name:'30/30 · 2×10', tipo:'Anaeróbico', desc:'Cambios de ritmo cortos. En un rodillo de rueda el ERG tarda unos segundos en ajustarse: es normal.',
+    segs:[R(12,.45,.8,'Calentamiento'), ...rep(10,[Sx(30,1.3,'ON'), Sx(30,.5,'OFF')]), M(5,.55,'Recupera'), ...rep(10,[Sx(30,1.3,'ON'), Sx(30,.5,'OFF')]), ...COOL(8)]},
+  {id:'rampa', name:'Test de rampa (FTP)', tipo:'Test', test:true, desc:'3 min a 100 W y después +20 W cada minuto hasta que no puedas más. Tu FTP estimado es el 75 % de tu mejor minuto. Pedalea hasta el final: cuando no puedas mantener los vatios, pulsa Terminar.',
+    segs:[{d:180, w:100, n:'Calentamiento'}, ...Array.from({length:30}, (_, i) => ({d:60, w:120 + 20*i, n:'Escalón ' + (i+1)}))]},
+];
+const wkById = id => WORKOUTS.find(w => w.id === id);
+function segW(seg, t, mult = 1){
+  let w;
+  if (seg.w != null) w = seg.w;
+  else if (seg.p0 != null) w = S.ftp * (seg.p0 + (seg.p1 - seg.p0) * Math.min(1, t / seg.d));
+  else w = S.ftp * seg.p;
+  return Math.round(w * mult);
+}
+const wkDur = wk => wk.segs.reduce((a, s) => a + s.d, 0);
+function wkTSS(wk){
+  let s4 = 0, n = 0;
+  for (const seg of wk.segs) for (let t = 0; t < seg.d; t += 5){ const r = segW(seg, t) / S.ftp; s4 += r**4 * 5; n += 5; }
+  const IF = Math.pow(s4 / n, .25);
+  return Math.round(n / 3600 * IF * IF * 100);
+}
+function wkTop(wk){ let m = 0; wk.segs.forEach(s => { m = Math.max(m, segW(s, 0), segW(s, s.d)); }); return Math.max(m * 1.12, S.ftp * 1.2); }
+function profilePaths(wk, H, top){
+  let x = 0; const out = [];
+  for (const s of wk.segs){
+    const w0 = segW(s, 0), w1 = segW(s, s.d);
+    out.push(`<path d="M${x},${H}L${x},${(H - w0/top*H).toFixed(1)}L${x+s.d},${(H - w1/top*H).toFixed(1)}L${x+s.d},${H}Z" fill="${zcol((w0+w1)/2)}" opacity=".8"/>`);
+    x += s.d;
+  }
+  return out.join('');
+}
+function profileSVG(wk, cls = 'prof'){
+  const H = 100, top = wkTop(wk);
+  return `<svg class="${cls}" viewBox="0 0 ${wkDur(wk)} ${H}" preserveAspectRatio="none">${profilePaths(wk, H, top)}</svg>`;
+}
+
+// ================= BLUETOOTH =================
 const FEC_SVC = '6e40fec1-b5a3-f393-e0a9-e50e24dcca9e';
 const FEC_RX  = '6e40fec2-b5a3-f393-e0a9-e50e24dcca9e';
 const FEC_TX  = '6e40fec3-b5a3-f393-e0a9-e50e24dcca9e';
-const NUS_SVC = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const WAHOO_SVC = 'a026ee0b-0a7d-4ab3-97fa-f1500f9feb8b';
-
-const OPTIONAL = [0x1826,0x1818,0x1816,0x180d,0x180a,0x180f,0x1800,0x1801, FEC_SVC, NUS_SVC, WAHOO_SVC];
-
-const KNOWN = {
-  '1826':'FTMS (Fitness Machine)','1818':'Cycling Power','1816':'Cycling Speed & Cadence','180d':'Heart Rate',
-  '180a':'Device Information','180f':'Battery','1800':'Generic Access','1801':'Generic Attribute',
-  '2ad2':'Indoor Bike Data','2ad9':'FTMS Control Point','2acc':'FTMS Feature','2ada':'FTMS Status',
-  '2ad6':'Supported Resistance Range','2ad8':'Supported Power Range','2a63':'Cycling Power Measurement',
-  '2a65':'Cycling Power Feature','2a5d':'Sensor Location','2a66':'Cycling Power Control Point',
-  '2a5b':'CSC Measurement','2a37':'Heart Rate Measurement','2a19':'Battery Level',
-  '2a29':'Fabricante','2a24':'Modelo','2a25':'Nº serie','2a26':'Firmware','2a27':'Hardware','2a28':'Software'
-};
-KNOWN[FEC_SVC]='FE-C sobre Bluetooth (Tacx)'; KNOWN[FEC_RX]='FE-C RX (datos)'; KNOWN[FEC_TX]='FE-C TX (control)';
-KNOWN[NUS_SVC]='Nordic UART'; KNOWN[WAHOO_SVC]='Wahoo propietario';
-
-function label(uuid){
-  const m = uuid.match(/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i);
-  const key = m ? m[1].toLowerCase() : uuid.toLowerCase();
-  const name = KNOWN[key];
-  return (m ? '0x'+key : uuid) + (name ? ' · '+name : ' · (desconocido)');
+const BT = {dev:null, fecTx:null, hrDev:null, cadDev:null, cmd:null, busy:{},
+  cpP:0, cpAt:0, fecP:0, fecAt:0, spd:0, spdAt:0, hrV:0, hrAt:0, cadV:0, cadAt:0, cadSeen:false, crank:{}};
+const btOK = () => 'bluetooth' in navigator && window.isSecureContext;
+const trainerOn = () => !!(BT.dev && BT.dev.gatt.connected && BT.fecTx);
+function curPower(){
+  const t = now(), cp = t - BT.cpAt < 3000, fe = t - BT.fecAt < 3000;
+  if (S.src === 'fec') return fe ? BT.fecP : (cp ? BT.cpP : 0);
+  return cp ? BT.cpP : (fe ? BT.fecP : 0);
 }
+const curHR  = () => now() - BT.hrAt  < 5000 ? BT.hrV  : 0;
+const curCad = () => now() - BT.cadAt < 3000 ? BT.cadV : 0;
+const curSpd = () => now() - BT.spdAt < 4000 ? BT.spd  : 0;
 
-// ---------- UI helpers ----------
-const $ = id => document.getElementById(id);
-const logLines = [];
-function log(msg){
-  const t = new Date().toLocaleTimeString('es-ES');
-  logLines.push('['+t+'] '+msg);
-  if (logLines.length > 600) logLines.shift();
-  const el = $('log'); el.textContent = logLines.join('\n'); el.scrollTop = el.scrollHeight;
-}
-function setVal(id, v, srcId, src){
-  const unit = $(id).querySelector('small');
-  $(id).firstChild.nodeValue = v;
-  if (srcId) $(srcId).textContent = src || '';
-}
-function pill(id, text, on){ $(id).textContent = text; $(id).classList.toggle('on', !!on); }
-
-// ---------- Checks ----------
-(function(){
-  const w = $('warn'); const msgs = [];
-  if (!('bluetooth' in navigator)) msgs.push('Este navegador no tiene Web Bluetooth. Usa Chrome en Android, Windows o Mac (no funciona en iPhone/iPad ni dentro de un APK).');
-  if (!window.isSecureContext) msgs.push('La página debe abrirse por https (GitHub Pages). Abriendo el archivo directamente no funciona el Bluetooth.');
-  if (msgs.length){ w.style.display='block'; w.innerHTML = msgs.join('<br><br>'); }
-})();
-
-// ---------- State ----------
-let trainer = null, ftmsCP = null, fecTx = null, ctrlMode = null;
-let wakeLock = null;
-const lastSeen = {pow:0, cad:0, hr:0, spd:0};
-const crank = {cps:null, csc:null};
-
-async function keepAwake(){
-  try { if ('wakeLock' in navigator){ wakeLock = await navigator.wakeLock.request('screen'); log('Pantalla: se mantendrá encendida'); } } catch(e){ log('Wake lock no disponible: '+e.message); }
-}
-document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='visible' && trainer && (!wakeLock || wakeLock.released)) keepAwake(); });
-
-// ---------- Data updates ----------
-function upPow(w, src){ lastSeen.pow=Date.now(); setVal('vPow', Math.round(w), 'sPow', src); }
-function upCad(c, src){ lastSeen.cad=Date.now(); setVal('vCad', Math.round(c), 'sCad', src); }
-function upHR(h, src){ lastSeen.hr=Date.now(); setVal('vHR', Math.round(h), 'sHR', src); }
-function upSpd(s, src){ lastSeen.spd=Date.now(); setVal('vSpd', s.toFixed(1), 'sSpd', src); }
-
-setInterval(()=>{
-  const now = Date.now();
-  if (lastSeen.pow && now-lastSeen.pow>4000) setVal('vPow','--');
-  if (lastSeen.cad && now-lastSeen.cad>4000) setVal('vCad','0');
-  if (lastSeen.hr  && now-lastSeen.hr >5000) setVal('vHR','--');
-}, 1000);
-
-function crankCadence(key, revs, time1024, src){
-  const prev = crank[key];
-  crank[key] = {revs, t:time1024, at:Date.now()};
+function crankCad(key, revs, t){
+  const prev = BT.crank[key]; BT.crank[key] = {revs, t};
   if (!prev) return;
-  const dR = (revs - prev.revs + 65536) % 65536;
-  const dT = ((time1024 - prev.t + 65536) % 65536) / 1024;
-  if (dR>0 && dT>0){ const c = dR/dT*60; if (c<250) upCad(c, src); }
+  const dR = (revs - prev.revs + 65536) % 65536, dT = ((t - prev.t + 65536) % 65536) / 1024;
+  if (dR > 0 && dT > 0){ const c = dR / dT * 60; if (c < 220){ BT.cadV = c; BT.cadAt = now(); BT.cadSeen = true; } }
 }
-
-// Cycling Power Measurement 0x2A63
-function onCPS(dv){
-  const flags = dv.getUint16(0,true);
-  upPow(dv.getInt16(2,true), 'Cycling Power');
+function parseCP(dv, withPower, key){
+  const f = dv.getUint16(0, true);
+  if (withPower){ BT.cpP = Math.max(0, dv.getInt16(2, true)); BT.cpAt = now(); }
   let o = 4;
-  if (flags & 0x01) o += 1;
-  if (flags & 0x04) o += 2;
-  if (flags & 0x10) o += 6;
-  if (flags & 0x20 && dv.byteLength >= o+4) crankCadence('cps', dv.getUint16(o,true), dv.getUint16(o+2,true), 'Cycling Power');
+  if (f & 0x01) o += 1;
+  if (f & 0x04) o += 2;
+  if (f & 0x10) o += 6;
+  if (f & 0x20 && dv.byteLength >= o + 4) crankCad(key, dv.getUint16(o, true), dv.getUint16(o + 2, true));
 }
-
-// CSC Measurement 0x2A5B
-function onCSC(dv){
-  const flags = dv.getUint8(0); let o = 1;
-  if (flags & 0x01) o += 6;
-  if (flags & 0x02 && dv.byteLength >= o+4) crankCadence('csc', dv.getUint16(o,true), dv.getUint16(o+2,true), 'CSC');
+function parseCSC(dv){
+  const f = dv.getUint8(0); let o = 1;
+  if (f & 0x01) o += 6;
+  if (f & 0x02 && dv.byteLength >= o + 4) crankCad('csc', dv.getUint16(o, true), dv.getUint16(o + 2, true));
 }
-
-// FTMS Indoor Bike Data 0x2AD2
-function onFTMS(dv){
-  const f = dv.getUint16(0,true); let o = 2;
-  if (!(f & 0x0001)){ upSpd(dv.getUint16(o,true)/100, 'FTMS'); o+=2; }
-  if (f & 0x0002) o+=2;
-  if (f & 0x0004){ upCad(dv.getUint16(o,true)/2, 'FTMS'); o+=2; }
-  if (f & 0x0008) o+=2;
-  if (f & 0x0010) o+=3;
-  if (f & 0x0020) o+=2;
-  if (f & 0x0040){ upPow(dv.getInt16(o,true), 'FTMS'); o+=2; }
-  if (f & 0x0080) o+=2;
-  if (f & 0x0100) o+=5;
-  if (f & 0x0200){ const h = dv.getUint8(o); if (h) upHR(h,'FTMS'); o+=1; }
-}
-
-function onFTMSCP(dv){
-  const b = [...new Uint8Array(dv.buffer)];
-  if (b[0]===0x80){
-    const res = {1:'OK',2:'no soportado',3:'parámetro inválido',4:'falló',5:'sin control'}[b[2]] || b[2];
-    log('FTMS respuesta a 0x'+b[1].toString(16).padStart(2,'0')+': '+res);
-  } else log('FTMS CP: '+hex(b));
-}
-
-// Heart Rate 0x2A37
-function onHR(dv, src){
-  const f = dv.getUint8(0);
-  const h = (f & 0x01) ? dv.getUint16(1,true) : dv.getUint8(1);
-  if (h) upHR(h, src);
-}
-
-// FE-C over BLE
-const fecSeenPages = new Set();
-function onFEC(dv){
-  const b = [...new Uint8Array(dv.buffer)];
+function parseFEC(dv){
+  const b = new Uint8Array(dv.buffer);
   let i = 0;
   while (i < b.length){
     if (b[i] !== 0xA4){ i++; continue; }
-    const len = b[i+1], id = b[i+2];
-    const msg = b.slice(i, i+len+4);
+    const len = b[i+1], id = b[i+2], p = b.slice(i+4, i+12);
     i += len + 4;
-    if ((id===0x4E || id===0x4F) && msg.length>=12){
-      const p = msg.slice(4,12);
-      const page = p[0];
-      if (!fecSeenPages.has(page)){ fecSeenPages.add(page); log('FE-C página recibida: 0x'+page.toString(16)+' → '+hex(p)); }
-      if (page===0x19){
-        if (p[2]!==0xFF) upCad(p[2], 'FE-C');
-        const w = p[5] | ((p[6] & 0x0F) << 8);
-        if (w !== 0xFFF) upPow(w, 'FE-C');
-      } else if (page===0x10){
-        const sp = (p[4] | (p[5]<<8)) / 1000 * 3.6;
-        if (sp>=0 && sp<120) upSpd(sp, 'FE-C');
-        if (p[6]!==0xFF && p[6]>0) upHR(p[6], 'FE-C');
-      } else if (page===0x47){
-        log('FE-C estado de comando: '+hex(p));
-      }
-    } else if (id===0x40){
-      log('FE-C respuesta canal: '+hex(msg));
+    if ((id !== 0x4E && id !== 0x4F) || p.length < 8) continue;
+    if (p[0] === 0x19){
+      const w = p[5] | ((p[6] & 0x0F) << 8);
+      if (w !== 0xFFF){ BT.fecP = w; BT.fecAt = now(); }
+      if (p[2] !== 0xFF){ BT.cadV = p[2]; BT.cadAt = now(); BT.cadSeen = true; }
+    } else if (p[0] === 0x10){
+      const sp = (p[4] | (p[5] << 8)) / 1000 * 3.6;
+      if (sp >= 0 && sp < 120){ BT.spd = sp; BT.spdAt = now(); }
     }
   }
 }
+function parseHR(dv){
+  const f = dv.getUint8(0);
+  const h = (f & 0x01) ? dv.getUint16(1, true) : dv.getUint8(1);
+  if (h > 0){ BT.hrV = h; BT.hrAt = now(); }
+}
 
-function hex(arr){ return arr.map(x=>x.toString(16).padStart(2,'0')).join(' '); }
+// Cola de escritura (evita "GATT operation already in progress")
+let wq = Promise.resolve();
+function fecWrite(page){
+  wq = wq.then(async () => {
+    const ch = BT.fecTx; if (!ch) return;
+    const m = [0xA4, 0x09, 0x4F, 0x05, ...page]; m.push(m.reduce((a, b) => a ^ b, 0));
+    const u = new Uint8Array(m);
+    if (ch.properties.write && ch.writeValueWithResponse) await ch.writeValueWithResponse(u);
+    else if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(u);
+    else await ch.writeValue(u);
+  }).catch(e => console.warn('FE-C', e));
+  return wq;
+}
+function sendERG(w){
+  w = Math.max(0, Math.min(2000, Math.round(w)));
+  BT.cmd = {t:'erg', v:w};
+  const v = w * 4;
+  return fecWrite([0x31, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, v & 0xFF, (v >> 8) & 0xFF]);
+}
+function sendGrade(g){
+  g = Math.max(-10, Math.min(20, g));
+  BT.cmd = {t:'grade', v:g};
+  const v = Math.round((g + 200) * 100);
+  return fecWrite([0x33, 0xFF, 0xFF, 0xFF, 0xFF, v & 0xFF, (v >> 8) & 0xFF, 0x50]);
+}
+function sendUserCfg(){
+  const u = Math.round((S.peso || 75) * 100), bike = 180; // 9 kg en unidades de 0,05 kg
+  return fecWrite([0x37, u & 0xFF, (u >> 8) & 0xFF, 0xFF, ((bike & 0x0F) << 4) | 0x0F, (bike >> 4) & 0xFF, 70, 0x00]);
+}
+function resendCmd(){ if (!BT.cmd) return; BT.cmd.t === 'erg' ? sendERG(BT.cmd.v) : sendGrade(BT.cmd.v); }
 
-// ---------- Connection ----------
-async function trySub(server, svcUuid, chrUuid, fn){
+async function setupTrainer(dev){
+  const server = await dev.gatt.connect();
+  let ok = false;
   try{
-    const svc = await server.getPrimaryService(svcUuid);
-    const ch = await svc.getCharacteristic(chrUuid);
-    ch.addEventListener('characteristicvaluechanged', e => { try{ fn(e.target.value); }catch(err){ log('Error leyendo '+label(ch.uuid)+': '+err.message); } });
-    await ch.startNotifications();
-    log('✓ Recibiendo '+label(ch.uuid));
-    return ch;
-  }catch(e){ return null; }
+    const s = await server.getPrimaryService(0x1818);
+    const ch = await s.getCharacteristic(0x2a63);
+    ch.addEventListener('characteristicvaluechanged', e => parseCP(e.target.value, true, 'cp'));
+    await ch.startNotifications(); ok = true;
+  }catch(e){}
+  try{
+    const s = await server.getPrimaryService(FEC_SVC);
+    const rx = await s.getCharacteristic(FEC_RX);
+    rx.addEventListener('characteristicvaluechanged', e => parseFEC(e.target.value));
+    await rx.startNotifications();
+    BT.fecTx = await s.getCharacteristic(FEC_TX); ok = true;
+  }catch(e){ BT.fecTx = null; }
+  if (!ok) throw new Error('el rodillo no ofrece datos compatibles');
+  BT.dev = dev;
+  sendUserCfg();
+  updateConn();
 }
-
-async function writeChar(ch, bytes){
-  const data = new Uint8Array(bytes);
-  if (ch.properties.write && ch.writeValueWithResponse) return ch.writeValueWithResponse(data);
-  if (ch.writeValueWithoutResponse) return ch.writeValueWithoutResponse(data);
-  return ch.writeValue(data);
-}
-
 async function connectTrainer(){
+  if (!btOK()) return toast('Abre la app en Chrome (Android o PC) desde https');
+  if (trainerOn()) return toast('El rodillo ya está conectado');
   try{
-    const device = await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:OPTIONAL});
-    log('Dispositivo elegido: '+(device.name||'(sin nombre)'));
-    device.addEventListener('gattserverdisconnected', ()=>{
-      log('⚠ Rodillo desconectado'); pill('pTrainer','Rodillo: desconectado'); pill('pCtrl','Control: —');
-      ftmsCP=null; fecTx=null; ctrlMode=null; setCtrlEnabled(false);
+    const dev = await navigator.bluetooth.requestDevice({
+      filters:[{namePrefix:'Think'}, {services:[FEC_SVC]}, {services:[0x1826]}],
+      optionalServices:[FEC_SVC, 0x1818, 0x180a]
     });
-    const server = await device.gatt.connect();
-    trainer = device;
-    pill('pTrainer','Rodillo: '+(device.name||'conectado'), true);
-    log('Conectado. Servicios accesibles:');
-
-    const services = await server.getPrimaryServices();
-    for (const s of services){
-      log('■ '+label(s.uuid));
-      let chars = [];
-      try{ chars = await s.getCharacteristics(); }catch(e){}
-      for (const c of chars){
-        const p = c.properties;
-        const props = ['read','write','writeWithoutResponse','notify','indicate'].filter(k=>p[k]).join(',');
-        let extra = '';
-        if (p.read && /^00002a2[4-9]/.test(c.uuid)){
-          try{ const v = await c.readValue(); extra = ' = "'+new TextDecoder().decode(v.buffer).replace(/\0/g,'')+'"'; }catch(e){}
-        }
-        log('   · '+label(c.uuid)+' ['+props+']'+extra);
-      }
-    }
-
-    // Datos
-    await trySub(server, 0x1818, 0x2a63, onCPS);
-    await trySub(server, 0x1816, 0x2a5b, onCSC);
-    await trySub(server, 0x1826, 0x2ad2, onFTMS);
-    await trySub(server, 0x180d, 0x2a37, dv=>onHR(dv,'rodillo'));
-
-    // Control FTMS
-    try{
-      const svc = await server.getPrimaryService(0x1826);
-      ftmsCP = await svc.getCharacteristic(0x2ad9);
-      ftmsCP.addEventListener('characteristicvaluechanged', e=>onFTMSCP(e.target.value));
-      await ftmsCP.startNotifications();
-      await writeChar(ftmsCP,[0x00]); log('FTMS: solicitado control');
-      await writeChar(ftmsCP,[0x07]); log('FTMS: start');
-      ctrlMode = 'FTMS';
-    }catch(e){ ftmsCP = null; }
-
-    // Control FE-C
-    try{
-      const svc = await server.getPrimaryService(FEC_SVC);
-      const rx = await svc.getCharacteristic(FEC_RX);
-      rx.addEventListener('characteristicvaluechanged', e=>onFEC(e.target.value));
-      await rx.startNotifications();
-      log('✓ Recibiendo FE-C');
-      fecTx = await svc.getCharacteristic(FEC_TX);
-      if (!ctrlMode) ctrlMode = 'FE-C';
-    }catch(e){ fecTx = null; }
-
-    if (ctrlMode){
-      pill('pCtrl','Control: '+ctrlMode, true); setCtrlEnabled(true);
-      log('➜ Modo de control: '+ctrlMode+(ftmsCP&&fecTx?' (también disponible FE-C)':''));
-    } else {
-      pill('pCtrl','Control: no encontrado');
-      log('➜ No se encontró FTMS ni FE-C. Copia este registro y pásaselo a Claude.');
-    }
-    keepAwake();
-  }catch(e){
-    log('Error: '+e.message);
-  }
+    dev.addEventListener('gattserverdisconnected', () => onLost(dev, setupTrainer, 'Rodillo'));
+    setChip('cTrainer', 'wait', 'Conectando…');
+    await setupTrainer(dev);
+    toast('Rodillo conectado');
+  }catch(e){ updateConn(); if (e.name !== 'NotFoundError') toast('Rodillo: ' + e.message); }
 }
-
+async function setupHR(d){
+  const s = await d.gatt.connect();
+  const sv = await s.getPrimaryService('heart_rate');
+  const ch = await sv.getCharacteristic('heart_rate_measurement');
+  ch.addEventListener('characteristicvaluechanged', e => parseHR(e.target.value));
+  await ch.startNotifications();
+  BT.hrDev = d; updateConn();
+}
 async function connectHR(){
+  if (!btOK()) return toast('Abre la app en Chrome desde https');
+  if (BT.hrDev && BT.hrDev.gatt.connected) return toast('El pulso ya está conectado');
   try{
     const d = await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
-    const s = await d.gatt.connect();
-    d.addEventListener('gattserverdisconnected', ()=>{ log('⚠ Pulsómetro desconectado'); pill('pHR','Pulso: desconectado'); });
-    const ok = await trySub(s, 0x180d, 0x2a37, dv=>onHR(dv,'pulsómetro'));
-    pill('pHR','Pulso: '+(d.name||'conectado'), !!ok);
-  }catch(e){ log('Pulsómetro: '+e.message); }
+    d.addEventListener('gattserverdisconnected', () => onLost(d, setupHR, 'Pulsómetro'));
+    setChip('cHR', 'wait', 'Conectando…');
+    await setupHR(d); toast('Pulso conectado');
+  }catch(e){ updateConn(); if (e.name !== 'NotFoundError') toast('Pulso: ' + e.message); }
 }
-
-// ---------- Control ----------
-function fecMsg(page){
-  const m = [0xA4, 0x09, 0x4F, 0x05, ...page];
-  m.push(m.reduce((a,b)=>a^b,0));
-  return m;
-}
-
-async function setPower(w){
-  w = Math.max(0, Math.min(2000, Math.round(w)));
-  $('inW').value = w;
+async function setupCad(d){
+  const s = await d.gatt.connect();
   try{
-    if (ctrlMode==='FTMS' && ftmsCP){
-      await writeChar(ftmsCP,[0x05, w & 0xFF, (w>>8) & 0xFF]);
-    } else if (fecTx){
-      const v = w*4;
-      await writeChar(fecTx, fecMsg([0x31,0xFF,0xFF,0xFF,0xFF,0xFF, v & 0xFF, (v>>8) & 0xFF]));
-    } else return;
-    $('vTgt').textContent = w+' W';
-    log('→ ERG '+w+' W ('+ctrlMode+')');
-  }catch(e){ log('Error al fijar vatios: '+e.message); }
+    const sv = await s.getPrimaryService('cycling_speed_and_cadence');
+    const ch = await sv.getCharacteristic('csc_measurement');
+    ch.addEventListener('characteristicvaluechanged', e => parseCSC(e.target.value));
+    await ch.startNotifications();
+  }catch(e){
+    const sv = await s.getPrimaryService('cycling_power');
+    const ch = await sv.getCharacteristic('cycling_power_measurement');
+    ch.addEventListener('characteristicvaluechanged', e => parseCP(e.target.value, false, 'cad'));
+    await ch.startNotifications();
+  }
+  BT.cadDev = d; updateConn();
 }
-
-async function setGrade(g){
-  g = Math.max(-15, Math.min(20, Number(g)));
+async function connectCad(){
+  if (!btOK()) return toast('Abre la app en Chrome desde https');
+  if (BT.cadDev && BT.cadDev.gatt.connected) return toast('La cadencia ya está conectada');
   try{
-    if (ctrlMode==='FTMS' && ftmsCP){
-      const v = Math.round(g*100) & 0xFFFF;
-      await writeChar(ftmsCP,[0x11, 0x00,0x00, v & 0xFF, (v>>8) & 0xFF, 40, 51]);
-    } else if (fecTx){
-      const v = Math.round((g+200)*100);
-      await writeChar(fecTx, fecMsg([0x33,0xFF,0xFF,0xFF,0xFF, v & 0xFF, (v>>8) & 0xFF, 0x50]));
-    } else return;
-    $('vTgt').textContent = g+' %';
-    log('→ Pendiente '+g+' % ('+ctrlMode+')');
-  }catch(e){ log('Error al fijar pendiente: '+e.message); }
+    const d = await navigator.bluetooth.requestDevice({filters:[{services:['cycling_speed_and_cadence']}, {services:['cycling_power']}], optionalServices:['cycling_speed_and_cadence', 'cycling_power']});
+    d.addEventListener('gattserverdisconnected', () => onLost(d, setupCad, 'Sensor de cadencia'));
+    setChip('cCad', 'wait', 'Conectando…');
+    await setupCad(d); toast('Cadencia conectada');
+  }catch(e){ updateConn(); if (e.name !== 'NotFoundError') toast('Cadencia: ' + e.message); }
+}
+async function onLost(dev, setup, name){
+  if (dev === BT.dev) BT.fecTx = null;
+  updateConn(); renderPlayerWarn();
+  if (dev._retrying) return; dev._retrying = true;
+  for (let i = 0; i < 20; i++){
+    await sleep(2500);
+    if (dev.gatt.connected) break;
+    try{
+      await setup(dev);
+      toast(name + ' reconectado');
+      if (dev === BT.dev) resendCmd();
+      break;
+    }catch(e){}
+  }
+  dev._retrying = false;
+  updateConn(); renderPlayerWarn();
+  if (!dev.gatt.connected) toast(name + ': no se pudo reconectar');
+}
+function setChip(id, state, text){
+  const c = $(id); c.classList.toggle('on', state === 'on'); c.classList.toggle('wait', state === 'wait');
+  c.querySelector('span').textContent = text;
+}
+function updateConn(){
+  setChip('cTrainer', trainerOn() ? 'on' : '', trainerOn() ? (BT.dev.name || 'Rodillo') : 'Rodillo');
+  const hr = BT.hrDev && BT.hrDev.gatt.connected; setChip('cHR', hr ? 'on' : '', hr ? (BT.hrDev.name || 'Pulso') : 'Pulso');
+  const cd = BT.cadDev && BT.cadDev.gatt.connected; setChip('cCad', cd ? 'on' : '', cd ? (BT.cadDev.name || 'Cadencia') : 'Cadencia');
 }
 
-function setCtrlEnabled(on){ ['btnW','btnWm','btnWp','btnG','btnFree'].forEach(id=>$(id).disabled=!on); }
+// ================= WAKE LOCK =================
+let wl = null, wlOK = true;
+async function wake(){
+  if (!('wakeLock' in navigator)){ wlOK = false; return; }
+  try{ if (!wl || wl.released){ wl = await navigator.wakeLock.request('screen'); } wlOK = true; }
+  catch(e){ wlOK = false; }
+  renderPlayerWarn();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && P.on) wake(); });
 
-// ---------- Events ----------
-$('btnTrainer').onclick = connectTrainer;
-$('btnHR').onclick = connectHR;
-$('btnW').onclick  = ()=>setPower(+$('inW').value);
-$('btnWm').onclick = ()=>setPower(+$('inW').value-25);
-$('btnWp').onclick = ()=>setPower(+$('inW').value+25);
-$('btnG').onclick  = ()=>setGrade(+$('inG').value);
-$('btnFree').onclick = ()=>setGrade(0);
-$('btnCopy').onclick = async ()=>{
-  try{ await navigator.clipboard.writeText(logLines.join('\n')); log('Registro copiado al portapapeles'); }
-  catch(e){ log('No se pudo copiar: selecciona el texto a mano'); }
-};
-$('btnClear').onclick = ()=>{ logLines.length=0; $('log').textContent=''; };
+// ================= PLAYER =================
+const P = {on:false};
+function newRec(){ return {t:[], p:[], hr:[], c:[], s:[], wt:[]}; }
+function startSession(wk){
+  if (!trainerOn()){
+    openSheet(`<h2>Conecta el rodillo</h2><p class="mut">Pedalea un poco para despertarlo y pulsa conectar.</p>
+      <button class="btn acc block" onclick="closeSheet();connectTrainer().then(()=>{ if(trainerOn()) startSession(${wk ? `wkById('${wk.id}')` : 'null'}) })">Conectar rodillo</button>`);
+    return;
+  }
+  closeSheet();
+  Object.assign(P, {
+    on:true, wk, free:!wk, mode: wk ? 'erg' : 'grade', mult:1, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
+    wt:0, segI:0, running:false, auto:true, manual:false, zero:0,
+    start:null, rec:newRec(), dist:0, lastSent:null, lastChart:0, p3:[],
+    starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
+    total: wk ? wkDur(wk) : 0
+  });
+  $('pName').textContent = wk ? wk.name : 'Rodar libre';
+  $('pSub').textContent = wk ? (wk.test ? 'Test · hasta agotarte' : dur(P.total) + ' · FTP ' + S.ftp + ' W') : 'Controla tú la resistencia';
+  $('player').classList.add('on');
+  renderCtl();
+  wake();
+  if (P.mode === 'grade') sendGrade(P.grade); else applyTarget(true);
+  clearInterval(P.tick); P.tick = setInterval(tick, 1000);
+  render();
+}
+function curSeg(){
+  if (!P.wk) return null;
+  while (P.segI < P.wk.segs.length - 1 && P.wt >= P.starts[P.segI + 1]) P.segI++;
+  return P.wk.segs[P.segI];
+}
+function target(){
+  if (P.free) return P.ergW;
+  const seg = curSeg(); return segW(seg, P.wt - P.starts[P.segI], P.mult);
+}
+function applyTarget(force){
+  if (P.mode !== 'erg') return;
+  const w = target();
+  if (force || w !== P.lastSent){ P.lastSent = w; sendERG(w); }
+}
+function tick(){
+  if (!P.on) return;
+  const pw = curPower(), sp = curSpd();
+  // pausa automática
+  P.zero = (pw <= 0 && sp < 1) ? P.zero + 1 : 0;
+  if (!P.manual){
+    if (P.running && P.zero >= 4){ P.running = false; P.auto = true; }
+    else if (!P.running && P.auto && pw > 15){ P.running = true; P.auto = false; if (!P.start) P.start = now(); }
+  }
+  if (P.running){
+    const r = P.rec;
+    r.t.push(Math.round((now() - P.start) / 1000));
+    r.p.push(Math.round(pw)); r.hr.push(curHR()); r.c.push(Math.round(curCad())); r.s.push(Math.round(sp * 10)); r.wt.push(P.wt);
+    P.dist += sp / 3.6;
+    P.wt++;
+    if (P.wk && P.wt >= P.total){ toast(P.wk.test ? 'Fin del test' : '¡Entreno completado!'); return endSession(); }
+    if (r.p.length % 30 === 0) saveLive();
+  }
+  P.p3.push(pw); if (P.p3.length > 3) P.p3.shift();
+  applyTarget(false);
+  render();
+}
+function render(){
+  const pw = P.p3.length ? Math.round(P.p3.reduce((a, b) => a + b, 0) / P.p3.length) : 0;
+  const tgt = P.mode === 'erg' || P.wk ? target() : null;
+  $('pPow').innerHTML = pw + '<small>W</small>';
+  $('pPow').style.color = pw > 0 ? zcol(pw) : 'var(--txt)';
+  const hr = curHR(); $('pHR').textContent = hr || '--';
+  if (BT.cadSeen){ $('pCadLab').textContent = 'Cadencia'; $('pCad').textContent = Math.round(curCad()) || 0; }
+  else { $('pCadLab').textContent = 'Media W'; const p = P.rec.p; $('pCad').textContent = p.length ? Math.round(p.reduce((a, b) => a + b, 0) / p.length) : '--'; }
+  $('pTime').textContent = clock(P.rec.p.length);
 
-log('Listo. Pedalea un poco para despertar el rodillo y pulsa "Conectar rodillo".');
+  // estado
+  let st = '';
+  if (P.manual) st = 'En pausa';
+  else if (!P.running) st = P.rec.p.length ? 'Pausa automática · pedalea para seguir' : 'Empieza a pedalear';
+  else if (P.mode === 'grade' && P.wk) st = 'Pendiente ' + P.grade.toFixed(1).replace('.', ',') + ' %';
+  else if (P.wk && P.mult !== 1) st = 'Intensidad ' + Math.round(P.mult * 100) + ' %';
+  $('pState').textContent = st;
+
+  // intervalo
+  if (P.wk){
+    const seg = curSeg(), left = P.starts[P.segI] + seg.d - P.wt;
+    $('pIntName').textContent = `${seg.n} · ${P.segI + 1}/${P.wk.segs.length}`;
+    $('pIntT').textContent = clock(left);
+    $('pTgtLab').textContent = P.mode === 'erg' ? 'Objetivo' : 'Guía';
+    $('pTgt').textContent = tgt + ' W';
+    const nx = P.wk.segs[P.segI + 1];
+    $('pNext').textContent = nx ? `Siguiente: ${clock(nx.d)} · ${nx.n} · ${segW(nx, 0, P.mult)}${nx.p0 != null ? '→' + segW(nx, nx.d, P.mult) : ''} W` : 'Último intervalo';
+  } else {
+    $('pIntName').textContent = 'Distancia';
+    $('pIntT').textContent = (P.dist / 1000).toFixed(1).replace('.', ',') + ' km';
+    $('pTgtLab').textContent = P.mode === 'erg' ? 'Vatios' : 'Pendiente';
+    $('pTgt').textContent = P.mode === 'erg' ? P.ergW + ' W' : P.grade.toFixed(1).replace('.', ',') + ' %';
+    $('pNext').textContent = '';
+  }
+  if (now() - P.lastChart > 2000){ P.lastChart = now(); drawPlayerChart(); }
+}
+function polyline(xs, ys, top, H, color, w){
+  const n = xs.length; if (n < 2) return '';
+  const step = Math.max(1, Math.ceil(n / 700)); let pts = '';
+  for (let i = 0; i < n; i += step) pts += xs[i] + ',' + (H - Math.min(ys[i], top) / top * H).toFixed(1) + ' ';
+  return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${w}" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+}
+function drawPlayerChart(){
+  const H = 100, r = P.rec;
+  let svg;
+  if (P.wk){
+    const top = Math.max(wkTop(P.wk) * P.mult, ...r.p.slice(-600), 1);
+    svg = `<svg id="pChart" viewBox="0 0 ${P.total} ${H}" preserveAspectRatio="none">${profilePaths(P.wk, H, top)}
+      ${polyline(r.wt, r.p, top, H, '#ffffff', 1.6)}
+      <line x1="${P.wt}" x2="${P.wt}" y1="0" y2="${H}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" opacity=".7"/></svg>`;
+  } else {
+    const win = 600, n = r.p.length, from = Math.max(0, n - win);
+    const ps = r.p.slice(from), xs = ps.map((_, i) => i);
+    const top = Math.max(S.ftp * 1.2, ...ps, 1) * 1.05;
+    const ftpY = (H - S.ftp / top * H).toFixed(1);
+    svg = `<svg id="pChart" viewBox="0 0 ${win} ${H}" preserveAspectRatio="none">
+      <line x1="0" x2="${win}" y1="${ftpY}" y2="${ftpY}" stroke="#f5c518" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" opacity=".5"/>
+      ${polyline(xs, ps, top, H, 'var(--acc)', 2)}</svg>`;
+  }
+  $('pChartBox').innerHTML = svg;
+}
+function renderCtl(){
+  const b = [];
+  b.push(`<button class="btn" onclick="togglePause()">${P.manual ? 'Seguir' : 'Pausa'}</button>`);
+  if (P.wk) b.push(`<button class="btn" onclick="skipSeg()">Saltar</button>`);
+  if (P.mode === 'grade'){
+    b.push(`<button class="btn" onclick="adj(-1)">−0,5 %</button>`, `<button class="btn" onclick="adj(1)">+0,5 %</button>`);
+  } else if (P.wk){
+    b.push(`<button class="btn" onclick="adj(-1)">−5 %</button>`, `<button class="btn" onclick="adj(1)">+5 %</button>`);
+  } else {
+    b.push(`<button class="btn" onclick="adj(-1)">−10 W</button>`, `<button class="btn" onclick="adj(1)">+10 W</button>`);
+  }
+  if (!P.wk) b.push(`<button class="btn" onclick="adj(0)">${P.mode === 'erg' ? 'Reset' : '0 %'}</button>`);
+  b.push(`<button class="btn full" onclick="toggleMode()">Modo: <span style="color:var(--acc)">${P.mode === 'erg' ? 'ERG (vatios fijos)' : 'Pendiente (tú controlas)'}</span> · cambiar</button>`);
+  $('pCtl').innerHTML = b.join('');
+}
+function togglePause(){
+  P.manual = !P.manual;
+  if (P.manual){ P.running = false; P.auto = false; }
+  else { P.auto = true; }
+  wake(); renderCtl(); render();
+}
+function skipSeg(){
+  if (!P.wk) return;
+  if (P.segI >= P.wk.segs.length - 1){ if (confirm('Es el último intervalo. ¿Terminar el entreno?')) endSession(); return; }
+  P.wt = P.starts[P.segI + 1]; curSeg(); applyTarget(true); render(); drawPlayerChart();
+}
+function adj(dir){
+  if (P.mode === 'grade'){
+    P.grade = dir === 0 ? 0 : Math.max(-5, Math.min(15, P.grade + dir * .5));
+    sendGrade(P.grade);
+  } else if (P.wk){
+    P.mult = Math.max(.5, Math.min(1.5, Math.round((P.mult + dir * .05) * 100) / 100));
+    applyTarget(true);
+  } else {
+    P.ergW = dir === 0 ? Math.round(S.ftp * .6 / 5) * 5 : Math.max(50, Math.min(1000, P.ergW + dir * 10));
+    applyTarget(true);
+  }
+  wake(); render();
+}
+function toggleMode(){
+  P.mode = P.mode === 'erg' ? 'grade' : 'erg';
+  if (P.mode === 'grade') sendGrade(P.grade); else applyTarget(true);
+  wake(); renderCtl(); render();
+}
+function renderPlayerWarn(){
+  if (!P.on){ $('pWarn').innerHTML = ''; return; }
+  const w = [];
+  if (!trainerOn()) w.push('Rodillo desconectado · intentando reconectar…');
+  if (!wlOK) w.push('La pantalla puede apagarse sola. Desactiva el ahorro de batería o alarga el tiempo de pantalla.');
+  $('pWarn').innerHTML = w.map(x => `<div class="warn" style="margin:8px 0 0">${x}</div>`).join('');
+}
+setInterval(() => { if (P.on && P.running && BT.cmd) resendCmd(); }, 10000);
+
+function askEnd(){
+  if (!P.rec.p.length){ if (confirm('No has empezado a rodar. ¿Salir?')) endSession(); return; }
+  if (confirm('¿Terminar la sesión?')) endSession();
+}
+function saveLive(){
+  LS.set('ht_live', {start:P.start, name:$('pName').textContent, wkId:P.wk ? P.wk.id : null, rec:P.rec, dist:P.dist, ftp:S.ftp});
+}
+function endSession(){
+  clearInterval(P.tick); P.on = false;
+  $('player').classList.remove('on');
+  try{ wl && wl.release(); }catch(e){}
+  if (BT.cmd && BT.cmd.t === 'erg') sendGrade(0); // deja el rodillo suave
+  LS.del('ht_live');
+  renderPlayerWarn();
+  if (P.rec.p.length < 30){ toast('Sesión muy corta: no se guarda'); renderHome(); return; }
+  const meta = finalize(P.start, $('pName').textContent, P.wk ? P.wk.id : null, P.rec, P.dist);
+  renderHome();
+  showAct(meta.id, true);
+}
+
+// ================= ACTIVITIES =================
+function bestAvg(p, win){
+  if (p.length < win) return null;
+  let s = 0, best = 0;
+  for (let i = 0; i < p.length; i++){ s += p[i]; if (i >= win) s -= p[i - win]; if (i >= win - 1) best = Math.max(best, s / win); }
+  return Math.round(best);
+}
+function calcStats(rec, ftp){
+  const p = rec.p, n = p.length;
+  const sum = p.reduce((a, b) => a + b, 0), avg = n ? sum / n : 0;
+  let np = avg;
+  if (n >= 30){
+    let roll = 0, acc = 0, cnt = 0;
+    for (let i = 0; i < n; i++){ roll += p[i]; if (i >= 30) roll -= p[i - 30]; if (i >= 29){ acc += Math.pow(roll / 30, 4); cnt++; } }
+    np = Math.pow(acc / cnt, .25);
+  }
+  const IF = np / ftp, tss = n / 3600 * IF * IF * 100;
+  const hrs = rec.hr.filter(x => x > 0), cads = rec.c.filter(x => x > 0);
+  return {
+    dur:n, avgP:Math.round(avg), np:Math.round(np), ifv:Math.round(IF * 100) / 100, tss:Math.round(tss),
+    maxP: n ? Math.max(...p) : 0,
+    avgHr: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null,
+    maxHr: hrs.length ? Math.max(...hrs) : null,
+    avgC: cads.length ? Math.round(cads.reduce((a, b) => a + b, 0) / cads.length) : null,
+    kj: Math.round(sum / 1000),
+    best: {5:bestAvg(p, 5), 60:bestAvg(p, 60), 300:bestAvg(p, 300), 1200:bestAvg(p, 1200), 3600:bestAvg(p, 3600)}
+  };
+}
+function finalize(start, name, wkId, rec, dist){
+  const id = start || now();
+  const meters = rec.s.reduce((a, v) => a + v / 10 / 3.6, 0);
+  const meta = Object.assign({id, date:id, name, wkId, dist:Math.round(meters / 10) / 100, ftp:S.ftp, strava:null}, calcStats(rec, S.ftp));
+  LS.set('ht_act_' + id, rec);
+  ACTS = ACTS.filter(a => a.id !== id); ACTS.push(meta); ACTS.sort((a, b) => b.date - a.date); saveActs();
+  return meta;
+}
+function renderActs(){
+  if (!ACTS.length){ $('actList').innerHTML = '<div class="empty">Todavía no hay sesiones.<br>¡A rodar!</div>'; return; }
+  $('actList').innerHTML = ACTS.map(a => `
+    <div class="card act" onclick="showAct(${a.id})">
+      <div class="row" style="justify-content:space-between"><b>${esc(a.name)}</b>${a.strava ? '<span class="tag" style="color:#fc6a2c">Strava ✓</span>' : ''}</div>
+      <div class="small mut">${fdate(a.date)} · ${ftime(a.date)}</div>
+      <div class="kv" style="margin-bottom:0">
+        <div><span>Tiempo</span><b>${dur(a.dur)}</b></div>
+        <div><span>TSS</span><b>${a.tss}</b></div>
+        <div><span>NP</span><b>${a.np} W</b></div>
+      </div>
+    </div>`).join('');
+}
+function actChart(rec){
+  const H = 100, n = rec.p.length; if (n < 2) return '';
+  const top = Math.max(...rec.p, S.ftp * 1.2) * 1.05;
+  const hrTop = Math.max(...rec.hr, 100) * 1.08;
+  const xs = rec.p.map((_, i) => i);
+  // potencia suavizada a 10 s para que se lea mejor
+  const sm = []; let s = 0;
+  for (let i = 0; i < n; i++){ s += rec.p[i]; if (i >= 10) s -= rec.p[i - 10]; sm.push(s / Math.min(i + 1, 10)); }
+  const ftpY = (H - S.ftp / top * H).toFixed(1);
+  return `<svg class="chart" viewBox="0 0 ${n} ${H}" preserveAspectRatio="none">
+    <line x1="0" x2="${n}" y1="${ftpY}" y2="${ftpY}" stroke="#f5c518" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" opacity=".45"/>
+    ${rec.hr.some(x => x > 0) ? polyline(xs, rec.hr, hrTop, H, 'var(--hr)', 1.3) : ''}
+    ${polyline(xs, sm, top, H, 'var(--acc)', 1.8)}</svg>
+    <div class="row small mut" style="gap:14px;margin-top:6px"><span><b style="color:var(--acc)">━</b> Potencia (10 s)</span>${rec.hr.some(x => x > 0) ? '<span><b style="color:var(--hr)">━</b> Pulso</span>' : ''}<span><b style="color:#f5c518">┅</b> FTP</span></div>`;
+}
+function showAct(id, fresh){
+  const a = ACTS.find(x => x.id === id); if (!a) return;
+  const rec = LS.get('ht_act_' + id, null);
+  const test = a.wkId === 'rampa' && a.best && a.best[60];
+  const ftpEst = test ? Math.round(a.best[60] * .75) : null;
+  const bests = [[5, '5 s'], [60, '1 min'], [300, '5 min'], [1200, '20 min'], [3600, '60 min']].filter(([k]) => a.best && a.best[k]);
+  openSheet(`
+    ${fresh ? '<div class="small" style="color:var(--ok);font-weight:700;margin-bottom:4px">✓ Sesión guardada</div>' : ''}
+    <h2 style="margin-right:40px">${esc(a.name)}</h2>
+    <div class="small mut" style="margin-top:-6px">${fdate(a.date)} · ${ftime(a.date)} · FTP ${a.ftp} W</div>
+    ${test ? `<div class="card" style="margin:12px 0;border-color:#8a6216"><div class="small mut">Mejor minuto: ${a.best[60]} W</div><div style="font:800 28px var(--hf)">FTP estimado: ${ftpEst} W</div>
+      <button class="btn acc block" style="margin-top:8px" onclick="setFtp(${ftpEst})">Usar ${ftpEst} W como mi FTP</button></div>` : ''}
+    <div class="kv">
+      <div><span>Tiempo</span><b>${clock(a.dur)}</b></div>
+      <div><span>TSS</span><b>${a.tss}</b></div>
+      <div><span>IF</span><b>${a.ifv.toFixed(2).replace('.', ',')}</b></div>
+      <div><span>Media</span><b>${a.avgP} W</b></div>
+      <div><span>NP</span><b>${a.np} W</b></div>
+      <div><span>Máx</span><b>${a.maxP} W</b></div>
+      <div><span>FC media</span><b>${a.avgHr || '--'}</b></div>
+      <div><span>FC máx</span><b>${a.maxHr || '--'}</b></div>
+      <div><span>Trabajo</span><b>${a.kj} kJ</b></div>
+      ${a.avgC ? `<div><span>Cadencia</span><b>${a.avgC}</b></div>` : ''}
+      <div><span>Distancia</span><b>${String(a.dist).replace('.', ',')} km</b></div>
+    </div>
+    ${rec ? actChart(rec) : ''}
+    ${bests.length ? `<div class="small mut" style="margin:14px 0 4px;text-transform:uppercase;letter-spacing:.06em">Mejores potencias</div>
+      <div class="row wrap" style="gap:8px">${bests.map(([k, l]) => `<span class="tag" style="font-size:13px">${l}: <b style="color:var(--txt)">${a.best[k]} W</b></span>`).join('')}</div>` : ''}
+    <div class="grid2" style="margin-top:16px">
+      ${a.strava ? `<a class="btn" style="text-align:center;text-decoration:none;color:#fc6a2c" href="https://www.strava.com/activities/${a.strava}" target="_blank">Ver en Strava</a>`
+                 : `<button class="btn acc" id="upBtn" onclick="stravaUpload(${a.id})">Subir a Strava</button>`}
+      <button class="btn" onclick="downloadTCX(${a.id})">Descargar TCX</button>
+    </div>
+    <button class="btn red block" style="margin-top:10px" onclick="delAct(${a.id})">Borrar sesión</button>
+  `);
+}
+function setFtp(v){ S.ftp = v; saveS(); toast('FTP actualizado a ' + v + ' W'); closeSheet(); renderHome(); }
+function delAct(id){
+  if (!confirm('¿Borrar esta sesión? No se puede deshacer.')) return;
+  ACTS = ACTS.filter(a => a.id !== id); saveActs(); LS.del('ht_act_' + id);
+  closeSheet(); renderActs(); renderHome(); toast('Sesión borrada');
+}
+
+// ================= TCX =================
+function buildTCX(a, rec){
+  const iso = t => new Date(a.date + t * 1000).toISOString();
+  let d = 0, pts = '';
+  for (let i = 0; i < rec.p.length; i++){
+    const ms = rec.s[i] / 10 / 3.6; d += ms;
+    pts += `<Trackpoint><Time>${iso(rec.t[i])}</Time><DistanceMeters>${d.toFixed(1)}</DistanceMeters>` +
+      (rec.hr[i] > 0 ? `<HeartRateBpm><Value>${rec.hr[i]}</Value></HeartRateBpm>` : '') +
+      (rec.c[i] > 0 ? `<Cadence>${rec.c[i]}</Cadence>` : '') +
+      `<Extensions><ns3:TPX><ns3:Speed>${ms.toFixed(2)}</ns3:Speed><ns3:Watts>${rec.p[i]}</ns3:Watts></ns3:TPX></Extensions></Trackpoint>\n`;
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
+<Activities><Activity Sport="Biking"><Id>${iso(0)}</Id>
+<Lap StartTime="${iso(0)}"><TotalTimeSeconds>${a.dur}</TotalTimeSeconds><DistanceMeters>${d.toFixed(1)}</DistanceMeters><Calories>${a.kj}</Calories>${a.avgHr ? `<AverageHeartRateBpm><Value>${a.avgHr}</Value></AverageHeartRateBpm><MaximumHeartRateBpm><Value>${a.maxHr}</Value></MaximumHeartRateBpm>` : ''}<Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod>
+<Track>
+${pts}</Track></Lap></Activity></Activities></TrainingCenterDatabase>`;
+}
+function downloadTCX(id){
+  const a = ACTS.find(x => x.id === id), rec = LS.get('ht_act_' + id, null);
+  if (!a || !rec) return toast('No se encuentran los datos');
+  const blob = new Blob([buildTCX(a, rec)], {type:'application/vnd.garmin.tcx+xml'});
+  const url = URL.createObjectURL(blob), el = document.createElement('a');
+  el.href = url; el.download = 'hometrainer_' + new Date(a.date).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.tcx';
+  document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// ================= STRAVA =================
+const REDIRECT = location.origin + location.pathname;
+function stravaConnect(){
+  readCfg();
+  if (!S.sid || !S.ssec) return toast('Rellena Client ID y Client Secret');
+  location.href = 'https://www.strava.com/oauth/authorize?client_id=' + encodeURIComponent(S.sid) +
+    '&redirect_uri=' + encodeURIComponent(REDIRECT) + '&response_type=code&approval_prompt=auto&scope=activity:write,activity:read';
+}
+function stravaDisconnect(){ S.strava = null; saveS(); renderCfg(); toast('Strava desconectado'); }
+async function stravaTokenReq(params){
+  const r = await fetch('https://www.strava.com/oauth/token', {method:'POST', body:new URLSearchParams(Object.assign({client_id:S.sid, client_secret:S.ssec}, params))});
+  const j = await r.json();
+  if (!j.access_token) throw new Error(j.message || 'Strava no devolvió token');
+  S.strava = {at:j.access_token, rt:j.refresh_token, exp:j.expires_at, who:(j.athlete && j.athlete.firstname) || (S.strava && S.strava.who) || ''};
+  saveS();
+}
+async function stravaCallback(){
+  const u = new URL(location.href), code = u.searchParams.get('code'), err = u.searchParams.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', REDIRECT);
+  if (err) return toast('Strava: permiso denegado');
+  if (!(u.searchParams.get('scope') || '').includes('activity:write')) toast('Marca el permiso para subir actividades');
+  try{ await stravaTokenReq({code, grant_type:'authorization_code'}); toast('Strava conectado'); show('sCfg'); }
+  catch(e){ toast('Strava: ' + e.message); }
+}
+async function stravaToken(){
+  if (!S.strava) throw new Error('conecta Strava en Ajustes');
+  if (now() / 1000 > S.strava.exp - 120) await stravaTokenReq({grant_type:'refresh_token', refresh_token:S.strava.rt});
+  return S.strava.at;
+}
+async function stravaUpload(id){
+  const a = ACTS.find(x => x.id === id), rec = LS.get('ht_act_' + id, null);
+  const btn = $('upBtn');
+  if (!a || !rec) return toast('No se encuentran los datos');
+  try{
+    if (btn){ btn.disabled = true; btn.textContent = 'Subiendo…'; }
+    const tk = await stravaToken();
+    const fd = new FormData();
+    fd.append('file', new Blob([buildTCX(a, rec)], {type:'application/xml'}), 'ht_' + id + '.tcx');
+    fd.append('data_type', 'tcx'); fd.append('name', a.name); fd.append('trainer', '1');
+    fd.append('description', `Hometrainer · NP ${a.np} W · IF ${a.ifv} · TSS ${a.tss}`);
+    fd.append('external_id', 'ht_' + id);
+    const r = await fetch('https://www.strava.com/api/v3/uploads', {method:'POST', headers:{Authorization:'Bearer ' + tk}, body:fd});
+    let j = await r.json();
+    if (!r.ok) throw new Error(j.message || ('error ' + r.status));
+    for (let i = 0; i < 15 && !j.activity_id && !j.error; i++){
+      await sleep(2000);
+      j = await (await fetch('https://www.strava.com/api/v3/uploads/' + j.id, {headers:{Authorization:'Bearer ' + tk}})).json();
+    }
+    if (j.error) throw new Error(j.error);
+    if (!j.activity_id) throw new Error('Strava sigue procesando; mira la app de Strava en un rato');
+    a.strava = j.activity_id; saveActs();
+    toast('Subida a Strava ✓'); showAct(id); renderActs();
+  }catch(e){
+    toast('Strava: ' + e.message);
+    if (btn){ btn.disabled = false; btn.textContent = 'Subir a Strava'; }
+  }
+}
+
+// ================= HOME =================
+function weekStart(d = new Date()){ const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return x.getTime(); }
+function renderHome(){
+  const h = new Date().getHours();
+  $('hello').textContent = (h < 13 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches') + (S.name ? ', ' + S.name : '');
+  const w = [];
+  if (!('bluetooth' in navigator)) w.push('Este navegador no tiene Bluetooth web. Usa Chrome en Android o PC.');
+  else if (!window.isSecureContext) w.push('Abre la app desde https (GitHub Pages).');
+  $('homeWarn').innerHTML = w.map(x => `<div class="warn">${x}</div>`).join('');
+
+  const live = LS.get('ht_live', null);
+  $('recover').innerHTML = live && live.rec && live.rec.p.length >= 30 && !P.on ? `<div class="warn">
+      Hay una sesión sin guardar (${esc(live.name)}, ${clock(live.rec.p.length)}).
+      <div class="row" style="margin-top:8px"><button class="btn acc" onclick="recoverLive(true)">Guardar</button><button class="btn ghost" onclick="recoverLive(false)">Descartar</button></div></div>` : '';
+
+  const ws = weekStart(), prev = ws - 7 * 864e5;
+  const cur = ACTS.filter(a => a.date >= ws), last = ACTS.filter(a => a.date >= prev && a.date < ws);
+  const tss = cur.reduce((s, a) => s + a.tss, 0), tssL = last.reduce((s, a) => s + a.tss, 0);
+  $('wN').textContent = cur.length;
+  $('wT').textContent = dur(cur.reduce((s, a) => s + a.dur, 0));
+  $('wTSS').textContent = tss;
+  $('wBar').style.width = Math.min(100, tssL ? tss / tssL * 100 : (tss ? 100 : 0)) + '%';
+  $('wCmp').textContent = tssL ? `Semana pasada: ${tssL} TSS · ${Math.round(tss / tssL * 100)} % hecho` : '';
+
+  const a = ACTS[0];
+  $('lastCard').style.display = a ? 'block' : 'none';
+  if (a) $('lastCard').innerHTML = `<h2>Última sesión</h2><div class="act" onclick="showAct(${a.id})"><b>${esc(a.name)}</b>
+    <div class="small mut">${fdate(a.date)} · ${dur(a.dur)} · ${a.np} W NP · TSS ${a.tss}${a.strava ? ' · Strava ✓' : ''}</div></div>`;
+  updateConn();
+}
+function recoverLive(save){
+  const live = LS.get('ht_live', null); LS.del('ht_live');
+  if (save && live){ const m = finalize(live.start, live.name, live.wkId, live.rec, live.dist || 0); renderHome(); showAct(m.id, true); }
+  else renderHome();
+}
+
+// ================= WORKOUTS UI =================
+function renderWorkouts(){
+  $('wkFtp').textContent = 'Calculados con tu FTP: ' + S.ftp + ' W';
+  $('wkList').innerHTML = WORKOUTS.map(w => `
+    <div class="card wk" onclick="openWk('${w.id}')">
+      <b>${w.name}</b>
+      <div class="tags"><span class="tag">${w.tipo}</span><span class="tag">${w.test ? 'Hasta agotarte' : dur(wkDur(w))}</span>${w.test ? '' : `<span class="tag">TSS ${wkTSS(w)}</span>`}</div>
+      ${profileSVG(w)}
+    </div>`).join('');
+}
+function openWk(id){
+  const w = wkById(id);
+  openSheet(`
+    <h2 style="margin-right:40px">${w.name}</h2>
+    <div class="tags" style="margin-top:-4px"><span class="tag">${w.tipo}</span><span class="tag">${w.test ? 'Hasta agotarte' : dur(wkDur(w))}</span>${w.test ? '' : `<span class="tag">TSS ${wkTSS(w)}</span>`}</div>
+    <p class="mut">${w.desc}</p>
+    ${profileSVG(w, 'chart')}
+    <div class="small mut" style="margin:8px 0 14px">Empieza en modo ERG: el rodillo pone los vatios. Puedes cambiar a modo pendiente durante el entreno.</div>
+    <button class="btn acc block" onclick="startSession(wkById('${w.id}'))">Empezar</button>`);
+}
+
+// ================= SETTINGS =================
+function renderCfg(){
+  $('iFtp').value = S.ftp; $('iPeso').value = S.peso; $('iFc').value = S.fcmax; $('iName').value = S.name;
+  $('iSrc').value = S.src; $('iSid').value = S.sid; $('iSsec').value = S.ssec;
+  $('cbDom').textContent = location.hostname || '(tu dominio)';
+  $('stravaState').innerHTML = S.strava ? `<span style="color:var(--ok)">● Conectado${S.strava.who ? ' como ' + esc(S.strava.who) : ''}</span>` : 'No conectado';
+  $('ver').textContent = 'Hometrainer v' + VER + ' · ' + ACTS.length + ' sesiones guardadas';
+}
+function readCfg(){
+  const n = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : d; };
+  const oldPeso = S.peso;
+  S.ftp = Math.round(n('iFtp', S.ftp)); S.peso = n('iPeso', S.peso); S.fcmax = Math.round(n('iFc', S.fcmax));
+  S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
+  saveS();
+  if (S.peso !== oldPeso && trainerOn()) sendUserCfg();
+}
+['iFtp', 'iPeso', 'iFc', 'iName', 'iSrc', 'iSid', 'iSsec'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
+
+function exportData(){
+  const data = {v:1, settings:Object.assign({}, S, {strava:null, ssec:''}), acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data)], {type:'application/json'}));
+  const el = document.createElement('a'); el.href = url; el.download = 'hometrainer-copia-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function importData(inp){
+  const f = inp.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result); let n = 0;
+      (d.acts || []).forEach(a => { if (a.rec && !ACTS.some(x => x.id === a.id)){ LS.set('ht_act_' + a.id, a.rec); const m = Object.assign({}, a); delete m.rec; ACTS.push(m); n++; } });
+      ACTS.sort((a, b) => b.date - a.date); saveActs();
+      toast(n + ' sesiones importadas'); renderCfg();
+    }catch(e){ toast('Archivo no válido'); }
+    inp.value = '';
+  };
+  r.readAsText(f);
+}
+
+// ================= INIT =================
+renderHome();
+stravaCallback();
 </script>
 </body>
+</html>
