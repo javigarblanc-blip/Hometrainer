@@ -1,6 +1,6 @@
-# Hometrainer: instrucciones para Claude
+# Umbral (antes Hometrainer): instrucciones para Claude
 
-App web de entrenamiento en rodillo de Javi (Salamanca), hecha en un único `index.html`. Él no programa: dirige, prueba en el móvil y decide rápido. Respuestas en español.
+App web de entrenamiento en rodillo de Javi, llamada **Umbral** desde la v0.7.2. El repositorio y la dirección siguen siendo Hometrainer, y las claves de localStorage siguen con el prefijo `ht_` (Salamanca), hecha en un único `index.html`. Él no programa: dirige, prueba en el móvil y decide rápido. Respuestas en español.
 
 ## Dónde está todo
 - Código (fuente de verdad): este repositorio, rama `main`. GitHub Pages la publica en https://javigarblanc-blip.github.io/Hometrainer/
@@ -8,7 +8,7 @@ App web de entrenamiento en rodillo de Javi (Salamanca), hecha en un único `ind
 
 ## Archivos
 - `index.html`: toda la app (HTML, CSS y JS en un solo archivo, con localStorage).
-- `sw.js`: service worker. Va primero a la red y, sin conexión, tira de la caché. **Sube el nombre de la caché (`hometrainer-vN`) en cada versión.**
+- `sw.js`: service worker. Va primero a la red y, sin conexión, tira de la caché. **Sube el nombre de la caché (`umbral-vN`) en cada versión.**
 - `manifest.webmanifest`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`: archivos de PWA.
 - `prueba.html`: diagnóstico Bluetooth del rodillo (paso 0).
 

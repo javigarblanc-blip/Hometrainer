@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1b2029">
-<title>Hometrainer</title>
+<title>Umbral</title>
+<meta name="apple-mobile-web-app-title" content="Umbral">
+<meta name="application-name" content="Umbral">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -447,7 +449,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.7.1';
+const VER = '0.7.2';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -911,7 +913,7 @@ function coachContext(focusActId){
   }
   return L.join('\n');
 }
-const COACH_SYS = `Eres el entrenador de ciclismo personal de un ciclista aficionado que entrena en rodillo con la app Hometrainer y también sale en bici y corre. Hablas en español de España, cercano y directo, como un buen entrenador: concreto, con números, sin rollos. Usas los datos que te da la app (forma CTL/ATL/TSB, fatiga matinal, plan, sesiones con RPE y notas, actividades de Strava). Si algo apunta a enfermedad, dolor o lesión, recomiendas parar y consultar a un profesional sanitario; no diagnosticas.
+const COACH_SYS = `Eres el entrenador de ciclismo personal de un ciclista aficionado que entrena en rodillo con la app Umbral y también sale en bici y corre. Hablas en español de España, cercano y directo, como un buen entrenador: concreto, con números, sin rollos. Usas los datos que te da la app (forma CTL/ATL/TSB, fatiga matinal, plan, sesiones con RPE y notas, actividades de Strava). Si algo apunta a enfermedad, dolor o lesión, recomiendas parar y consultar a un profesional sanitario; no diagnosticas.
 
 Respondes SIEMPRE con un único objeto JSON válido, sin texto fuera de él, con esta forma:
 {"texto": "respuesta para el ciclista (máximo ~120 palabras; puedes usar **negrita** y líneas que empiecen por '- ')",
@@ -1627,7 +1629,7 @@ function downloadBlob(blob, name){
 function downloadTCX(id){
   const a = ACTS.find(x => x.id === id), rec = LS.get('ht_act_' + id, null);
   if (!a || !rec) return toast('No se encuentran los datos');
-  downloadBlob(new Blob([buildTCX(a, rec)], {type:'application/vnd.garmin.tcx+xml'}), 'hometrainer_' + dkey(a.date) + '_' + ftime(a.date).replace(':', '') + '.tcx');
+  downloadBlob(new Blob([buildTCX(a, rec)], {type:'application/vnd.garmin.tcx+xml'}), 'umbral_' + dkey(a.date) + '_' + ftime(a.date).replace(':', '') + '.tcx');
 }
 
 // ================= STRAVA =================
@@ -1695,7 +1697,7 @@ async function stravaUpload(id){
     const fd = new FormData();
     fd.append('file', new Blob([buildTCX(a, rec)], {type:'application/xml'}), 'ht_' + id + '.tcx');
     fd.append('data_type', 'tcx'); fd.append('name', a.name); fd.append('trainer', '1');
-    fd.append('description', `Hometrainer · NP ${a.np} W · IF ${dec(a.ifv, 2)} · TSS ${a.tss}` + (a.note ? '\n' + a.note : ''));
+    fd.append('description', `Umbral · NP ${a.np} W · IF ${dec(a.ifv, 2)} · TSS ${a.tss}` + (a.note ? '\n' + a.note : ''));
     fd.append('external_id', 'ht_' + id);
     const r = await fetch('https://www.strava.com/api/v3/uploads', {method:'POST', headers:{Authorization:'Bearer ' + tk}, body:fd});
     let j = await r.json();
@@ -2226,7 +2228,7 @@ function renderCfg(){
   $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
   $('cbDom').textContent = location.hostname || '(tu dominio)';
   $('stravaState').innerHTML = S.strava ? `<span style="color:var(--ok)">● Conectado${S.strava.who ? ' como ' + esc(S.strava.who) : ''}</span>${S.lastSync ? ' · sincronizado ' + fdate(S.lastSync) : ''}` : 'No conectado';
-  $('ver').textContent = 'Hometrainer v' + VER + ' · ' + ACTS.length + ' sesiones · ' + CUSTOM.length + ' workouts propios';
+  $('ver').textContent = 'Umbral v' + VER + ' · ' + ACTS.length + ' sesiones · ' + CUSTOM.length + ' workouts propios';
 }
 function readCfg(){
   const n = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : d; };
@@ -2241,7 +2243,7 @@ function readCfg(){
 ['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iSid', 'iSsec'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
 function exportData(){
   const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
-  downloadBlob(new Blob([JSON.stringify(data)], {type:'application/json'}), 'hometrainer-copia-' + today() + '.json');
+  downloadBlob(new Blob([JSON.stringify(data)], {type:'application/json'}), 'umbral-copia-' + today() + '.json');
 }
 function importData(inp){
   const f = inp.files[0]; if (!f) return;
@@ -2267,7 +2269,7 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); instal
 window.addEventListener('appinstalled', () => { installEvt = null; renderInstall(); toast('App instalada'); });
 function renderInstall(){
   $('installBox').innerHTML = installEvt ? `<div class="card row between">
-    <div class="row"><img src="icon-192.png" width="44" height="44" style="border-radius:12px" alt=""><div><b>Instalar Hometrainer</b><div class="small mut">Icono en el móvil y pantalla completa</div></div></div>
+    <div class="row"><img src="icon-192.png" width="44" height="44" style="border-radius:12px" alt=""><div><b>Instalar Umbral</b><div class="small mut">Icono en el móvil y pantalla completa</div></div></div>
     <button class="btn acc" onclick="doInstall()">Instalar</button></div>` : '';
 }
 async function doInstall(){ if (!installEvt) return; installEvt.prompt(); try{ await installEvt.userChoice; }catch(e){} installEvt = null; renderInstall(); }

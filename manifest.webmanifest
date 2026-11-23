@@ -1,7 +1,7 @@
 {
-  "name": "Hometrainer",
-  "short_name": "Hometrainer",
-  "description": "Entrenamiento en rodillo con ERG, pendiente y subida a Strava",
+  "name": "Umbral",
+  "short_name": "Umbral",
+  "description": "Umbral: entrenamiento en rodillo con ERG, pendiente y subida a Strava",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
