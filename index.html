@@ -405,7 +405,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.6';
+const VER = '0.6.1';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -653,21 +653,47 @@ function parseGPX(txt, fname){
 }
 // Puertos tipo (genéricos, no reales)
 function rng(seed){ let x = seed; return () => (x = (x * 16807) % 2147483647) / 2147483647; }
-function genClimb(id, name, km, avg, spread, seed){
-  const r = rng(seed), pts = [{d:0, e:500}]; let e = 500, d = 0;
-  const segs = Math.round(km * 1000 / 250);
-  let gs = Array.from({length:segs}, () => avg + (r() - .5) * 2 * spread);
-  const corr = avg - gs.reduce((a, b) => a + b, 0) / segs; gs = gs.map(g => Math.max(0, g + corr));
-  gs.forEach(g => { d += 250; e += g / 100 * 250; pts.push({d, e}); });
+// Puertos tipo: tramos [km, % medio] con pequeñas variaciones dentro de cada tramo
+function genClimb(id, kind, tramos, seed, base = 600){
+  const r = rng(seed), pts = [{d:0, e:base}]; let e = base, d = 0;
+  tramos.forEach(([km, g]) => {
+    const n = Math.max(1, Math.round(km * 10));
+    for (let i = 0; i < n; i++){ const gi = g + (r() - .5) * 1.4; d += 100; e += gi; pts.push({d, e}); }
+  });
+  const km = d / 1000, avg = (e - base) / d * 100;
+  const name = kind === 'rompe' ? `Rompepiernas tipo: ${dec(km, 0)} km` : `${kind} tipo: ${dec(km, km % 1 ? 1 : 0)} km al ${dec(avg)} %`;
   const rt = buildRoute(name, pts, 'tipo'); rt.id = id; return rt;
 }
 const GEN_ROUTES = [
-  genClimb('g_corto', 'Repecho tipo: 3 km al 6 %', 3, 6, 2, 7),
-  genClimb('g_medio', 'Puerto tipo: 8 km al 6,5 %', 8, 6.5, 2.5, 11),
-  genClimb('g_duro', 'Puerto tipo: 6 km al 8,5 %', 6, 8.5, 3, 23),
-  genClimb('g_largo', 'Puerto largo tipo: 15 km al 5,5 %', 15, 5.5, 2.5, 31),
-  (() => { const r = rng(5), pts = [{d:0, e:300}]; let d = 0, e = 300; for (let i = 0; i < 100; i++){ const g = Math.sin(i / 6) * 4 + (r() - .5) * 2.5; d += 250; e += g / 100 * 250; pts.push({d, e}); } const rt = buildRoute('Rompepiernas tipo: 25 km', pts, 'tipo'); rt.id = 'g_rompe'; return rt; })()
+  genClimb('g_corto', 'Repecho', [[.5, 4], [.8, 7.5], [.3, 3], [.9, 8.5], [.5, 5]], 7),
+  genClimb('g_medio', 'Puerto', [[1, 5], [1.5, 7], [.5, 3], [1.5, 8], [1, 6], [.5, 2.5], [1.2, 9], [.8, 7]], 11),
+  genClimb('g_duro', 'Puerto duro', [[.8, 7], [1, 9.5], [.4, 5], [1.2, 10.5], [.6, 7], [1, 11.5], [1, 8]], 23),
+  genClimb('g_largo', 'Puerto largo', [[2, 4], [1.5, 6], [1, 3], [2, 6.5], [.5, 1.5], [2, 7], [1.5, 5], [1, 8.5], [2, 6], [1.5, 4.5]], 31),
+  genClimb('g_escalon', 'Puerto escalonado', [[1, 6], [.6, 2], [1, 8], [.6, 2.5], [1, 9], [.5, 3], [1.2, 10], [.6, 6]], 41),
+  genClimb('g_rompe', 'rompe', [[2, 1], [1, 6], [1.5, -4], [.8, 8], [1.2, -5], [2, 1.5], [1, 7], [2, -3], [1.5, 5], [1, -6], [2, .5], [1.5, 9], [1.5, -5], [2, 2], [1, 6.5], [2, -2.5], [1, 4]], 5, 400),
 ];
+// Perfil por kilómetros, como una altimetría de carrera
+function kmProfileSVG(r){
+  const W = 360, H = 190, L = 6, Rr = 6, T = 26, B = 22, iw = W - L - Rr, ih = H - T - B;
+  const unit = r.dist > 60000 ? 5000 : r.dist > 30000 ? 2000 : 1000;
+  const n = Math.ceil(r.dist / unit), emin = Math.min(...r.e), emax = Math.max(...r.e), span = Math.max(60, emax - emin);
+  const X = x => L + x / r.dist * iw, Y = v => T + ih - (v - emin) / span * ih;
+  let g = `<line x1="${L}" x2="${W - Rr}" y1="${T + ih}" y2="${T + ih}" stroke="var(--grid)"/>`;
+  for (let k = 0; k < n; k++){
+    const x0 = k * unit, x1 = Math.min(r.dist, (k + 1) * unit);
+    const e0 = routeEle(r, x0), e1 = routeEle(r, x1), gr = (e1 - e0) / Math.max(1, x1 - x0) * 100;
+    // contorno real dentro del tramo
+    let path = `M${X(x0).toFixed(1)},${T + ih}`;
+    for (let x = x0; x <= x1; x += 50) path += `L${X(x).toFixed(1)},${Y(routeEle(r, x)).toFixed(1)}`;
+    path += `L${X(x1).toFixed(1)},${Y(e1).toFixed(1)}L${X(x1).toFixed(1)},${T + ih}Z`;
+    g += `<path d="${path}" fill="${gcol(gr)}" stroke="var(--s1)" stroke-width="1"/>`;
+    const cx = X((x0 + x1) / 2), top = Math.min(Y(e0), Y(e1));
+    if (X(x1) - X(x0) > 11) g += `<text x="${cx.toFixed(1)}" y="${(top - 6).toFixed(1)}" fill="var(--txt)" font-size="${n > 20 ? 8 : n > 12 ? 9 : 10}" font-weight="700" text-anchor="middle" font-family="Barlow Condensed,sans-serif">${dec(Math.abs(gr) < .05 ? 0 : gr)}</text>`;
+    const st = Math.ceil(n / 8); if (k === n - 1 || ((k + 1) % st === 0 && n - 1 - k >= st / 2)) g += `<text x="${X(x1).toFixed(1)}" y="${H - 6}" fill="var(--mut)" font-size="10" text-anchor="end">${Math.round(x1 / 1000)} km</text>`;
+  }
+  g += `<text x="${L}" y="12" fill="var(--mut)" font-size="10">${Math.round(emax)} m</text><text x="${W - Rr}" y="12" fill="var(--mut)" font-size="10" text-anchor="end">% medio por ${unit / 1000} km</text>`;
+  return `<svg class="lc" viewBox="0 0 ${W} ${H}">${g}</svg>`;
+}
 const allRoutes = () => ROUTES.concat(GEN_ROUTES);
 const routeById = id => allRoutes().find(r => r.id === id);
 const gcol = g => g < -1 ? '#3d8bff' : g < 3 ? '#2bc48a' : g < 6 ? '#f2c230' : g < 9 ? '#ff8a2a' : g < 12 ? '#ff4d5e' : '#b0306a';
@@ -727,8 +753,8 @@ function openRoute(id){
   for (let i = 0; i + w < r.d.length; i += 4){ const g = (r.e[i + w] - r.e[i]) / (r.d[i + w] - r.d[i]) * 100; if (g > best.g) best = {g, at:r.d[i]}; }
   openSheet(`<h2>${esc(r.name)}</h2>
     <div class="small mut" style="margin-top:2px">${r.src === 'tipo' ? 'Perfil de ejemplo' : r.src === 'strava' ? 'Desde una salida de Strava' : 'Importado de GPX'}</div>
-    <div style="height:130px;margin-top:14px;background:var(--viz);border-radius:12px;padding-top:10px">${routeSVG(r, '', null).replace('<svg ', '<svg style="width:100%;height:100%;display:block" ')}</div>
-    <div class="row small mut" style="gap:12px;margin-top:8px;flex-wrap:wrap">${[[-1, '<0 %'], [2, '0-3'], [4, '3-6'], [7, '6-9'], [10, '9-12'], [13, '>12 %']].map(([g, t]) => `<span><i class="tdot" style="background:${gcol(g)}"></i> ${t}</span>`).join('')}</div>
+    <div style="margin-top:14px;background:var(--viz);border-radius:12px;padding:6px 4px 2px">${kmProfileSVG(r)}</div>
+    <div class="row small mut" style="gap:12px;margin-top:8px;flex-wrap:wrap">${[[-3, '<0 %'], [2, '0-3'], [4, '3-6'], [7, '6-9'], [10, '9-12'], [13, '>12 %']].map(([g, t]) => `<span><i class="tdot" style="background:${gcol(g)}"></i> ${t}</span>`).join('')}</div>
     <div class="kv">
       <div><span>Distancia</span><b>${kmTxt(r.dist)}</b></div>
       <div><span>Desnivel +</span><b>${r.gain} m</b></div>
