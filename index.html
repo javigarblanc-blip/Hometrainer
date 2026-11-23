@@ -290,6 +290,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   <div class="seg acc" id="libTabs">
     <button data-t="planes" onclick="libTab('planes')">Planes</button>
     <button data-t="workouts" onclick="libTab('workouts')">Workouts</button>
+    <button data-t="trayectos" onclick="libTab('trayectos')">Trayectos</button>
   </div>
   <div id="libBox"></div>
 </section>
@@ -404,7 +405,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.5.2';
+const VER = '0.6';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -603,6 +604,169 @@ function startPlan(id, days, when){
 }
 function todaySess(){ if (!PLAN) return null; const k = today(); return PLAN.sessions.find(s => s.date === k && s.status !== 'skip') || null; }
 function nextSess(){ if (!PLAN) return null; const k = today(); return PLAN.sessions.find(s => s.date > k && s.status === 'pend') || null; }
+
+// ================= TRAYECTOS (rutas y puertos) =================
+let ROUTES = LS.get('ht_routes', []);
+const saveRoutes = () => LS.set('ht_routes', ROUTES);
+const STEP = 25; // metros entre puntos
+function hav(a, b, c, d){ const R = 6371000, t = Math.PI / 180, x = (c - a) * t, y = (d - b) * t; const h = Math.sin(x/2)**2 + Math.cos(a*t) * Math.cos(c*t) * Math.sin(y/2)**2; return 2 * R * Math.asin(Math.sqrt(h)); }
+// pts: [{d, e, la, lo}] con distancia acumulada -> ruta remuestreada y suavizada
+function buildRoute(name, pts, src){
+  if (pts.length < 2) throw new Error('el trayecto no tiene puntos suficientes');
+  const total = pts[pts.length - 1].d;
+  if (total < 300) throw new Error('el trayecto es demasiado corto');
+  const n = Math.floor(total / STEP) + 1, d = [], e = [], la = [], lo = [];
+  let j = 0;
+  for (let i = 0; i < n; i++){
+    const x = Math.min(i * STEP, total);
+    while (j < pts.length - 2 && pts[j + 1].d < x) j++;
+    const A = pts[j], B = pts[j + 1], f = B.d > A.d ? (x - A.d) / (B.d - A.d) : 0;
+    d.push(x); e.push(A.e + (B.e - A.e) * f);
+    if (A.la != null){ la.push(+(A.la + (B.la - A.la) * f).toFixed(5)); lo.push(+(A.lo + (B.lo - A.lo) * f).toFixed(5)); }
+  }
+  // suavizado de altitud (media móvil de 7 puntos = 175 m)
+  const es = e.map((_, i) => { let s = 0, c = 0; for (let k = -3; k <= 3; k++){ const v = e[i + k]; if (v != null){ s += v; c++; } } return +(s / c).toFixed(1); });
+  return finishRoute({id:'r_' + now(), name, src, d, e:es, la:la.length ? la : null, lo:lo.length ? lo : null});
+}
+function finishRoute(r){
+  const n = r.d.length; r.g = [];
+  for (let i = 0; i < n; i++){ const a = Math.max(0, i - 2), b = Math.min(n - 1, i + 2); const dd = r.d[b] - r.d[a]; r.g.push(dd ? Math.max(-20, Math.min(25, (r.e[b] - r.e[a]) / dd * 100)) : 0); }
+  r.dist = r.d[n - 1]; let gain = 0; for (let i = 1; i < n; i++) if (r.e[i] > r.e[i - 1]) gain += r.e[i] - r.e[i - 1];
+  r.gain = Math.round(gain); r.maxG = Math.max(...r.g); r.avgG = (r.e[n - 1] - r.e[0]) / r.dist * 100;
+  return r;
+}
+function parseGPX(txt, fname){
+  const doc = new DOMParser().parseFromString(txt, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('el archivo no es un GPX válido');
+  let nodes = [...doc.getElementsByTagName('trkpt')]; if (!nodes.length) nodes = [...doc.getElementsByTagName('rtept')];
+  if (!nodes.length) throw new Error('el GPX no tiene puntos de recorrido');
+  const nm = (doc.querySelector('trk > name, rte > name, metadata > name') || {}).textContent || fname.replace(/\.gpx$/i, '');
+  const pts = []; let acc = 0, prev = null;
+  nodes.forEach(n => {
+    const la = +n.getAttribute('lat'), lo = +n.getAttribute('lon'), ee = n.getElementsByTagName('ele')[0];
+    const e = ee ? +ee.textContent : (prev ? prev.e : 0);
+    if (prev) acc += hav(prev.la, prev.lo, la, lo);
+    if (!prev || acc > (pts[pts.length - 1].d + 0.5)) pts.push({d:acc, e, la, lo});
+    prev = {la, lo, e};
+  });
+  return buildRoute(nm.trim().slice(0, 60), pts, 'gpx');
+}
+// Puertos tipo (genéricos, no reales)
+function rng(seed){ let x = seed; return () => (x = (x * 16807) % 2147483647) / 2147483647; }
+function genClimb(id, name, km, avg, spread, seed){
+  const r = rng(seed), pts = [{d:0, e:500}]; let e = 500, d = 0;
+  const segs = Math.round(km * 1000 / 250);
+  let gs = Array.from({length:segs}, () => avg + (r() - .5) * 2 * spread);
+  const corr = avg - gs.reduce((a, b) => a + b, 0) / segs; gs = gs.map(g => Math.max(0, g + corr));
+  gs.forEach(g => { d += 250; e += g / 100 * 250; pts.push({d, e}); });
+  const rt = buildRoute(name, pts, 'tipo'); rt.id = id; return rt;
+}
+const GEN_ROUTES = [
+  genClimb('g_corto', 'Repecho tipo: 3 km al 6 %', 3, 6, 2, 7),
+  genClimb('g_medio', 'Puerto tipo: 8 km al 6,5 %', 8, 6.5, 2.5, 11),
+  genClimb('g_duro', 'Puerto tipo: 6 km al 8,5 %', 6, 8.5, 3, 23),
+  genClimb('g_largo', 'Puerto largo tipo: 15 km al 5,5 %', 15, 5.5, 2.5, 31),
+  (() => { const r = rng(5), pts = [{d:0, e:300}]; let d = 0, e = 300; for (let i = 0; i < 100; i++){ const g = Math.sin(i / 6) * 4 + (r() - .5) * 2.5; d += 250; e += g / 100 * 250; pts.push({d, e}); } const rt = buildRoute('Rompepiernas tipo: 25 km', pts, 'tipo'); rt.id = 'g_rompe'; return rt; })()
+];
+const allRoutes = () => ROUTES.concat(GEN_ROUTES);
+const routeById = id => allRoutes().find(r => r.id === id);
+const gcol = g => g < -1 ? '#3d8bff' : g < 3 ? '#2bc48a' : g < 6 ? '#f2c230' : g < 9 ? '#ff8a2a' : g < 12 ? '#ff4d5e' : '#b0306a';
+function routeSVG(r, cls = '', pos = null, H = 100){
+  const n = r.d.length, emin = Math.min(...r.e), emax = Math.max(...r.e), span = Math.max(40, emax - emin);
+  const Y = v => (H - 6 - (v - emin) / span * (H - 14)).toFixed(1);
+  const bars = Math.min(90, n - 1), stp = (n - 1) / bars; let out = '';
+  for (let b = 0; b < bars; b++){
+    const i0 = Math.floor(b * stp), i1 = Math.min(n - 1, Math.floor((b + 1) * stp));
+    const g = (r.e[i1] - r.e[i0]) / Math.max(1, r.d[i1] - r.d[i0]) * 100;
+    out += `<path d="M${r.d[i0]},${H}L${r.d[i0]},${Y(r.e[i0])}L${r.d[i1]},${Y(r.e[i1])}L${r.d[i1]},${H}Z" fill="${gcol(g)}" opacity=".85"/>`;
+  }
+  if (pos != null) out += `<line x1="${pos}" x2="${pos}" y1="0" y2="${H}" stroke="var(--txt)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+  return `<svg class="${cls}" viewBox="0 0 ${r.dist} ${H}" preserveAspectRatio="none">${out}</svg>`;
+}
+function routeIdx(r, x){ return Math.max(0, Math.min(r.d.length - 1, Math.round(x / STEP))); }
+const routeGrade = (r, x) => r.g[routeIdx(r, x)];
+const routeEle = (r, x) => r.e[routeIdx(r, x)];
+// velocidad virtual de equilibrio (m/s) para una potencia y pendiente
+function eqSpeed(P_, g){
+  const m = (S.peso || 75) + 9, G = 9.81, crr = .005, cda = .32, rho = 1.2, th = Math.atan(g / 100);
+  const a = .5 * rho * cda, b = m * G * (crr * Math.cos(th) + Math.sin(th)), c = Math.max(0, P_) * .97;
+  const f = v => a * v * v * v + b * v - c;
+  let lo = .05, hi = 40; if (f(lo) > 0) return lo;
+  for (let k = 0; k < 40; k++){ const mid = (lo + hi) / 2; if (f(mid) > 0) hi = mid; else lo = mid; }
+  return lo;
+}
+function routeETA(r, watts){ let t = 0; for (let i = 1; i < r.d.length; i += 4){ const j = Math.min(r.d.length - 1, i + 3); t += (r.d[j] - r.d[i - 1]) / Math.max(.8, eqSpeed(watts, r.g[i])); } return t; }
+const kmTxt = m => dec(m / 1000, m < 10000 ? 1 : 0) + ' km';
+let ROUTE_DIFF = 1;
+function renderRoutes(){
+  const card = r => `<div class="wkc" onclick="openRoute('${r.id}')"><div class="viz">${routeSVG(r)}</div><div class="body">
+      <div style="min-width:0"><span class="nm">${esc(r.name)}</span><div class="meta">${kmTxt(r.dist)}, +${r.gain} m, media ${dec(r.avgG)} %</div></div>
+      <div class="side"><b>${dur(routeETA(r, S.ftp * .75))}</b><span>a ${Math.round(S.ftp * .75)} W</span></div></div></div>`;
+  $('libBox').innerHTML = `<div class="grid2" style="margin-bottom:6px">
+      <button class="btn" onclick="$('gpxFile').click()">${ICON.plus.replace(/22/g, '16')} Importar GPX</button>
+      <button class="btn" onclick="stravaRoutesSheet()">Desde Strava</button></div>
+    <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" style="display:none" onchange="importGPX(this)">
+    <div class="small mut" style="margin:6px 2px 4px">Exporta el GPX de una ruta de Strava, Wikiloc o Komoot, o usa una salida tuya de Strava. El rodillo reproduce sus pendientes.</div>
+    ${ROUTES.length ? `<div class="wkhead"><b>Tus trayectos</b><span>${ROUTES.length}</span></div>${ROUTES.slice().reverse().map(card).join('')}` : ''}
+    <div class="wkhead"><b>Puertos tipo</b><span>perfiles de ejemplo</span></div>${GEN_ROUTES.map(card).join('')}`;
+}
+function importGPX(inp){
+  const f = inp.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{ const r = parseGPX(rd.result, f.name); ROUTES.push(r); saveRoutes(); toast('Trayecto importado: ' + kmTxt(r.dist) + ', +' + r.gain + ' m'); renderRoutes(); openRoute(r.id); }
+    catch(e){ toast('GPX: ' + e.message); }
+    inp.value = '';
+  };
+  rd.readAsText(f);
+}
+function openRoute(id){
+  const r = routeById(id); if (!r) return;
+  const climbs = []; // tramo más duro de 1 km
+  let best = {g:-99, at:0}; const w = Math.round(1000 / STEP);
+  for (let i = 0; i + w < r.d.length; i += 4){ const g = (r.e[i + w] - r.e[i]) / (r.d[i + w] - r.d[i]) * 100; if (g > best.g) best = {g, at:r.d[i]}; }
+  openSheet(`<h2>${esc(r.name)}</h2>
+    <div class="small mut" style="margin-top:2px">${r.src === 'tipo' ? 'Perfil de ejemplo' : r.src === 'strava' ? 'Desde una salida de Strava' : 'Importado de GPX'}</div>
+    <div style="height:130px;margin-top:14px;background:var(--viz);border-radius:12px;padding-top:10px">${routeSVG(r, '', null).replace('<svg ', '<svg style="width:100%;height:100%;display:block" ')}</div>
+    <div class="row small mut" style="gap:12px;margin-top:8px;flex-wrap:wrap">${[[-1, '<0 %'], [2, '0-3'], [4, '3-6'], [7, '6-9'], [10, '9-12'], [13, '>12 %']].map(([g, t]) => `<span><i class="tdot" style="background:${gcol(g)}"></i> ${t}</span>`).join('')}</div>
+    <div class="kv">
+      <div><span>Distancia</span><b>${kmTxt(r.dist)}</b></div>
+      <div><span>Desnivel +</span><b>${r.gain} m</b></div>
+      <div><span>Pendiente media</span><b>${dec(r.avgG)} %</b></div>
+      <div><span>Máxima</span><b>${dec(r.maxG)} %</b></div>
+      <div><span>Km más duro</span><b>${dec(best.g)} %</b></div>
+      <div><span>Tiempo a ${Math.round(S.ftp * .75)} W</span><b>${dur(routeETA(r, S.ftp * .75))}</b></div>
+    </div>
+    <h3>Dificultad de las pendientes</h3>
+    <div class="seg" id="diffSeg" style="margin-bottom:6px">${[.5, .75, 1].map(v => `<button class="${ROUTE_DIFF === v ? 'on' : ''}" onclick="ROUTE_DIFF=${v};document.querySelectorAll('#diffSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===${v}))" data-v="${v}">${v * 100} %</button>`).join('')}</div>
+    <div class="small mut">Al 50 % una rampa del 10 % se nota como un 5 %. La velocidad y el tiempo se calculan siempre con la pendiente real. Un rodillo de rueda como el X3 no llega a simular rampas muy duras: por encima del 8-10 % notarás el tope.</div>
+    <button class="btn acc block lg" style="margin-top:14px" onclick="startSession(null,null,routeById('${r.id}'))">${ICON.play} Empezar trayecto</button>
+    ${r.src !== 'tipo' ? `<button class="btn red block" style="margin-top:10px" onclick="delRoute('${r.id}')">Borrar trayecto</button>` : ''}`);
+}
+function delRoute(id){ if (!confirm('¿Borrar este trayecto?')) return; ROUTES = ROUTES.filter(r => r.id !== id); saveRoutes(); closeSheet(); renderRoutes(); }
+async function stravaRoutesSheet(){
+  if (!S.strava) return toast('Conecta Strava en Ajustes');
+  const rides = EXT.filter(e => /Ride/.test(e.sport || '') && !/Virtual/.test(e.sport || '') && (e.dist || 0) > 3000).slice(0, 40);
+  if (!rides.length) return toast('No hay salidas en bici sincronizadas. Pulsa Sincronizar en Ajustes');
+  openSheet(`<h2>Rodar una salida tuya</h2><div class="small mut" style="margin:2px 0 12px">Elige una salida de Strava y la repites en el rodillo con sus mismas pendientes.</div>
+    <div class="group">${rides.map(e => `<div class="li" onclick="importStravaRide(${e.id},this)"><div class="zs" style="background:var(--strava)"></div>
+      <div class="main"><b>${esc(e.name)}</b><div class="meta">${fdate(e.date)}, ${dec(e.dist / 1000)} km</div></div><div class="side"><span>Importar</span></div></div>`).join('')}</div>`);
+}
+async function importStravaRide(id, el){
+  try{
+    if (el) el.querySelector('.side span').textContent = 'Cargando…';
+    const tk = await stravaToken();
+    const r = await fetch(`https://www.strava.com/api/v3/activities/${id}/streams?keys=latlng,altitude,distance&key_by_type=true`, {headers:{Authorization:'Bearer ' + tk}});
+    if (!r.ok) throw new Error('error ' + r.status);
+    const j = await r.json();
+    if (!j.distance || !j.altitude) throw new Error('esa actividad no tiene altitud');
+    const ll = j.latlng ? j.latlng.data : null;
+    const pts = j.distance.data.map((d, i) => ({d, e:j.altitude.data[i], la:ll ? ll[i][0] : null, lo:ll ? ll[i][1] : null}));
+    const name = (EXT.find(e => e.id === id) || {}).name || 'Salida de Strava';
+    const rt = buildRoute(name, pts, 'strava'); ROUTES.push(rt); saveRoutes();
+    toast('Trayecto creado: ' + kmTxt(rt.dist) + ', +' + rt.gain + ' m'); renderRoutes(); openRoute(rt.id);
+  }catch(e){ toast('Strava: ' + e.message); if (el) el.querySelector('.side span').textContent = 'Importar'; }
+}
 
 // ================= BLUETOOTH =================
 const FEC_SVC = '6e40fec1-b5a3-f393-e0a9-e50e24dcca9e';
@@ -819,30 +983,45 @@ function buzz(p){ if (+S.sound && navigator.vibrate) try{ navigator.vibrate(p); 
 
 // ================= PLAYER =================
 const P = {on:false};
-function newRec(){ return {t:[], p:[], hr:[], c:[], s:[], wt:[]}; }
-function startSession(wk, sessKey){
+function newRec(){ return {t:[], p:[], hr:[], c:[], s:[], wt:[], rd:[]}; }
+function startSession(wk, sessKey, route){
   if (!trainerOn()){
-    window._pendingStart = [wk, sessKey];
+    window._pendingStart = [wk, sessKey, route];
     openSheet(`<h2>Conecta el rodillo</h2><p class="mut">Pedalea un poco para despertarlo y pulsa conectar.</p>
       <button class="btn acc block" onclick="closeSheet();connectTrainer().then(()=>{ if(trainerOn()) startSession(..._pendingStart) })">Conectar rodillo</button>`);
     return;
   }
   closeSheet(); audioInit();
   Object.assign(P, {
-    on:true, wk, free:!wk, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', mult:1, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
+    on:true, wk, route:route || null, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, mult:1, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
     wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
     start:null, rec:newRec(), dist:0, lastSent:null, lastChart:0, p3:[],
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
     total: wk ? wkDur(wk) : 0
   });
-  $('pName').textContent = wk ? wk.name : 'Rodar libre';
-  $('pSub').textContent = wk ? (wk.test === 'rampa' ? 'Test · hasta agotarte' : dur(P.total) + ' con FTP de ' + S.ftp + ' W') : 'Controla tú la resistencia';
+  $('pName').textContent = wk ? wk.name : route ? route.name : 'Rodar libre';
+  $('pSub').textContent = wk ? (wk.test === 'rampa' ? 'Test · hasta agotarte' : dur(P.total) + ' con FTP de ' + S.ftp + ' W') : route ? kmTxt(route.dist) + ', +' + route.gain + ' m' + (P.diff !== 1 ? ', dificultad ' + Math.round(P.diff * 100) + ' %' : '') : 'Controla tú la resistencia';
   $('player').classList.add('on');
   renderCtl();
   wake();
-  if (P.mode === 'grade') sendGrade(P.grade); else applyTarget(true);
+  if (P.route) routeGradeSend(true); else if (P.mode === 'grade') sendGrade(P.grade); else applyTarget(true);
   clearInterval(P.tick); P.tick = setInterval(tick, 1000);
   render();
+}
+function routeGradeSend(force){
+  const g = Math.round(routeGrade(P.route, P.rDist) * P.diff * 10) / 10;
+  if (force || P.gSent == null || Math.abs(g - P.gSent) >= .3 || now() - P.gAt > 5000){ P.gSent = g; P.gAt = now(); P.grade = g; sendGrade(g); }
+}
+function renderRoute(){
+  const r = P.route, g = routeGrade(r, P.rDist), left = Math.max(0, r.dist - P.rDist);
+  $('pIntName').textContent = 'Pendiente';
+  $('pIntT').innerHTML = `<span style="color:${gcol(g)}">${dec(g)} %</span>`;
+  $('pTgtLab').textContent = 'Quedan'; $('pTgt').textContent = kmTxt(left);
+  const pc = P.rDist / r.dist * 100; $('pIntProg').style.width = pc + '%'; $('pProg').style.width = pc + '%';
+  $('pCadLab').textContent = 'km/h'; $('pCad').textContent = dec(P.vSpd * 3.6);
+  $('pXLab').textContent = 'desnivel (m)'; $('pX').textContent = '+' + Math.round(P.gain);
+  const ahead = Math.min(500, left), gA = ahead > 50 ? (routeEle(r, P.rDist + ahead) - routeEle(r, P.rDist)) / ahead * 100 : 0;
+  $('pNext').textContent = ahead > 50 ? `Próximos ${Math.round(ahead)} m: media del ${dec(gA)} %` : 'Últimos metros';
 }
 function curSeg(){
   if (!P.wk) return null;
@@ -868,10 +1047,19 @@ function tick(){
   }
   if (P.running){
     const r = P.rec;
+    let vs = sp;
+    if (P.route){
+      const g = routeGrade(P.route, P.rDist), tgtV = eqSpeed(pw, g);
+      P.vSpd = Math.max(0, P.vSpd + (tgtV - P.vSpd) * .3);
+      const e0 = routeEle(P.route, P.rDist); P.rDist = Math.min(P.route.dist, P.rDist + P.vSpd);
+      const e1 = routeEle(P.route, P.rDist); if (e1 > e0) P.gain += e1 - e0;
+      vs = P.vSpd * 3.6; r.rd.push(Math.round(P.rDist));
+    }
     r.t.push(Math.round((now() - P.start) / 1000));
-    r.p.push(Math.round(pw)); r.hr.push(curHR()); r.c.push(Math.round(curCad())); r.s.push(Math.round(sp * 10)); r.wt.push(P.wt);
-    P.dist += sp / 3.6;
+    r.p.push(Math.round(pw)); r.hr.push(curHR()); r.c.push(Math.round(curCad())); r.s.push(Math.round(vs * 10)); r.wt.push(P.wt);
+    P.dist += vs / 3.6;
     P.wt++;
+    if (P.route && P.rDist >= P.route.dist){ beep(660, 500); toast('¡Trayecto completado!'); return endSession(); }
     if (P.wk && P.wt >= P.total){ beep(660, 500); toast(P.wk.test ? 'Fin del test' : '¡Entreno completado!'); return endSession(); }
     if (P.wk){
       curSeg();
@@ -882,7 +1070,7 @@ function tick(){
     if (r.p.length % 30 === 0) saveLive();
   }
   P.p3.push(pw); if (P.p3.length > 3) P.p3.shift();
-  applyTarget(false);
+  if (P.route) routeGradeSend(false); else applyTarget(false);
   render();
 }
 function render(){
@@ -899,11 +1087,13 @@ function render(){
   let st = '';
   if (P.manual) st = 'En pausa';
   else if (!P.running) st = P.rec.p.length ? 'Pausa automática. Pedalea para seguir' : 'Empieza a pedalear';
+  else if (P.route && P.diff !== 1) st = 'Dificultad al ' + Math.round(P.diff * 100) + ' %';
   else if (P.mode === 'grade' && P.wk) st = 'Modo pendiente, ' + dec(P.grade) + ' %';
   else if (P.wk && P.mult !== 1) st = 'Intensidad al ' + Math.round(P.mult * 100) + ' %';
   else if (P.mode === 'erg' && tgt && pw > 0) { const dlt = pw - tgt; st = Math.abs(dlt) <= 5 ? 'En el objetivo' : (dlt > 0 ? '+' : '') + dlt + ' W del objetivo'; }
   $('pState').textContent = st;
-  if (P.wk){
+  if (P.route) renderRoute();
+  else if (P.wk){
     const seg = curSeg(), el = P.wt - P.starts[P.segI], left = seg.d - el;
     $('pIntName').textContent = `${seg.n}, ${P.segI + 1} de ${P.wk.segs.length}`;
     $('pIntT').textContent = clock(left);
@@ -932,6 +1122,7 @@ function polyline(xs, ys, top, H, color, w){
   return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${w}" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
 }
 function drawPlayerChart(){
+  if (P.route){ $('pChartBox').innerHTML = routeSVG(P.route, '', P.rDist).replace('<svg ', '<svg id="pChart" '); return; }
   const H = 100, r = P.rec;
   let svg;
   if (P.wk){
@@ -951,6 +1142,13 @@ function drawPlayerChart(){
   $('pChartBox').innerHTML = svg;
 }
 function renderCtl(){
+  if (P.route){
+    $('pCtl').innerHTML = `<button class="btn" onclick="togglePause()">${P.manual ? ICON.resume : ICON.pause}${P.manual ? 'Seguir' : 'Pausa'}</button>
+      <button class="btn" onclick="adj(-1)">${ICON.minus}Más fácil</button><button class="btn" onclick="adj(1)">${ICON.plus}Más duro</button>
+      <button class="btn" onclick="adj(0)">${ICON.reset}${Math.round(P.diff * 100)} %</button>
+      <div class="full small mut" style="text-align:center;padding:4px 0 0">Los botones cambian la dureza de las pendientes, no la velocidad.</div>`;
+    return;
+  }
   const b = [];
   b.push(`<button class="btn" onclick="togglePause()">${P.manual ? ICON.resume : ICON.pause}${P.manual ? 'Seguir' : 'Pausa'}</button>`);
   if (P.wk) b.push(`<button class="btn" onclick="skipSeg()">${ICON.skip}Saltar</button>`);
@@ -971,12 +1169,14 @@ function skipSeg(){
   P.wt = P.starts[P.segI + 1]; curSeg(); P.lastSegI = P.segI; applyTarget(true); render(); drawPlayerChart();
 }
 function adj(dir){
+  if (P.route){ P.diff = dir === 0 ? 1 : Math.max(.25, Math.min(1.5, Math.round((P.diff + dir * .25) * 100) / 100)); P.gSent = null; routeGradeSend(true); renderCtl(); render(); return; }
   if (P.mode === 'grade'){ P.grade = dir === 0 ? 0 : Math.max(-5, Math.min(15, P.grade + dir * .5)); sendGrade(P.grade); }
   else if (P.wk){ P.mult = Math.max(.5, Math.min(1.5, Math.round((P.mult + dir * .05) * 100) / 100)); applyTarget(true); }
   else { P.ergW = dir === 0 ? Math.round(S.ftp * .6 / 5) * 5 : Math.max(50, Math.min(1000, P.ergW + dir * 10)); applyTarget(true); }
   wake(); render();
 }
 function toggleMode(){
+  if (P.route) return;
   P.mode = P.mode === 'erg' ? 'grade' : 'erg';
   if (P.mode === 'grade') sendGrade(P.grade); else applyTarget(true);
   wake(); renderCtl(); render();
@@ -994,7 +1194,7 @@ function askEnd(){
   if (confirm('¿Terminar la sesión?')) endSession();
 }
 function saveLive(){
-  LS.set('ht_live', {start:P.start, name:$('pName').textContent, wkId:P.wk ? P.wk.id : null, sessKey:P.sessKey, rec:P.rec, ftp:S.ftp});
+  LS.set('ht_live', {start:P.start, name:$('pName').textContent, wkId:P.wk ? P.wk.id : P.route ? 'route:' + P.route.id : null, sessKey:P.sessKey, rec:P.rec, ftp:S.ftp});
 }
 function endSession(){
   clearInterval(P.tick); P.on = false;
@@ -1004,7 +1204,7 @@ function endSession(){
   LS.del('ht_live');
   renderPlayerWarn();
   if (P.rec.p.length < 30){ toast('Sesión muy corta: no se guarda'); renderHome(); return; }
-  const meta = finalize(P.start, $('pName').textContent, P.wk ? P.wk.id : null, P.rec, P.sessKey);
+  const meta = finalize(P.start, $('pName').textContent, P.wk ? P.wk.id : P.route ? 'route:' + P.route.id : null, P.rec, P.sessKey);
   renderHome();
   showAct(meta.id, true);
 }
@@ -1143,10 +1343,13 @@ function delAct(id){
 // ================= TCX =================
 function buildTCX(a, rec){
   const iso = t => new Date(a.date + t * 1000).toISOString();
+  const rt = a.wkId && String(a.wkId).startsWith('route:') && rec.rd && rec.rd.length ? routeById(a.wkId.slice(6)) : null;
   let d = 0, pts = '';
   for (let i = 0; i < rec.p.length; i++){
     const ms = rec.s[i] / 10 / 3.6; d += ms;
-    pts += `<Trackpoint><Time>${iso(rec.t[i])}</Time><DistanceMeters>${d.toFixed(1)}</DistanceMeters>` +
+    let geo = '';
+    if (rt){ const k = routeIdx(rt, rec.rd[i]); if (rt.la) geo += `<Position><LatitudeDegrees>${rt.la[k]}</LatitudeDegrees><LongitudeDegrees>${rt.lo[k]}</LongitudeDegrees></Position>`; geo += `<AltitudeMeters>${rt.e[k]}</AltitudeMeters>`; }
+    pts += `<Trackpoint><Time>${iso(rec.t[i])}</Time>${geo}<DistanceMeters>${d.toFixed(1)}</DistanceMeters>` +
       (rec.hr[i] > 0 ? `<HeartRateBpm><Value>${rec.hr[i]}</Value></HeartRateBpm>` : '') +
       (rec.c[i] > 0 ? `<Cadence>${rec.c[i]}</Cadence>` : '') +
       `<Extensions><ns3:TPX><ns3:Speed>${ms.toFixed(2)}</ns3:Speed><ns3:Watts>${rec.p[i]}</ns3:Watts></ns3:TPX></Extensions></Trackpoint>\n`;
@@ -1533,7 +1736,7 @@ let LIB_TAB = 'planes', WK_FILTER = 'Todos';
 function libTab(t){ LIB_TAB = t; renderLib(); }
 function renderLib(){
   document.querySelectorAll('#libTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === LIB_TAB));
-  if (LIB_TAB === 'planes') renderPlans(); else renderWorkouts();
+  if (LIB_TAB === 'planes') renderPlans(); else if (LIB_TAB === 'trayectos') renderRoutes(); else renderWorkouts();
 }
 function renderPlans(){
   $('libBox').innerHTML = (PLAN ? `<div class="warn">Tienes en marcha ${esc(planById(PLAN.id).name)}. Si empiezas otro, lo sustituye.</div>` : '') +
