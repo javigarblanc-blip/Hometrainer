@@ -252,6 +252,30 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .pctl .btn{padding:12px 4px;font-size:13px;flex-direction:column;gap:4px;border:0;background:var(--s1);border-radius:14px}
 .pctl .btn svg{color:var(--txt)}
 .pctl .full{grid-column:1/-1;flex-direction:row;padding:13px}
+/* entrenador */
+#coach{position:fixed;inset:0;background:var(--bg);z-index:25;display:none;flex-direction:column}
+#coach.on{display:flex}
+.chead{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line)}
+.chead .av{width:38px;height:38px;border-radius:12px;background:var(--accbg);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:none}
+.chead b{font:700 20px/1.1 var(--num)}
+#coachMsgs{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.bub{max-width:88%;padding:11px 13px;border-radius:16px;font-size:15px;line-height:1.45}
+.bub.me{align-self:flex-end;background:var(--acc);color:var(--ontint);border-bottom-right-radius:5px}
+.bub.ai{align-self:flex-start;background:var(--s1);border-bottom-left-radius:5px}
+.bub.err{color:var(--err)}
+.cact{background:var(--s2);border-radius:12px;padding:10px 12px;margin-top:10px}
+.cchips{display:flex;gap:6px;overflow-x:auto;padding:8px 14px 0;scrollbar-width:none}
+.cchips::-webkit-scrollbar{display:none}
+.cchips button{flex:none;border:1px solid var(--line);background:var(--s1);color:var(--txt);border-radius:99px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer}
+.cchips button:disabled{opacity:.4}
+.cin{display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom))}
+.cin textarea{min-height:46px;max-height:120px;flex:1;resize:none;border-radius:14px}
+.typing{display:inline-flex;gap:4px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--mut);animation:tp 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.coachcard{display:flex;gap:12px;align-items:center;cursor:pointer}
+.coachcard .av{width:44px;height:44px;border-radius:14px;background:var(--accbg);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:none}
 #toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--txt);color:var(--bg);padding:11px 16px;border-radius:12px;font-size:14px;font-weight:600;z-index:50;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw;text-align:center}
 #toast.on{opacity:1}
 </style>
@@ -271,6 +295,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   </div>
   <div id="heroBox"></div>
   <div class="quick" id="quickBox"></div>
+  <div class="card coachcard" id="coachCard" style="margin-top:10px" onclick="openCoach()"></div>
   <div class="sec"><h2>Forma</h2><button class="link" onclick="show('sAna');anaTab('forma')">Ver análisis</button></div>
   <div class="card" id="formCard"></div>
   <div class="sec"><h2>Esta semana</h2><span class="small mut" id="wRange"></span></div>
@@ -338,6 +363,13 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     <div class="small mut" style="margin-top:8px">Calibra el X3 con su app antes de las sesiones importantes, tras 10 minutos de calentamiento y siempre con la misma presión de rueda.</div>
   </div>
   <div class="card">
+    <h2>Entrenador IA</h2>
+    <label>Clave de la API de Anthropic</label><input type="password" id="iKey" placeholder="sk-ant-…" autocomplete="off">
+    <label>Modelo</label><select id="iModel"></select>
+    <label>Notas para el entrenador</label><textarea id="iNotes" placeholder="Objetivos, molestias, días y horas disponibles, otros deportes…"></textarea>
+    <div class="small mut" style="margin-top:8px">La clave se guarda solo en este móvil y las consultas van directas a Anthropic. Cada consulta cuesta muy poco (céntimos o menos).</div>
+  </div>
+  <div class="card">
     <h2>Strava</h2>
     <div id="stravaState" class="small mut" style="margin-bottom:6px"></div>
     <label>Client ID</label><input type="text" id="iSid" inputmode="numeric">
@@ -398,6 +430,14 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   <div class="pctl" id="pCtl"></div>
 </div>
 
+<div id="coach">
+  <div class="chead"><div class="av"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11h7M8.5 14h4"/></svg></div><div style="flex:1;min-width:0"><b>Tu entrenador</b><div class="small mut">Ve tu forma, tu plan y tus sesiones</div></div>
+    <button class="btn sm ghost" onclick="clearChat()">Borrar</button><button class="btn sm" onclick="closeCoach()">Cerrar</button></div>
+  <div id="coachMsgs"></div>
+  <div class="cchips" id="coachChips"></div>
+  <div class="cin"><textarea id="coachIn" rows="1" placeholder="Escribe al entrenador…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();coachSend()}"></textarea><button class="btn acc" onclick="coachSend()">Enviar</button></div>
+</div>
+
 <div class="sheet" id="sheet" onclick="if(event.target===this)closeSheet()">
   <div class="sheet-in"><button class="sheet-x" onclick="closeSheet()">✕</button><div id="sheetBody"></div></div>
 </div>
@@ -405,7 +445,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.6.1';
+const VER = '0.7';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -417,7 +457,7 @@ const LS = {
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ toast('No queda espacio para guardar'); return false; } },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
-const S = Object.assign({theme:'grafito', ftp:200, peso:75, fcmax:180, lthr:0, name:'', src:'cp', sound:1, sid:'', ssec:'', strava:null, lastSync:0, ftpHist:[]}, LS.get('ht_settings', {}));
+const S = Object.assign({apiKey:'', coachModel:'claude-sonnet-5-5', coachNotes:'', todayMult:null, theme:'grafito', ftp:200, peso:75, fcmax:180, lthr:0, name:'', src:'cp', sound:1, sid:'', ssec:'', strava:null, lastSync:0, ftpHist:[]}, LS.get('ht_settings', {}));
 if (!S.lthr) S.lthr = Math.round(S.fcmax * .9);
 if (!S.ftpHist.length) S.ftpHist = [{date:now(), ftp:S.ftp}];
 const saveS = () => LS.set('ht_settings', S);
@@ -794,6 +834,171 @@ async function importStravaRide(id, el){
   }catch(e){ toast('Strava: ' + e.message); if (el) el.querySelector('.side span').textContent = 'Importar'; }
 }
 
+// ================= ENTRENADOR IA =================
+let CHAT = LS.get('ht_chat', []);
+const saveChat = () => LS.set('ht_chat', CHAT.slice(-20));
+const COACH_MODELS = [['claude-sonnet-5-5', 'Sonnet 5.5 (recomendado)'], ['claude-haiku-5-5', 'Haiku 5.5 (más barato)'], ['claude-opus-5-5', 'Opus 5.5 (el más listo)']];
+let coachBusy = false;
+function intervalSummary(a, rec){
+  const wk = a.wkId ? BASE_WK.concat(CUSTOM.map(customToWk)).find(w => w.id === a.wkId) : null;
+  if (!wk || !rec || !rec.wt) return '';
+  const starts = []; let acc = 0; wk.segs.forEach(s => { starts.push(acc); acc += s.d; });
+  const out = [];
+  wk.segs.forEach((s, i) => {
+    if (s.d < 60 && wk.segs.length > 30) return;
+    const idx = []; rec.wt.forEach((t, k) => { if (t >= starts[i] && t < starts[i] + s.d) idx.push(k); });
+    if (!idx.length) return;
+    const p = Math.round(idx.reduce((x, k) => x + rec.p[k], 0) / idx.length);
+    const hrs = idx.map(k => rec.hr[k]).filter(x => x > 0);
+    const tg = Math.round((segW(s, 0, 1) + segW(s, s.d, 1)) / 2 * a.ftp / S.ftp);
+    out.push(`${s.n} ${clock(s.d)}: objetivo ${tg} W, real ${p} W${hrs.length ? ', FC ' + Math.round(hrs.reduce((x, y) => x + y, 0) / hrs.length) + '-' + Math.max(...hrs) : ''}`);
+  });
+  return out.slice(0, 40).join('\n');
+}
+function coachContext(focusActId){
+  const tk = today(), ls = loadSeries(90), last = ls[ls.length - 1];
+  const d7 = ls.slice(-7).reduce((a, x) => a + x.tss, 0), d28 = ls.slice(-28).reduce((a, x) => a + x.tss, 0);
+  const L = [];
+  L.push(`HOY: ${DOWL[dow(new Date())]} ${tk}.`);
+  L.push(`PERFIL: FTP ${S.ftp} W, peso ${S.peso} kg (${dec(S.ftp / S.peso, 2)} W/kg), FC máx ${S.fcmax}, FC umbral ${S.lthr}. Rodillo de rueda Thinkrider X3 (ERG tarda unos segundos en ajustarse; pendiente máx. realista 8-10 %). Sin sensor de cadencia.`);
+  if (S.coachNotes) L.push(`NOTAS DEL CICLISTA PARA EL ENTRENADOR: ${S.coachNotes}`);
+  L.push(`FORMA: CTL ${Math.round(last.ctl)}, ATL ${Math.round(last.atl)}, TSB ${Math.round(last.tsb)}, TSS 7 días ${d7}, TSS 28 días ${d28}.`);
+  const feels = ls.slice(-7).filter(d => FEEL[d.k] != null).map(d => `${d.k}: ${FEELS[FEEL[d.k]].t}`);
+  if (feels.length) L.push(`FATIGA MATINAL (últimos días): ${feels.join('; ')}.`);
+  if (PLAN){
+    const pl = planById(PLAN.id);
+    L.push(`PLAN ACTIVO: "${pl.name}" (${pl.weeks.length} semanas). Sesiones de los últimos 7 días y próximos 14:`);
+    PLAN.sessions.filter(s => s.date >= dkey(now() - 7 * DAY) && s.date <= dkey(now() + 14 * DAY)).forEach(s => {
+      const w = wkById(s.wkId); L.push(`- ${s.date} (${DOW[dow(kdate(s.date))]}) sem ${s.week} [${pl.weeks[s.week - 1].t}]: ${s.wkId} "${w.name}" ${wkDurTxt(w)} TSS ${wkTSS(w)} → ${s.status === 'done' ? 'HECHA' : s.status === 'skip' ? 'saltada' : s.date < tk ? 'NO HECHA' : 'pendiente'}`);
+    });
+  } else L.push('PLAN ACTIVO: ninguno.');
+  L.push('ACTIVIDADES ÚLTIMOS 21 DÍAS:');
+  const since = now() - 21 * DAY;
+  ACTS.filter(a => a.date >= since).forEach(a => L.push(`- ${dkey(a.date)} rodillo "${a.name}" ${dur(a.dur)} TSS ${a.tss} NP ${a.np} W IF ${dec(a.ifv, 2)}${a.avgHr ? ' FC media ' + a.avgHr + ' máx ' + a.maxHr : ''}${a.rpe ? ' RPE ' + a.rpe + '/10' : ''}${a.note ? ' nota: "' + a.note + '"' : ''}`));
+  EXT.filter(e => e.date >= since).forEach(e => L.push(`- ${dkey(e.date)} Strava ${SPORT(e.sport)} "${e.name}" ${dur(e.dur)}${e.dist ? ' ' + dec(e.dist / 1000) + ' km' : ''} TSS≈${e.tss} (${e.how})${e.hr ? ' FC media ' + Math.round(e.hr) : ''}`));
+  const best = allTimeBest(null); const bl = [5, 60, 300, 1200].filter(d => best[d]).map(d => `${BEST_L[d]} ${best[d].w} W`);
+  if (bl.length) L.push(`MEJORES POTENCIAS: ${bl.join(', ')}.`);
+  if (focusActId){
+    const a = ACTS.find(x => x.id === focusActId);
+    if (a){ const rec = LS.get('ht_act_' + a.id, null); const iv = intervalSummary(a, rec);
+      L.push(`SESIÓN A ANALIZAR: ${dkey(a.date)} "${a.name}" ${clock(a.dur)}, TSS ${a.tss}, NP ${a.np}, media ${a.avgP}, máx ${a.maxP}, IF ${dec(a.ifv, 2)}, FC media ${a.avgHr || '-'} máx ${a.maxHr || '-'}, RPE ${a.rpe || '-'}, nota "${a.note || ''}". Tiempo en zonas (s) Z1-Z6: ${(a.zt || []).slice(1).join(', ')}.${iv ? '\nIntervalos:\n' + iv : ''}`); }
+  }
+  L.push('BIBLIOTECA DE WORKOUTS (id: nombre, tipo, duración, TSS):');
+  allWorkouts().forEach(w => L.push(`${w.id}: ${w.name}, ${w.tipo}, ${wkDurTxt(w)}, TSS ${wkTSS(w)}`));
+  return L.join('\n');
+}
+const COACH_SYS = `Eres el entrenador de ciclismo personal de un ciclista aficionado que entrena en rodillo con la app Hometrainer y también sale en bici y corre. Hablas en español de España, cercano y directo, como un buen entrenador: concreto, con números, sin rollos. Usas los datos que te da la app (forma CTL/ATL/TSB, fatiga matinal, plan, sesiones con RPE y notas, actividades de Strava). Si algo apunta a enfermedad, dolor o lesión, recomiendas parar y consultar a un profesional sanitario; no diagnosticas.
+
+Respondes SIEMPRE con un único objeto JSON válido, sin texto fuera de él, con esta forma:
+{"texto": "respuesta para el ciclista (máximo ~120 palabras; puedes usar **negrita** y líneas que empiecen por '- ')",
+ "acciones": [ ... ]}
+
+"acciones" es opcional (lista vacía si no hace falta). Tipos permitidos:
+- {"tipo":"cambiar_sesion","fecha":"AAAA-MM-DD","wkId":"<id de la biblioteca>","motivo":"..."}  → cambia o añade una sesión del plan ese día. Usa solo ids de la BIBLIOTECA.
+- {"tipo":"saltar_sesion","fecha":"AAAA-MM-DD","motivo":"..."}  → marca como saltada la sesión de ese día.
+- {"tipo":"intensidad_hoy","porcentaje":95,"motivo":"..."}  → ajusta la intensidad de los vatios de hoy (entre 80 y 105).
+- {"tipo":"empezar","wkId":"<id>"}  → propone empezar ya ese workout.
+- {"tipo":"crear_workout","nombre":"...","tipo_workout":"Sweet Spot","descripcion":"...","pasos":[{"t":"ramp","min":10,"p0":45,"p1":75},{"t":"rep","k":4,"onMin":5,"onSec":0,"onP":90,"offMin":3,"offSec":0,"offP":55},{"t":"const","min":10,"p":65,"n":"Z2"}]}  → crea un workout nuevo (porcentajes de FTP; tipos de paso: const, ramp, rep).
+Propón acciones solo cuando aporten algo; el ciclista decide si las aplica.`;
+async function coachAsk(userText, focusActId){
+  if (!S.apiKey){ toast('Pon tu clave de la API de Anthropic en Ajustes'); return; }
+  if (coachBusy) return;
+  coachBusy = true;
+  CHAT.push({role:'user', text:userText, at:now()}); saveChat(); renderCoach(true);
+  try{
+    const history = CHAT.slice(-8, -1).map(m => ({role:m.role, content:m.role === 'user' ? m.text : JSON.stringify({texto:m.text, acciones:m.actions || []})}));
+    const msgs = history.concat([{role:'user', content:`DATOS ACTUALES DE LA APP:\n${coachContext(focusActId)}\n\nMENSAJE DEL CICLISTA: ${userText}`}]);
+    while (msgs.length && msgs[0].role !== 'user') msgs.shift();
+    const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST',
+      headers:{'content-type':'application/json', 'x-api-key':S.apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:S.coachModel || 'claude-sonnet-5-5', max_tokens:1500, system:COACH_SYS, messages:msgs})});
+    const j = await r.json();
+    if (!r.ok) throw new Error((j.error && j.error.message) || ('error ' + r.status));
+    const raw = (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+    let obj = null; const m = raw.match(/\{[\s\S]*\}/);
+    try{ obj = JSON.parse(m ? m[0] : raw); }catch(e){ obj = {texto:raw, acciones:[]}; }
+    CHAT.push({role:'assistant', text:String(obj.texto || ''), actions:validActions(obj.acciones), at:now()});
+  }catch(e){
+    CHAT.push({role:'assistant', text:'No he podido contestar: ' + e.message + (/(401|auth|x-api-key)/i.test(e.message) ? '. Revisa la clave en Ajustes.' : ''), actions:[], err:true, at:now()});
+  }
+  saveChat(); coachBusy = false; renderCoach(true);
+}
+function validActions(arr){
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(a => a && typeof a === 'object').filter(a => {
+    if (a.tipo === 'cambiar_sesion') return /^\d{4}-\d{2}-\d{2}$/.test(a.fecha) && wkById(a.wkId);
+    if (a.tipo === 'saltar_sesion') return /^\d{4}-\d{2}-\d{2}$/.test(a.fecha) && PLAN && PLAN.sessions.some(s => s.date === a.fecha);
+    if (a.tipo === 'intensidad_hoy') return +a.porcentaje >= 70 && +a.porcentaje <= 110;
+    if (a.tipo === 'empezar') return !!wkById(a.wkId);
+    if (a.tipo === 'crear_workout') return Array.isArray(a.pasos) && a.pasos.length;
+    return false;
+  }).slice(0, 4).map(a => Object.assign({done:false}, a));
+}
+function mdLite(t){
+  return esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split('\n').map(l => /^\s*[-•]\s+/.test(l) ? `<div style="padding-left:14px;text-indent:-10px">• ${l.replace(/^\s*[-•]\s+/, '')}</div>` : l ? `<div>${l}</div>` : '<div style="height:6px"></div>').join('');
+}
+function actionCard(a, mi, ai){
+  let title = '', body = '', btn = 'Aplicar';
+  const dlabel = f => { const d = kdate(f); return (f === today() ? 'hoy' : DOWL[dow(d)].toLowerCase()) + ' ' + d.getDate(); };
+  if (a.tipo === 'cambiar_sesion'){
+    const cur = PLAN && PLAN.sessions.find(s => s.date === a.fecha && s.status !== 'done');
+    title = `Sesión de ${dlabel(a.fecha)}`;
+    body = `${cur ? esc(wkById(cur.wkId).name) + ' → ' : 'Añadir: '}<b>${esc(wkById(a.wkId).name)}</b>`;
+  } else if (a.tipo === 'saltar_sesion'){ title = `Saltar la sesión de ${dlabel(a.fecha)}`; btn = 'Saltar'; }
+  else if (a.tipo === 'intensidad_hoy'){ title = `Intensidad de hoy al ${Math.round(a.porcentaje)} %`; body = 'Los vatios de los workouts de hoy se ajustarán solos.'; }
+  else if (a.tipo === 'empezar'){ const w = wkById(a.wkId); title = esc(w.name); body = `${wkDurTxt(w)}, TSS ${wkTSS(w)}`; btn = 'Empezar ahora'; }
+  else if (a.tipo === 'crear_workout'){ const w = customToWk({id:'x', name:a.nombre, tipo:a.tipo_workout, steps:a.pasos}); title = 'Workout: ' + esc(a.nombre || 'nuevo'); body = `${dur(wkDur(w))}, TSS ${wkTSS(w)}${profileSVG(w).replace('class="prof"', 'class="prof" style="margin-top:8px"')}`; btn = 'Guardar en mis workouts'; }
+  return `<div class="cact"><div class="small mut">${a.motivo ? esc(a.motivo) : 'Propuesta'}</div><div style="font-weight:600;margin-top:2px">${title}</div>${body ? `<div class="small" style="margin-top:2px">${body}</div>` : ''}
+    ${a.done ? '<div class="small" style="color:var(--ok);font-weight:600;margin-top:8px">✓ Aplicado</div>' : `<button class="btn sm acc" style="margin-top:10px" onclick="applyAction(${mi},${ai})">${btn}</button>`}</div>`;
+}
+function applyAction(mi, ai){
+  const a = CHAT[mi].actions[ai]; if (!a || a.done) return;
+  if (a.tipo === 'cambiar_sesion'){
+    if (!PLAN){ if (a.fecha === today()){ closeCoach(); startSession(wkById(a.wkId)); a.done = true; saveChat(); } else toast('No tienes plan activo: empieza el workout cuando toque'); return; }
+    const cur = PLAN.sessions.find(s => s.date === a.fecha && s.status !== 'done');
+    if (cur){ cur.wkId = a.wkId; cur.status = 'pend'; }
+    else { const near = PLAN.sessions.reduce((b, s) => Math.abs(kdate(s.date) - kdate(a.fecha)) < Math.abs(kdate(b.date) - kdate(a.fecha)) ? s : b, PLAN.sessions[0]); PLAN.sessions.push({date:a.fecha, wkId:a.wkId, week:near ? near.week : 1, status:'pend', actId:null}); PLAN.sessions.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0); }
+    savePlan(); toast('Plan actualizado');
+  } else if (a.tipo === 'saltar_sesion'){ PLAN.sessions.filter(s => s.date === a.fecha && s.status === 'pend').forEach(s => s.status = 'skip'); savePlan(); toast('Sesión saltada'); }
+  else if (a.tipo === 'intensidad_hoy'){ S.todayMult = {date:today(), mult:Math.round(a.porcentaje) / 100}; saveS(); toast('Intensidad de hoy al ' + Math.round(a.porcentaje) + ' %'); }
+  else if (a.tipo === 'empezar'){ a.done = true; saveChat(); closeCoach(); startSession(wkById(a.wkId), todaySess() && todaySess().wkId === a.wkId ? today() : null); return; }
+  else if (a.tipo === 'crear_workout'){
+    const c = {id:'c_' + now(), name:a.nombre || 'Workout del entrenador', tipo:TIPOS.includes(a.tipo_workout) ? a.tipo_workout : 'Sweet Spot', desc:a.descripcion || 'Creado por tu entrenador.', steps:a.pasos.map(p => Object.assign({}, p))};
+    CUSTOM.push(c); LS.set('ht_custom', CUSTOM); toast('Guardado en tus workouts');
+  }
+  a.done = true; saveChat(); renderCoach(false);
+}
+const COACH_CHIPS = [['¿Qué hago hoy?', '¿Qué hago hoy? Mira mi forma, mi fatiga y el plan, y dime si hago la sesión prevista, la ajusto o descanso.'],
+  ['Revisa mi semana', 'Revisa mi última semana y los próximos 7 días del plan. ¿Voy bien? ¿Cambiarías algo?'],
+  ['Analiza mi última sesión', null], ['Créame un workout', 'Créame un workout para hoy adaptado a cómo estoy, de unos 60 minutos.']];
+function openCoach(prefill, focusActId){
+  $('coach').classList.add('on'); renderCoach(true);
+  if (prefill) coachAsk(prefill, focusActId);
+}
+function closeCoach(){ $('coach').classList.remove('on'); if ($('sHome').classList.contains('on')) renderHome(); }
+function coachChip(i){
+  const c = COACH_CHIPS[i];
+  if (c[1]) return coachAsk(c[1]);
+  const a = ACTS[0]; if (!a) return toast('Todavía no hay sesiones');
+  coachAsk(`Analiza mi última sesión (${a.name}, ${fdate(a.date)}): cómo la he hecho, si cumplí los vatios y qué saco de ella.`, a.id);
+}
+function renderCoach(scroll){
+  const box = $('coachMsgs');
+  if (!S.apiKey){
+    box.innerHTML = `<div class="card" style="margin-top:10px"><h2>Activa tu entrenador</h2><p class="mut" style="margin:0 0 12px">Funciona con la API de Anthropic, igual que tus otras apps. Pega tu clave en Ajustes, en el apartado Entrenador IA. La clave se queda en este móvil.</p>
+      <button class="btn acc block" onclick="closeCoach();show('sCfg')">Ir a Ajustes</button></div>`;
+    $('coachChips').innerHTML = ''; return;
+  }
+  box.innerHTML = (CHAT.length ? '' : `<div class="empty" style="padding:24px 10px">Pregúntame lo que quieras sobre tu entrenamiento. Veo tu forma, tu plan, tus sesiones y lo que haces en Strava.</div>`) +
+    CHAT.map((m, mi) => m.role === 'user' ? `<div class="bub me">${esc(m.text)}</div>`
+      : `<div class="bub ai ${m.err ? 'err' : ''}">${mdLite(m.text)}${(m.actions || []).map((a, ai) => actionCard(a, mi, ai)).join('')}</div>`).join('') +
+    (coachBusy ? '<div class="bub ai"><span class="typing"><i></i><i></i><i></i></span></div>' : '');
+  $('coachChips').innerHTML = COACH_CHIPS.map((c, i) => `<button onclick="coachChip(${i})" ${coachBusy ? 'disabled' : ''}>${c[0]}</button>`).join('');
+  if (scroll) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 30);
+}
+function coachSend(){ const t = $('coachIn').value.trim(); if (!t) return; $('coachIn').value = ''; coachAsk(t); }
+function clearChat(){ if (!confirm('¿Borrar la conversación?')) return; CHAT = []; saveChat(); renderCoach(false); }
+
 // ================= BLUETOOTH =================
 const FEC_SVC = '6e40fec1-b5a3-f393-e0a9-e50e24dcca9e';
 const FEC_RX  = '6e40fec2-b5a3-f393-e0a9-e50e24dcca9e';
@@ -1019,7 +1224,7 @@ function startSession(wk, sessKey, route){
   }
   closeSheet(); audioInit();
   Object.assign(P, {
-    on:true, wk, route:route || null, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, mult:1, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
+    on:true, wk, route:route || null, mult:(S.todayMult && S.todayMult.date === today() && wk) ? S.todayMult.mult : 1, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
     wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
     start:null, rec:newRec(), dist:0, lastSent:null, lastChart:0, p3:[],
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
@@ -1340,7 +1545,8 @@ function showAct(id, fresh){
     <h3 style="margin-top:16px">¿Cómo ha ido? (esfuerzo 1-10)</h3>
     <div class="rpe">${[1,2,3,4,5,6,7,8,9,10].map(v => `<button onclick="setRPE(${a.id},${v})" style="${a.rpe === v ? `background:${rpeCol(v)};color:#111;border-color:transparent` : ''}">${v}</button>`).join('')}</div>
     <textarea placeholder="Notas: sensaciones, piernas, sueño…" style="margin-top:8px" onchange="setNote(${a.id},this.value)">${esc(a.note || '')}</textarea>
-    <div class="grid2" style="margin-top:16px">
+    <button class="btn block" style="margin-top:16px" onclick="closeSheet();openCoach('Analiza esta sesión: ${esc(a.name).replace(/'/g, '')} del ${dkey(a.date)}. ¿Cómo la he hecho y qué saco de ella?', ${a.id})">${ICON.coach} Pedir opinión al entrenador</button>
+    <div class="grid2" style="margin-top:10px">
       ${a.strava ? `<a class="btn" style="text-align:center;text-decoration:none;color:#fc6a2c" href="https://www.strava.com/activities/${a.strava}" target="_blank">Ver en Strava</a>`
                  : `<button class="btn acc" id="upBtn" onclick="stravaUpload(${a.id})">Subir a Strava</button>`}
       <button class="btn" onclick="downloadTCX(${a.id})">Descargar TCX</button>
@@ -1665,6 +1871,10 @@ function renderHome(){
   const a = ACTS[0];
   $('lastBox').innerHTML = a ? `<div class="sec"><h2>Última sesión</h2><button class="link" onclick="show('sAna');anaTab('actividad')">Ver todas</button></div>
     <div class="group">${actRow(a)}</div>` : '';
+  const lastAi = CHAT.slice().reverse().find(m => m.role === 'assistant' && !m.err);
+  $('coachCard').innerHTML = `<div class="av">${ICON.coach}</div><div style="flex:1;min-width:0"><b style="font-weight:600">Tu entrenador</b>
+    <div class="small mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${S.apiKey ? (lastAi ? esc(lastAi.text.replace(/\*\*/g, '').slice(0, 90)) : 'Pregúntale qué hacer hoy o pídele un workout') : 'Actívalo con tu clave de Anthropic'}</div></div>
+    <button class="btn sm acc" onclick="event.stopPropagation();openCoach(S.apiKey ? COACH_CHIPS[0][1] : null)">¿Qué hago hoy?</button>`;
   updateConn(); renderInstall();
 }
 const TIPO_C = {'Recuperación':'#8a93a6', 'Resistencia':'#3d8bff', 'Tempo':'#2bc48a', 'Sweet Spot':'#9fd13c', 'Umbral':'#f2c230', 'VO2max':'#ff8a2a', 'Anaeróbico':'#ff4d5e', 'Fuerza':'#b07cff', 'Test':'#ff4d5e', 'Mío':'#ff7a1a'};
@@ -1684,6 +1894,7 @@ const ICON = {
   plus:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   reset:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"/></svg>',
   list:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 20h3v-6H3zM10.5 20h3V8h-3zM18 20h3V4h-3z"/></svg>',
+  coach:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11h7M8.5 14h4"/></svg>',
   wave:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18l5-7 4 4 5-9 6 12"/></svg>'
 };
 function recoverLive(save){
@@ -1972,6 +2183,7 @@ function anaLogros(){
 function renderCfg(){
   applyTheme();
   $('iFtp').value = S.ftp; $('iPeso').value = S.peso; $('iFc').value = S.fcmax; $('iLthr').value = S.lthr; $('iName').value = S.name;
+  $('iModel').innerHTML = COACH_MODELS.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); $('iModel').value = S.coachModel; $('iKey').value = S.apiKey; $('iNotes').value = S.coachNotes;
   $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
   $('cbDom').textContent = location.hostname || '(tu dominio)';
   $('stravaState').innerHTML = S.strava ? `<span style="color:var(--ok)">● Conectado${S.strava.who ? ' como ' + esc(S.strava.who) : ''}</span>${S.lastSync ? ' · sincronizado ' + fdate(S.lastSync) : ''}` : 'No conectado';
@@ -1981,14 +2193,15 @@ function readCfg(){
   const n = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : d; };
   const oldPeso = S.peso, oldFtp = S.ftp;
   S.ftp = Math.round(n('iFtp', S.ftp)); S.peso = n('iPeso', S.peso); S.fcmax = Math.round(n('iFc', S.fcmax)); S.lthr = Math.round(n('iLthr', S.lthr));
+  S.apiKey = $('iKey').value.trim(); S.coachModel = $('iModel').value; S.coachNotes = $('iNotes').value.trim();
   S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
   if (S.ftp !== oldFtp) S.ftpHist.push({date:now(), ftp:S.ftp});
   saveS();
   if (S.peso !== oldPeso && trainerOn()) sendUserCfg();
 }
-['iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iSid', 'iSsec'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
+['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iSid', 'iSsec'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
 function exportData(){
-  const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
+  const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
   downloadBlob(new Blob([JSON.stringify(data)], {type:'application/json'}), 'hometrainer-copia-' + today() + '.json');
 }
 function importData(inp){
