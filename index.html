@@ -48,6 +48,12 @@ button{font-family:inherit;color:inherit}
 .top .tx{flex:1;min-width:0}
 .mascot{height:104px;max-width:46%;object-fit:contain;flex:none;cursor:pointer;margin:-6px 0 -10px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.18))}
 .av img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+.bri{position:fixed;left:14px;right:14px;top:calc(8px + env(safe-area-inset-top));z-index:25;display:flex;gap:10px;align-items:center;background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:8px 12px 8px 8px;box-shadow:0 8px 24px rgba(0,0,0,.28);transform:translateY(-150%);opacity:0;transition:transform .35s,opacity .35s;pointer-events:none;font-weight:600;font-size:15px;line-height:1.3;max-width:680px;margin:0 auto}
+.bri.on{transform:none;opacity:1;pointer-events:auto}
+.bri img{width:44px;height:44px;border-radius:12px;flex:none;object-fit:cover}
+.hsay{display:inline-block;margin-top:8px;background:var(--s1);color:var(--txt);font-size:14px;line-height:1.35;padding:7px 11px;border-radius:14px 14px 4px 14px;max-width:100%}
+.weekcard .av{width:44px;height:44px;border-radius:14px;background:var(--accbg);flex:none;overflow:hidden}
+.clamp3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .mascot-big{display:block;margin:0 auto 8px;max-width:72%;max-height:190px;object-fit:contain}
 .top .date{color:var(--mut);font-size:14px;font-weight:500}
 h1{font:700 30px/1.1 var(--body);margin:14px 0 16px;letter-spacing:-.015em}
@@ -290,7 +296,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <!-- ================= INICIO ================= -->
 <section class="screen on" id="sHome">
-  <div class="top"><div class="tx"><div class="date" id="hDate"></div><h1 id="hello">Hola</h1></div><img class="mascot" id="mascot" src="mascota/saludo.webp" alt="" onclick="openCoach()"></div>
+  <div class="top"><div class="tx"><div class="date" id="hDate"></div><h1 id="hello">Hola</h1><div class="hsay" id="hSay" onclick="openCoach()"></div></div><img class="mascot" id="mascot" src="mascota/saludo.webp" alt="" onclick="openCoach()"></div>
   <div id="homeWarn"></div>
   <div id="recover"></div>
   <div id="installBox"></div>
@@ -302,6 +308,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   <div id="heroBox"></div>
   <div class="quick" id="quickBox"></div>
   <div class="card coachcard" id="coachCard" style="margin-top:10px" onclick="openCoach()"></div>
+  <div id="weekCard"></div>
   <div class="sec"><h2>Forma</h2><button class="link" onclick="show('sAna');anaTab('forma')">Ver análisis</button></div>
   <div class="card" id="formCard"></div>
   <div class="sec"><h2>Esta semana</h2><span class="small mut" id="wRange"></span></div>
@@ -366,6 +373,8 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     </select>
     <label>Pitidos al cambiar de intervalo</label>
     <select id="iSound"><option value="1">Sí, con vibración</option><option value="0">No</option></select>
+    <label>Brinco durante la sesión</label>
+    <select id="iBrinco"><option value="1">Sí, que me anime</option><option value="0">No</option></select>
     <label>Pantalla siempre encendida</label>
     <button class="btn ghost block" onclick="testWake()">Probar pantalla encendida (3 min)</button>
     <div class="small" id="wakeRes" style="margin-top:8px"></div>
@@ -375,6 +384,8 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     <h2>Entrenador IA</h2>
     <label>Clave de la API de Anthropic</label><input type="password" id="iKey" placeholder="sk-ant-…" autocomplete="off">
     <label>Modelo</label><select id="iModel"></select>
+    <label>Informe semanal automático</label>
+    <select id="iWeek"><option value="1">Sí, al abrir la app cada semana</option><option value="0">No</option></select>
     <label>Notas para el entrenador</label><textarea id="iNotes" placeholder="Objetivos, molestias, días y horas disponibles, otros deportes…"></textarea>
     <div class="small mut" style="margin-top:8px">La clave se guarda solo en este móvil y las consultas van directas a Anthropic.</div>
     <h3 style="margin-top:18px">Gasto</h3>
@@ -413,6 +424,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <!-- ================= PLAYER ================= -->
 <div id="player">
+  <div class="bri" id="pBri" onclick="this.classList.remove('on')"><img src="mascota/avatar.webp" alt="Brinco"><div id="pBriT"></div></div>
   <div class="ptop">
     <div style="min-width:0"><div class="nm" id="pName"></div><div class="small mut" id="pSub"></div></div>
     <div class="row" style="gap:14px"><div class="tt"><b id="pTime">0:00</b><span>tiempo</span></div><button class="btn sm" onclick="askEnd()">Terminar</button></div>
@@ -456,7 +468,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.8.2';
+const VER = '0.9.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -939,7 +951,17 @@ async function coachAsk(userText, focusActId){
   coachBusy = true;
   CHAT.push({role:'user', text:userText, at:now()}); saveChat(); renderCoach(true);
   try{
-    const history = CHAT.slice(-8, -1).map(m => ({role:m.role, content:m.role === 'user' ? m.text : JSON.stringify({texto:m.text, acciones:m.actions || []})}));
+    const res = await coachApi(userText, focusActId, true);
+    CHAT.push(res.msg);
+  }catch(e){
+    CHAT.push({role:'assistant', text:'No he podido contestar: ' + e.message + (/(401|auth|x-api-key)/i.test(e.message) ? '. Revisa la clave en Ajustes.' : ''), actions:[], err:true, at:now()});
+  }
+  saveChat(); coachBusy = false; renderCoach(true);
+}
+// Llamada a la API. inChat: el último mensaje de CHAT ya es la pregunta y no va en el historial.
+async function coachApi(userText, focusActId, inChat){
+  {
+    const history = (inChat ? CHAT.slice(-8, -1) : CHAT.slice(-7)).map(m => ({role:m.role, content:m.role === 'user' ? m.text : JSON.stringify({texto:m.text, acciones:m.actions || []})}));
     const msgs = history.concat([{role:'user', content:`DATOS ACTUALES DE LA APP:\n${coachContext(focusActId)}\n\nMENSAJE DEL CICLISTA: ${userText}`}]);
     while (msgs.length && msgs[0].role !== 'user') msgs.shift();
     const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST',
@@ -952,11 +974,8 @@ async function coachAsk(userText, focusActId){
     const raw = (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
     let obj = null; const m = raw.match(/\{[\s\S]*\}/);
     try{ obj = JSON.parse(m ? m[0] : raw); }catch(e){ obj = {texto:raw, acciones:[]}; }
-    CHAT.push({role:'assistant', text:String(obj.texto || ''), actions:validActions(obj.acciones), at:now(), cost, tok:j.usage ? (j.usage.input_tokens || 0) + (j.usage.cache_creation_input_tokens || 0) + (j.usage.cache_read_input_tokens || 0) + (j.usage.output_tokens || 0) : 0, cached:j.usage ? j.usage.cache_read_input_tokens || 0 : 0});
-  }catch(e){
-    CHAT.push({role:'assistant', text:'No he podido contestar: ' + e.message + (/(401|auth|x-api-key)/i.test(e.message) ? '. Revisa la clave en Ajustes.' : ''), actions:[], err:true, at:now()});
+    return {msg:{role:'assistant', text:String(obj.texto || ''), actions:validActions(obj.acciones), at:now(), cost, tok:j.usage ? (j.usage.input_tokens || 0) + (j.usage.cache_creation_input_tokens || 0) + (j.usage.cache_read_input_tokens || 0) + (j.usage.output_tokens || 0) : 0, cached:j.usage ? j.usage.cache_read_input_tokens || 0 : 0}};
   }
-  saveChat(); coachBusy = false; renderCoach(true);
 }
 function validActions(arr){
   if (!Array.isArray(arr)) return [];
@@ -1287,7 +1306,7 @@ function startSession(wk, sessKey, route){
   Object.assign(P, {
     on:true, wk, route:route || null, mult:(S.todayMult && S.todayMult.date === today() && wk) ? S.todayMult.mult : 1, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
     wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
-    start:null, rec:newRec(), dist:0, lastSent:null, lastChart:0, p3:[],
+    start:null, rec:newRec(), dist:0, brAt:0, brStart:0, brHalf:0, brKm:0, brRamp:0, lastSent:null, lastChart:0, p3:[],
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
     total: wk ? wkDur(wk) : 0
   });
@@ -1315,6 +1334,52 @@ function renderRoute(){
   const ahead = Math.min(500, left), gA = ahead > 50 ? (routeEle(r, P.rDist + ahead) - routeEle(r, P.rDist)) / ahead * 100 : 0;
   $('pNext').textContent = ahead > 50 ? `Próximos ${Math.round(ahead)} m: media del ${dec(gA)} %` : 'Últimos metros';
 }
+// ================= BRINCO EN LA SESIÓN =================
+const BR = {
+  start:['¡Vamos allá! Empieza suave, que lo bueno llega luego.', 'Croac, a rodar. Calienta tranquilo los primeros minutos.', 'Aquí estoy contigo. Piernas sueltas y a disfrutar.'],
+  hard:['¡Toca apretar! {d} a {w} W. Respira hondo.', 'Bloque duro: {d} a {w} W. ¡Tú puedes!', '¡Al lío! {w} W durante {d}. Cadencia alta.'],
+  thr:['Umbral: {d} a {w} W. Constante, sin cebarte al principio.', 'Ritmo de umbral, {d}. Hombros sueltos y aguanta.'],
+  tempo:['Bloque de {d} a {w} W. Firme pero controlado.', '{d} a {w} W. Incómodo pero sostenible.'],
+  easy:['Recupera: suelta piernas y bebe un trago.', 'Respira. Aprovecha para beber y relajar los hombros.', 'Recuperación. Baja pulsaciones, que viene más.'],
+  last:['¡Último bloque duro! Vacía el depósito.', '¡El último! Aquí se gana la forma.', 'Último esfuerzo, ¡a por él!'],
+  cool:['Vuelta a la calma. ¡Buen trabajo!', 'Ya está lo duro. Gira suave y estira después.'],
+  half:['Mitad del entreno. Vas muy bien.', 'Ecuador superado. Sigue así.'],
+  ramp:['Rampa dura: {g} %. Siéntate y gira con calma.', '¡Repecho del {g} %! Esto es lo mío.'],
+  lastkm:['¡Último kilómetro! A coronar.', 'Queda un kilómetro. ¡Brinca hasta arriba!'],
+  drink:['Llevas un buen rato. Bebe un trago.', 'Recuerda hidratarte, que en el rodillo se suda el doble.']
+};
+const brPick = (k, v = {}) => { const a = BR[k]; return a[Math.floor(Math.random() * a.length)].replace(/\{(\w)\}/g, (_, x) => v[x] != null ? v[x] : ''); };
+const fmtD = s => s < 60 ? s + ' s' : s % 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : (s / 60) + ' min';
+const segInt = x => x.w != null ? x.w / S.ftp : x.p != null ? x.p : (x.p0 + x.p1) / 2;
+let brT = null;
+function brSay(txt){
+  if (S.brinco === 0 || !txt) return;
+  P.brAt = now(); $('pBriT').textContent = txt; const b = $('pBri'); b.classList.add('on');
+  clearTimeout(brT); brT = setTimeout(() => b.classList.remove('on'), 6500);
+}
+function brSeg(){
+  const segs = P.wk.segs, i = P.segI, s = segs[i], r = segInt(s) * P.mult, w = segW(s, s.d / 2, P.mult);
+  if (P.wk.test === 'rampa'){ if (i > 1 && i % 5 === 0) brSay('¡Escalón ' + i + '! Sigue, sigue…'); return; }
+  const hard = segs.map((x, k) => segInt(x) >= .88 ? k : -1).filter(k => k >= 0);
+  let k;
+  if (hard.length > 1 && i === hard[hard.length - 1]) k = 'last';
+  else if (i === segs.length - 1 && r < .6) k = 'cool';
+  else if (r >= 1.05) k = 'hard'; else if (r >= .88) k = 'thr'; else if (r >= .76) k = 'tempo';
+  else if (i && segInt(segs[i - 1]) >= .76) k = 'easy';
+  else return;
+  // en series cortas no hablar en cada cambio
+  if (s.d < 60 && k !== 'last' && k !== 'cool' && now() - P.brAt < 90000) return;
+  brSay(brPick(k, {d:fmtD(s.d), w}));
+}
+function brTick(){
+  if (P.wk && P.total >= 1200 && !P.brHalf && P.wt >= P.total / 2 && now() - P.brAt > 20000){ P.brHalf = 1; brSay(brPick('half')); }
+  if (P.route){
+    if (!P.brKm && P.route.dist > 3000 && P.route.dist - P.rDist <= 1000){ P.brKm = 1; brSay(brPick('lastkm')); }
+    const g = routeGrade(P.route, P.rDist) * P.diff;
+    if (g >= 8 && now() - P.brRamp > 180000 && now() - P.brAt > 20000){ P.brRamp = now(); brSay(brPick('ramp', {g:Math.round(g)})); }
+  }
+  if (!P.wk && P.wt > 0 && P.wt % 1200 === 0) brSay(brPick('drink'));
+}
 function curSeg(){
   if (!P.wk) return null;
   while (P.segI < P.wk.segs.length - 1 && P.wt >= P.starts[P.segI + 1]) P.segI++;
@@ -1335,7 +1400,7 @@ function tick(){
   P.zero = (pw <= 0 && sp < 1) ? P.zero + 1 : 0;
   if (!P.manual){
     if (P.running && P.zero >= 4){ P.running = false; P.auto = true; }
-    else if (!P.running && P.auto && pw > 15){ P.running = true; P.auto = false; if (!P.start) P.start = now(); }
+    else if (!P.running && P.auto && pw > 15){ P.running = true; P.auto = false; if (!P.start) P.start = now(); if (!P.brStart){ P.brStart = 1; brSay(brPick('start')); } }
   }
   if (P.running){
     const r = P.rec;
@@ -1351,12 +1416,13 @@ function tick(){
     r.p.push(Math.round(pw)); r.hr.push(curHR()); r.c.push(Math.round(curCad())); r.s.push(Math.round(vs * 10)); r.wt.push(P.wt);
     P.dist += vs / 3.6;
     P.wt++;
+    brTick();
     if (P.route && P.rDist >= P.route.dist){ beep(660, 500); toast('¡Trayecto completado!'); return endSession(); }
     if (P.wk && P.wt >= P.total){ beep(660, 500); toast(P.wk.test ? 'Fin del test' : '¡Entreno completado!'); return endSession(); }
     if (P.wk){
       curSeg();
       const left = P.starts[P.segI] + P.wk.segs[P.segI].d - P.wt;
-      if (P.segI !== P.lastSegI){ P.lastSegI = P.segI; beep(1180, 350); buzz([200, 80, 200]); const b = $('pIntBox'); b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 1500); }
+      if (P.segI !== P.lastSegI){ P.lastSegI = P.segI; brSeg(); beep(1180, 350); buzz([200, 80, 200]); const b = $('pIntBox'); b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 1500); }
       else if (left <= 3 && left >= 1 && P.wk.segs[P.segI].d >= 20) beep(880, 110);
     }
     if (r.p.length % 30 === 0) saveLive();
@@ -1858,7 +1924,53 @@ function mascotState(){
   if (ts && ts.status === 'pend') return 'esfuerzo';
   return 'saludo';
 }
-function setMascot(){ const el = $('mascot'); if (!el) return; const m = mascotState(), src = 'mascota/' + m + '.webp'; if (!el.src.endsWith(src)) el.src = src; el.dataset.m = m; }
+const HSAY = {
+  logro:['¡Hecho por hoy! Ahora come bien y descansa.', 'Sesión en el bolsillo. Croac de orgullo.', 'Así se hace. Mañana más y mejor.'],
+  descanso:['Hoy toca bajar el ritmo. Recuperar también es entrenar.', 'Las ranas también descansan. Hoy suave o sofá.', 'Hoy nada de heroicidades: piernas arriba.'],
+  esfuerzo:['Hoy toca {s}. Te espero en el rodillo.', '¡Hay sesión! {s}. ¿Saltamos?', 'Hoy: {s}. Calienta bien y a por ello.'],
+  saludo:['¿Rodamos hoy?', 'Sin plan para hoy. ¿Rodaje libre o un trayecto?', 'Si no sabes qué hacer, pregúntame.', '¿Subimos algún puerto hoy?']
+};
+function homeSay(m){
+  const a = HSAY[m]; let h = 0; for (const c of today() + m) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const ts = todaySess(), wk = ts ? wkById(ts.wkId) : null;
+  return a[h % a.length].replace('{s}', wk ? wk.name : 'tu sesión');
+}
+let weeklyBusy = false;
+function renderWeekCard(){
+  const el = $('weekCard'); if (!el) return;
+  const W = LS.get('ht_week', null);
+  if (!S.apiKey || !W || W.ws !== weekStart() || W.hidden){ el.innerHTML = ''; return; }
+  const body = W.busy ? '<div class="small mut">Brinco está repasando tu semana…</div>'
+    : W.err ? `<div class="small mut">No he podido hacer el informe (${esc(W.err)}).</div><button class="btn sm ghost" style="margin-top:8px" onclick="event.stopPropagation();weeklyReport(true)">Reintentar</button>`
+    : `<div class="small mut clamp3">${esc(W.text.replace(/\*\*/g, ''))}</div>`;
+  el.innerHTML = `<div class="card coachcard weekcard" onclick="${W.text ? 'weekSheet()' : ''}"><div class="av"><img src="mascota/entrenador.webp" alt="" style="width:100%;height:100%;object-fit:cover;object-position:50% 0"></div>
+    <div style="flex:1;min-width:0"><b style="font-weight:600">Informe de la semana</b>${body}</div></div>`;
+}
+function weekSheet(){
+  const W = LS.get('ht_week', null); if (!W || !W.text) return;
+  openSheet(`<img class="mascot-big" src="mascota/entrenador.webp" alt=""><h2>Informe de la semana</h2><div>${mdLite(W.text)}</div>
+    <div class="row" style="margin-top:14px"><button class="btn acc" onclick="closeSheet();openCoach()">Comentar con Brinco</button><button class="btn ghost" onclick="weekHide()">Ocultar</button></div>`);
+}
+function weekHide(){ const W = LS.get('ht_week', null); if (W){ W.hidden = true; LS.set('ht_week', W); } closeSheet(); renderWeekCard(); }
+async function weeklyReport(force){
+  if (!S.apiKey || weeklyBusy || coachBusy) return;
+  const ws = weekStart(), W = LS.get('ht_week', null);
+  if (!force){
+    if (S.weekAuto === 0 || (W && W.ws === ws)) return;
+    const prev = ws - 7 * 864e5;
+    if (!ACTS.some(a => a.date >= prev && a.date < ws) && !EXT.some(a => a.date >= prev && a.date < ws)) return;
+  }
+  weeklyBusy = true; LS.set('ht_week', {ws, busy:true}); renderWeekCard();
+  const q = 'Hazme el informe de la semana pasada (de lunes a domingo): qué hice, cómo han ido la carga y la fatiga, y uno o dos ajustes concretos para esta semana. Máximo 120 palabras. No propongas acciones salvo que sea muy claro.';
+  try{
+    const res = await coachApi(q);
+    CHAT.push({role:'user', text:'📋 Informe de la semana', at:now()}, res.msg); saveChat();
+    LS.set('ht_week', {ws, text:res.msg.text, at:now()});
+  }catch(e){ LS.set('ht_week', {ws, err:e.message}); }
+  weeklyBusy = false; renderWeekCard();
+  if ($('sHome').classList.contains('on')) renderHome();
+}
+function setMascot(){ const el = $('mascot'); if (!el) return; const m = mascotState(), src = 'mascota/' + m + '.webp'; if (!el.src.endsWith(src)) el.src = src; el.dataset.m = m; $('hSay').textContent = homeSay(m); }
 function renderHome(){
   const d = new Date(), h = d.getHours();
   const ds = d.toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'});
@@ -1949,7 +2061,8 @@ function renderHome(){
   $('coachCard').innerHTML = `<div class="av"><img src="mascota/avatar.webp" alt="Brinco"></div><div style="flex:1;min-width:0"><b style="font-weight:600">Brinco, tu entrenador</b>
     <div class="small mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${S.apiKey ? (lastAi ? esc(lastAi.text.replace(/\*\*/g, '').slice(0, 90)) : 'Pregúntale qué hacer hoy o pídele un workout') : 'Actívalo con tu clave de Anthropic'}</div></div>
     <button class="btn sm acc" onclick="event.stopPropagation();openCoach(S.apiKey ? COACH_CHIPS[0][1] : null)">¿Qué hago hoy?</button>`;
-  updateConn(); renderInstall();
+  renderWeekCard(); updateConn(); renderInstall();
+  if (!weeklyBusy) setTimeout(() => weeklyReport(false), 1500);
 }
 const TIPO_C = {'Recuperación':'#8a93a6', 'Resistencia':'#3d8bff', 'Tempo':'#2bc48a', 'Sweet Spot':'#9fd13c', 'Umbral':'#f2c230', 'VO2max':'#ff8a2a', 'Anaeróbico':'#ff4d5e', 'Fuerza':'#b07cff', 'Test':'#ff4d5e', 'Mío':'#ff7a1a'};
 function wkIF(wk){ const t = wkTSS(wk), h = wkDur(wk) / 3600; return h ? Math.sqrt(t / 100 / h) : 0; }
@@ -2270,7 +2383,7 @@ function renderCfg(){
       <button class="btn sm ghost" style="margin-top:8px" onclick="if(confirm('¿Poner el contador a cero?')){S.aiUsage=null;S.aiTotal=null;saveS();renderCfg();}">Poner a cero</button>`;
   }
   $('iModel').innerHTML = COACH_MODELS.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); $('iModel').value = S.coachModel; $('iKey').value = S.apiKey; $('iNotes').value = S.coachNotes;
-  $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
+  $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iBrinco').value = String(S.brinco == null ? 1 : +S.brinco); $('iWeek').value = String(S.weekAuto == null ? 1 : +S.weekAuto); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
   $('cbDom').textContent = location.hostname || '(tu dominio)';
   $('stravaState').innerHTML = S.strava ? `<span style="color:var(--ok)">● Conectado${S.strava.who ? ' como ' + esc(S.strava.who) : ''}</span>${S.lastSync ? ' · sincronizado ' + fdate(S.lastSync) : ''}` : 'No conectado';
   $('ver').textContent = 'Umbral v' + VER + ' · ' + ACTS.length + ' sesiones · ' + CUSTOM.length + ' workouts propios';
@@ -2280,12 +2393,12 @@ function readCfg(){
   const oldPeso = S.peso, oldFtp = S.ftp;
   S.ftp = Math.round(n('iFtp', S.ftp)); S.peso = n('iPeso', S.peso); S.fcmax = Math.round(n('iFc', S.fcmax)); S.lthr = Math.round(n('iLthr', S.lthr));
   S.apiKey = $('iKey').value.trim(); S.coachModel = $('iModel').value; S.coachNotes = $('iNotes').value.trim();
-  S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
+  S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.brinco = +$('iBrinco').value; S.weekAuto = +$('iWeek').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
   if (S.ftp !== oldFtp) S.ftpHist.push({date:now(), ftp:S.ftp});
   saveS();
   if (S.peso !== oldPeso && trainerOn()) sendUserCfg();
 }
-['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iSid', 'iSsec'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
+['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iBrinco', 'iWeek', 'iSid', 'iSsec'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
 function exportData(){
   const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
   downloadBlob(new Blob([JSON.stringify(data)], {type:'application/json'}), 'umbral-copia-' + today() + '.json');
