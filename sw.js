@@ -1,6 +1,7 @@
 // Umbral: primero la red y, sin conexión, la caché. Sube CACHE en cada versión.
-const CACHE = 'umbral-v9';
-const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+const CACHE = 'umbral-v10';
+const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
+  'mascota/saludo.webp', 'mascota/esfuerzo.webp', 'mascota/logro.webp', 'mascota/descanso.webp', 'mascota/entrenador.webp', 'mascota/avatar.webp'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).catch(() => {}));
