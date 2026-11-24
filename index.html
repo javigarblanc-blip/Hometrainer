@@ -54,6 +54,7 @@ button{font-family:inherit;color:inherit}
 .hsay{display:inline-block;margin-top:8px;background:var(--s1);color:var(--txt);font-size:14px;line-height:1.35;padding:7px 11px;border-radius:14px 14px 4px 14px;max-width:100%}
 .weekcard .av{width:44px;height:44px;border-radius:14px;background:var(--accbg);flex:none;overflow:hidden}
 .clamp3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mascot-big{display:block;margin:0 auto 8px;max-width:72%;max-height:190px;object-fit:contain}
 .top .date{color:var(--mut);font-size:14px;font-weight:500}
 h1{font:700 30px/1.1 var(--body);margin:14px 0 16px;letter-spacing:-.015em}
@@ -309,6 +310,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   <div class="quick" id="quickBox"></div>
   <div class="card coachcard" id="coachCard" style="margin-top:10px" onclick="openCoach()"></div>
   <div id="weekCard"></div>
+  <div id="backupCard"></div>
   <div class="sec"><h2>Forma</h2><button class="link" onclick="show('sAna');anaTab('forma')">Ver análisis</button></div>
   <div class="card" id="formCard"></div>
   <div class="sec"><h2>Esta semana</h2><span class="small mut" id="wRange"></span></div>
@@ -406,10 +408,11 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   <div class="card">
     <h2>Datos</h2>
     <div class="row wrap">
-      <button class="btn" onclick="exportData()">Exportar copia</button>
+      <button class="btn" onclick="exportData(true)">Guardar copia</button>
       <button class="btn" onclick="$('impFile').click()">Importar copia</button>
       <input type="file" id="impFile" accept=".json" style="display:none" onchange="importData(this)">
     </div>
+    <div class="small mut" style="margin-top:8px"><span id="backupInfo"></span> En el móvil puedes mandarla a Google Drive, al correo o a WhatsApp. Si pasan 7 días con sesiones nuevas sin copia, Brinco te lo recuerda en Inicio.</div>
     <div class="small mut" style="margin-top:10px" id="ver"></div>
   </div>
 </section>
@@ -468,7 +471,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.10.0';
+const VER = '0.11.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -2109,7 +2112,7 @@ function renderHome(){
   $('coachCard').innerHTML = `<div class="av"><img src="mascota/avatar.webp" alt="Brinco"></div><div style="flex:1;min-width:0"><b style="font-weight:600">Brinco, tu entrenador</b>
     <div class="small mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${S.apiKey ? (lastAi ? esc(lastAi.text.replace(/\*\*/g, '').slice(0, 90)) : 'Pregúntale qué hacer hoy o pídele un workout') : 'Actívalo con tu clave de Anthropic'}</div></div>
     <button class="btn sm acc" onclick="event.stopPropagation();openCoach(S.apiKey ? COACH_CHIPS[0][1] : null)">¿Qué hago hoy?</button>`;
-  renderWeekCard(); updateConn(); renderInstall();
+  renderWeekCard(); renderBackupCard(); updateConn(); renderInstall();
   if (!weeklyBusy) setTimeout(() => weeklyReport(false), 1500);
 }
 const TIPO_C = {'Recuperación':'#8a93a6', 'Resistencia':'#3d8bff', 'Tempo':'#2bc48a', 'Sweet Spot':'#9fd13c', 'Umbral':'#f2c230', 'VO2max':'#ff8a2a', 'Anaeróbico':'#ff4d5e', 'Fuerza':'#b07cff', 'Test':'#ff4d5e', 'Mío':'#ff7a1a'};
@@ -2255,7 +2258,8 @@ function renderWorkouts(){
   const tipos = ['Todos', ...TIPOS.filter(t => all.some(w => w.tipo === t)), ...(CUSTOM.length ? ['Míos'] : [])];
   const list = all.filter(w => WK_FILTER === 'Todos' || (WK_FILTER === 'Míos' ? w.custom : w.tipo === WK_FILTER));
   $('libBox').innerHTML = `<div class="filters">${tipos.map(t => `<button class="${t === WK_FILTER ? 'on' : ''}" onclick="WK_FILTER='${t}';renderWorkouts()">${TIPO_C[t] ? `<i class="tdot" style="background:${TIPO_C[t]}"></i>` : ''}${t}</button>`).join('')}</div>
-    <div class="row between" style="margin:0 2px 12px"><span class="small mut">${list.length} workouts con tu FTP de ${S.ftp} W</span><button class="btn sm acc" onclick="editWk(null)">${ICON.plus.replace(/22/g, '16')} Crear</button></div>` +
+    <div class="row between" style="margin:0 2px 12px"><span class="small mut">${list.length} workouts con tu FTP de ${S.ftp} W</span><div class="row" style="gap:6px"><button class="btn sm" onclick="$('wkFile').click()">Importar</button><button class="btn sm acc" onclick="editWk(null)">${ICON.plus.replace(/22/g, '16')} Crear</button></div></div>
+    <input type="file" id="wkFile" accept=".zwo,.erg,.mrc" multiple style="display:none" onchange="importWkFiles(this)">` +
     list.map(w => `<div class="wkc" onclick="openWk('${w.id}')"><div class="viz">${profileSVG(w, '')}</div><div class="body">
       <div style="min-width:0"><span class="nm">${esc(w.name)}</span><div class="meta"><i class="tdot" style="background:${TIPO_C[w.tipo] || 'var(--acc)'}"></i>${w.tipo}${w.custom ? ', creado por ti' : ''}</div></div>
       <div class="side"><b>${wkDurTxt(w)}</b><span>${w.test === 'rampa' ? 'test' : 'TSS ' + wkTSS(w)}</span></div></div></div>`).join('');
@@ -2269,7 +2273,102 @@ function openWk(id, sessKey){
     ${profileSVG(w, 'chart')}
     <div class="small mut" style="margin:8px 0 14px">${w.modo === 'grade' ? 'Empieza en modo Pendiente: tú controlas el esfuerzo.' : 'Empieza en modo ERG: el rodillo pone los vatios. Puedes cambiar a modo Pendiente durante el entreno.'}</div>
     <button class="btn acc block" onclick="startSession(wkById('${w.id}')${sessKey ? `,'${sessKey}'` : ''})">Empezar</button>
-    ${w.custom ? `<div class="grid2" style="margin-top:10px"><button class="btn" onclick="editWk('${w.id}')">Editar</button><button class="btn red" onclick="delWk('${w.id}')">Borrar</button></div>` : ''}`);
+    ${w.custom ? `<div class="grid2" style="margin-top:10px"><button class="btn" onclick="editWk('${w.id}')">Editar</button><button class="btn red" onclick="delWk('${w.id}')">Borrar</button></div>` : ''}
+    <h3 style="margin-top:16px">Exportar para otras apps</h3>
+    <div class="grid3"><button class="btn sm" onclick="exportWk('${w.id}','zwo')">.zwo</button><button class="btn sm" onclick="exportWk('${w.id}','erg')">.erg</button><button class="btn sm" onclick="exportWk('${w.id}','mrc')">.mrc</button></div>
+    <div class="small mut" style="margin-top:6px">.zwo para Zwift, Rouvy o TrainingPeaks; .erg y .mrc para TrainerRoad, Rouvy y otras. El .erg va en vatios con tu FTP de ${S.ftp} W.</div>`);
+}
+// ================= IMPORTAR / EXPORTAR WORKOUTS =================
+const r2 = x => Math.round(x * 100) / 100;
+function wkFileName(w, ext){ return (w.name || 'workout').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.' + ext; }
+const segP = (x, t) => x.w != null ? x.w / S.ftp : x.p != null ? x.p : (t ? x.p1 : x.p0);
+function exportWk(id, fmt){
+  const w = wkById(id); if (!w) return;
+  let txt = '';
+  if (fmt === 'zwo'){
+    const xe = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const body = w.segs.map((x, i) => {
+      const a = segP(x, 0), b = segP(x, 1);
+      if (Math.abs(a - b) < .005) return `    <SteadyState Duration="${x.d}" Power="${r2(a)}"/>`;
+      const tag = i === 0 && b > a ? 'Warmup' : i === w.segs.length - 1 && b < a ? 'Cooldown' : 'Ramp';
+      return `    <${tag} Duration="${x.d}" PowerLow="${r2(a)}" PowerHigh="${r2(b)}"/>`;
+    }).join('\n');
+    txt = `<workout_file>\n  <author>Umbral</author>\n  <name>${xe(w.name)}</name>\n  <description>${xe(w.desc || '')}</description>\n  <sportType>bike</sportType>\n  <tags/>\n  <workout>\n${body}\n  </workout>\n</workout_file>\n`;
+  } else {
+    const erg = fmt === 'erg', pts = []; let t = 0;
+    w.segs.forEach(x => { const a = segP(x, 0), b = segP(x, 1), v = q => erg ? Math.round(q * S.ftp) : Math.round(q * 100);
+      pts.push(`${(t / 60).toFixed(2)}\t${v(a)}`); t += x.d; pts.push(`${(t / 60).toFixed(2)}\t${v(b)}`); });
+    txt = `[COURSE HEADER]\r\nVERSION = 2\r\nUNITS = ENGLISH\r\nDESCRIPTION = ${(w.desc || '').replace(/\s+/g, ' ')}\r\nFILE NAME = ${w.name}\r\n${erg ? 'FTP = ' + S.ftp + '\r\nMINUTES WATTS' : 'MINUTES PERCENT'}\r\n[END COURSE HEADER]\r\n[COURSE DATA]\r\n${pts.join('\r\n')}\r\n[END COURSE DATA]\r\n`;
+  }
+  downloadBlob(new Blob([txt], {type:fmt === 'zwo' ? 'application/xml' : 'text/plain'}), wkFileName(w, fmt));
+  toast('Workout exportado en .' + fmt);
+}
+function guessTipo(steps){
+  let mx = 0, tot = 0, hard = 0;
+  customToWk({steps}).segs.forEach(x => { const a = Math.max(segP(x, 0), segP(x, 1)); mx = Math.max(mx, a); tot += x.d; if (a >= .76) hard += x.d; });
+  if (hard / tot < .1) return mx < .6 ? 'Recuperación' : 'Resistencia';
+  return mx >= 1.2 ? 'Anaeróbico' : mx >= 1.05 ? 'VO2max' : mx >= .95 ? 'Umbral' : mx >= .88 ? 'Sweet Spot' : 'Tempo';
+}
+function parseZWO(txt){
+  const doc = new DOMParser().parseFromString(txt, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('XML no válido');
+  const sport = (doc.querySelector('sportType') || {}).textContent || 'bike';
+  if (/run/i.test(sport)) throw new Error('es un workout de carrera');
+  const wk = doc.querySelector('workout'); if (!wk) throw new Error('sin bloques');
+  const num = (el, k) => el.hasAttribute(k) ? +el.getAttribute(k) : null;
+  const pct = v => Math.round(v * 100), steps = [];
+  for (const el of wk.children){
+    const tag = el.tagName.toLowerCase(), d = num(el, 'Duration') || 0, mins = r2(d / 60);
+    const lo = num(el, 'PowerLow'), hi = num(el, 'PowerHigh'), pw = num(el, 'Power');
+    if (tag === 'steadystate' || tag === 'solidstate'){ if (d) steps.push({t:'const', min:mins, p:pct(pw != null ? pw : ((lo || .6) + (hi || lo || .6)) / 2)}); }
+    else if (tag === 'warmup'){ if (d) steps.push({t:'ramp', min:mins, p0:pct(Math.min(lo, hi)), p1:pct(Math.max(lo, hi))}); }
+    else if (tag === 'cooldown'){ if (d) steps.push({t:'ramp', min:mins, p0:pct(Math.max(lo, hi)), p1:pct(Math.min(lo, hi))}); }
+    else if (tag === 'ramp'){ if (d) steps.push({t:'ramp', min:mins, p0:pct(lo), p1:pct(hi)}); }
+    else if (tag === 'intervalst'){
+      const on = num(el, 'OnDuration') || 0, off = num(el, 'OffDuration') || 0;
+      steps.push({t:'rep', k:num(el, 'Repeat') || 1, onMin:Math.floor(on / 60), onSec:on % 60, onP:pct(num(el, 'OnPower') ?? num(el, 'PowerOnHigh') ?? 1), offMin:Math.floor(off / 60), offSec:off % 60, offP:pct(num(el, 'OffPower') ?? num(el, 'PowerOffLow') ?? .5)});
+    }
+    else if (tag === 'freeride' || tag === 'freeridemode'){ if (d) steps.push({t:'const', min:mins, p:60, n:'Libre'}); }
+    else if (tag === 'maxeffort'){ if (d) steps.push({t:'const', min:mins, p:150, n:'Esfuerzo máximo'}); }
+  }
+  if (!steps.length) throw new Error('sin bloques de potencia');
+  const tx = q => ((doc.querySelector(q) || {}).textContent || '').trim();
+  return {name:tx('name'), desc:tx('description'), steps};
+}
+function parseERG(txt){
+  const head = (txt.split(/\[COURSE DATA\]/i)[0] || '');
+  const ftpM = head.match(/FTP\s*=\s*(\d+)/i), ftp = ftpM ? +ftpM[1] : S.ftp;
+  const watts = /MINUTES\s+WATTS/i.test(head), percent = /MINUTES\s+PERCENT/i.test(head);
+  if (!watts && !percent) throw new Error('cabecera sin MINUTES WATTS ni MINUTES PERCENT');
+  const dataM = txt.match(/\[COURSE DATA\]([\s\S]*?)(\[END COURSE DATA\]|$)/i); if (!dataM) throw new Error('sin datos');
+  const pts = dataM[1].split(/\r?\n/).map(l => l.trim().split(/\s+/).map(Number)).filter(a => a.length >= 2 && a.every(x => !isNaN(x)));
+  const toP = v => Math.round(watts ? v / ftp * 100 : v), steps = [];
+  for (let i = 1; i < pts.length; i++){
+    const [t0, v0] = pts[i - 1], [t1, v1] = pts[i], min = r2(t1 - t0);
+    if (min <= 0) continue;
+    const a = toP(v0), b = toP(v1), last = steps[steps.length - 1];
+    if (a === b){ if (last && last.t === 'const' && last.p === a) last.min = r2(last.min + min); else steps.push({t:'const', min, p:a}); }
+    else steps.push({t:'ramp', min, p0:a, p1:b});
+  }
+  if (!steps.length) throw new Error('sin bloques');
+  const nm = (head.match(/FILE NAME\s*=\s*(.+)/i) || [])[1], ds = (head.match(/DESCRIPTION\s*=\s*(.+)/i) || [])[1];
+  return {name:(nm || '').trim(), desc:(ds || '').trim(), steps};
+}
+async function importWkFiles(inp){
+  const files = [...inp.files]; let ok = 0; const bad = [];
+  for (const f of files){
+    try{
+      const txt = await f.text(), ext = f.name.split('.').pop().toLowerCase();
+      const r = ext === 'zwo' ? parseZWO(txt) : parseERG(txt);
+      const name = r.name || f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+      CUSTOM.push({id:'c_' + now() + '_' + ok, name, tipo:guessTipo(r.steps), desc:(r.desc || 'Importado de ' + f.name).slice(0, 400), steps:r.steps, src:ext});
+      ok++;
+    }catch(e){ bad.push(f.name + ' (' + e.message + ')'); }
+  }
+  inp.value = '';
+  if (ok){ LS.set('ht_custom', CUSTOM); WK_FILTER = 'Míos'; renderWorkouts(); }
+  toast(ok ? (ok === 1 ? 'Workout importado' : ok + ' workouts importados') + (bad.length ? ', ' + bad.length + ' con errores' : '') : 'No se pudo importar: ' + bad.join(', '));
+  if (ok === 1 && !bad.length) openWk(CUSTOM[CUSTOM.length - 1].id);
 }
 
 // ---------- Editor de workouts ----------
@@ -2328,7 +2427,7 @@ let ANA_TAB = 'actividad', CARGA_D = 90;
 function anaTab(t){ ANA_TAB = t; renderAna(); }
 function renderAna(){
   document.querySelectorAll('#anaTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === ANA_TAB));
-  if (S.strava && now() - (S.lastSync || 0) > 6 * 3600e3) stravaSync(true);
+  if (S.strava && !P.on && now() - (S.lastSync || 0) > 30 * 60e3) stravaSync(true);
   ({actividad:anaActs, forma:anaForma, carga:anaCarga, semanas:anaSemanas, logros:anaLogros})[ANA_TAB]();
 }
 const SPORT = s => /Run/.test(s) ? 'Carrera' : /Ride/.test(s) ? 'Bici' : /Walk|Hike/.test(s) ? 'Andar' : /Swim/.test(s) ? 'Natación' : /Weight|Workout|Crossfit/.test(s) ? 'Gimnasio' : s;
@@ -2419,6 +2518,7 @@ function anaLogros(){
 // ================= AJUSTES =================
 function renderCfg(){
   applyTheme();
+  renderBackupInfo();
   $('iFtp').value = S.ftp; $('iPeso').value = S.peso; $('iFc').value = S.fcmax; $('iLthr').value = S.lthr; $('iName').value = S.name;
   {
     const m = today().slice(0, 7), U = S.aiUsage && S.aiUsage.month === m ? S.aiUsage : null, T = S.aiTotal;
@@ -2449,10 +2549,36 @@ function readCfg(){
   if (S.peso !== oldPeso && trainerOn()) sendUserCfg();
 }
 ['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iBrinco', 'iWeek', 'iSid', 'iSsec'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
-function exportData(){
-  const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
-  downloadBlob(new Blob([JSON.stringify(data)], {type:'application/json'}), 'umbral-copia-' + today() + '.json');
+async function exportData(share){
+  const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, routes:ROUTES, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
+  const name = 'umbral-copia-' + today() + '.json', blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+  let done = false;
+  if (share){
+    try{ const file = new File([blob], name, {type:'application/json'});
+      if (navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Copia de Umbral'}); done = true; } }
+    catch(e){ if (e && e.name === 'AbortError') return; }
+  }
+  if (!done) downloadBlob(blob, name);
+  S.lastBackup = now(); S.backupSnooze = 0; saveS(); renderBackupInfo();
+  if ($('sHome').classList.contains('on')) renderHome();
+  toast('Copia guardada');
 }
+function backupDue(){
+  if (ACTS.length < 2) return false;
+  const last = S.lastBackup || 0;
+  if (!ACTS.some(a => a.date > last)) return false;
+  if (S.backupSnooze && now() < S.backupSnooze) return false;
+  return now() - last > 7 * DAY;
+}
+function renderBackupCard(){
+  const el = $('backupCard'); if (!el) return;
+  if (!backupDue()){ el.innerHTML = ''; return; }
+  const n = ACTS.filter(a => a.date > (S.lastBackup || 0)).length;
+  el.innerHTML = `<div class="card" style="display:flex;gap:12px;align-items:flex-start"><div class="av" style="width:44px;height:44px;border-radius:14px;overflow:hidden;flex:none"><img src="mascota/avatar.webp" alt="Brinco" style="width:100%;height:100%"></div>
+    <div style="flex:1;min-width:0"><b>Haz una copia de seguridad</b><div class="small mut">${S.lastBackup ? 'La última fue el ' + fdate(S.lastBackup) : 'Aún no has hecho ninguna'} y tienes ${n} ${n === 1 ? 'sesión nueva' : 'sesiones nuevas'}. Si se borran los datos del navegador, se pierden. Guárdala en Drive o donde quieras.</div>
+    <div class="row" style="margin-top:8px"><button class="btn acc sm" onclick="exportData(true)">Guardar copia</button><button class="btn ghost sm" onclick="S.backupSnooze=now()+3*DAY;saveS();renderBackupCard()">Luego</button></div></div></div>`;
+}
+function renderBackupInfo(){ const el = $('backupInfo'); if (el) el.textContent = S.lastBackup ? 'Última copia: ' + fdate(S.lastBackup) + ', ' + ftime(S.lastBackup) + '.' : 'Aún no has hecho ninguna copia.'; }
 function importData(inp){
   const f = inp.files[0]; if (!f) return;
   const r = new FileReader();
@@ -2464,6 +2590,7 @@ function importData(inp){
       if (d.custom) { d.custom.forEach(c => { if (!CUSTOM.some(x => x.id === c.id)) CUSTOM.push(c); }); LS.set('ht_custom', CUSTOM); }
       if (d.feel) { FEEL = Object.assign({}, d.feel, FEEL); LS.set('ht_feel', FEEL); }
       if (d.plan && !PLAN) { PLAN = d.plan; savePlan(); }
+      if (d.routes) { d.routes.forEach(r => { if (!ROUTES.some(x => x.id === r.id)) ROUTES.push(r); }); saveRoutes(); }
       toast(n + ' sesiones importadas'); renderCfg();
     }catch(e){ toast('Archivo no válido'); }
     inp.value = '';
@@ -2497,7 +2624,12 @@ applyTheme();
 saveS();
 renderHome();
 stravaCallback();
-if (S.strava && now() - (S.lastSync || 0) > 6 * 3600e3) setTimeout(() => stravaSync(true), 1500);
+// Strava al abrir y al volver a la app (cada 30 min como mucho, nunca durante una sesión)
+function autoSync(){ if (S.strava && !P.on && now() - (S.lastSync || 0) > 30 * 60e3) stravaSync(true); }
+setTimeout(autoSync, 1500);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(autoSync, 800); });
+// Pide al navegador que no borre los datos de la app por falta de espacio
+try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 </script>
 </body>
 </html>
