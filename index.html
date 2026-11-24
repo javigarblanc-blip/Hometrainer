@@ -468,7 +468,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.9.0';
+const VER = '0.10.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1306,7 +1306,7 @@ function startSession(wk, sessKey, route){
   Object.assign(P, {
     on:true, wk, route:route || null, mult:(S.todayMult && S.todayMult.date === today() && wk) ? S.todayMult.mult : 1, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
     wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
-    start:null, rec:newRec(), dist:0, brAt:0, brStart:0, brHalf:0, brKm:0, brRamp:0, lastSent:null, lastChart:0, p3:[],
+    start:null, rec:newRec(), dist:0, cum:[0], prRef:liveRef(), prSaid:{}, brAt:0, brStart:0, brHalf:0, brKm:0, brRamp:0, lastSent:null, lastChart:0, p3:[],
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
     total: wk ? wkDur(wk) : 0
   });
@@ -1371,7 +1371,18 @@ function brSeg(){
   if (s.d < 60 && k !== 'last' && k !== 'cool' && now() - P.brAt < 90000) return;
   brSay(brPick(k, {d:fmtD(s.d), w}));
 }
+const PR_LIVE = [60, 300, 1200];
+function liveRef(){ if (!ACTS.length) return {}; const b = allTimeBest(null), r = {}; PR_LIVE.forEach(d => { if (b[d]) r[d] = b[d].w; }); return r; }
+function brPR(){
+  const n = P.rec.p.length; P.cum.push(P.cum[n - 1 + 0] + P.rec.p[n - 1]);
+  for (const d of PR_LIVE){
+    if (n < d || P.prSaid[d] || !P.prRef[d]) continue;
+    const avg = Math.round((P.cum[n] - P.cum[n - d]) / d);
+    if (avg > P.prRef[d]){ P.prSaid[d] = 1; brSay('¡Récord de ' + BEST_L[d] + '! ' + avg + ' W, antes ' + P.prRef[d] + '. ¡Croac!'); buzz([100, 60, 100, 60, 200]); return; }
+  }
+}
 function brTick(){
+  brPR();
   if (P.wk && P.total >= 1200 && !P.brHalf && P.wt >= P.total / 2 && now() - P.brAt > 20000){ P.brHalf = 1; brSay(brPick('half')); }
   if (P.route){
     if (!P.brKm && P.route.dist > 3000 && P.route.dist - P.rDist <= 1000){ P.brKm = 1; brSay(brPick('lastkm')); }
@@ -1589,14 +1600,41 @@ function calcStats(rec, ftp){
   const hrs = rec.hr.filter(x => x > 0), cads = rec.c.filter(x => x > 0);
   const zt = [0, 0, 0, 0, 0, 0, 0]; p.forEach(w => { if (w > 0) zt[zone(w / ftp)]++; });
   const best = {}; BEST_D.forEach(d => { best[d] = bestAvg(p, d); });
+  const hz = hrZones(rec.hr);
   return {
     dur:n, avgP:Math.round(avg), np:Math.round(np), ifv:Math.round(IF * 100) / 100, tss:Math.round(tss),
     maxP: n ? Math.max(...p) : 0,
     avgHr: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null,
     maxHr: hrs.length ? Math.max(...hrs) : null,
     avgC: cads.length ? Math.round(cads.reduce((a, b) => a + b, 0) / cads.length) : null,
-    kj: Math.round(sum / 1000), zt, best
+    kj: Math.round(sum / 1000), zt, best, hz
   };
+}
+// Zonas de pulso de Friel sobre la FC umbral (LTHR)
+const HZ_L = ['', 'Recuperación', 'Aeróbico', 'Tempo', 'Umbral', 'Por encima'];
+const hrZone = h => { const r = h / S.lthr; return r < .81 ? 1 : r < .90 ? 2 : r < .94 ? 3 : r < 1 ? 4 : 5; };
+function hrZones(hr){ const z = [0, 0, 0, 0, 0, 0]; (hr || []).forEach(h => { if (h > 0) z[hrZone(h)]++; }); return z.some(x => x) ? z : null; }
+function hrBars(hz){
+  const tot = hz.reduce((a, b) => a + b, 0); if (!tot) return '';
+  return [1, 2, 3, 4, 5].map(z => `<div class="zbar"><span>Z${z}</span><div class="t"><i style="width:${(hz[z] / tot * 100).toFixed(1)}%;background:${ZH[z === 5 ? 6 : z]}"></i></div><em>${dur(hz[z])}  ${Math.round(hz[z] / tot * 100)} %</em></div>`).join('')
+    + `<div class="small mut" style="margin-top:4px">Con FC umbral de ${S.lthr}: Z1 &lt;${Math.round(S.lthr * .81)}, Z2 hasta ${Math.round(S.lthr * .89)}, Z3 hasta ${Math.round(S.lthr * .93)}, Z4 hasta ${S.lthr - 1}, Z5 desde ${S.lthr}.</div>`;
+}
+// FTP estimado con los mejores esfuerzos recientes
+function ftpEstimate(days = 90){
+  const since = now() - days * DAY, b = {};
+  ACTS.filter(a => a.date >= since && a.best).forEach(a => [600, 1200, 3600].forEach(d => { const v = a.best[d]; if (v && (!b[d] || v > b[d].w)) b[d] = {w:v, date:a.date}; }));
+  const c = [];
+  if (b[1200]) c.push({w:Math.round(b[1200].w * .95), basis:'95 % de tu mejor 20 min (' + b[1200].w + ' W)', date:b[1200].date});
+  if (b[3600]) c.push({w:b[3600].w, basis:'tu mejor hora (' + b[3600].w + ' W)', date:b[3600].date});
+  if (b[600]) c.push({w:Math.round(b[600].w * .9), basis:'90 % de tu mejor 10 min (' + b[600].w + ' W)', date:b[600].date});
+  if (!c.length) return null;
+  return c.sort((x, y) => y.w - x.w)[0];
+}
+function ftpCard(est, fresh){
+  return `<div class="card" style="margin:12px 0;display:flex;gap:12px;align-items:flex-start"><div class="av" style="width:44px;height:44px;border-radius:14px;overflow:hidden;flex:none"><img src="mascota/avatar.webp" alt="Brinco" style="width:100%;height:100%"></div>
+    <div style="flex:1;min-width:0"><b>${fresh ? '¡Croac! Creo que tu FTP ha subido' : 'FTP estimado'}: ${est.w} W</b>
+    <div class="small mut">Sale del ${est.basis}, de los últimos 90 días. Ahora tienes ${S.ftp} W. ${est.w > S.ftp ? 'Si lo subes, los entrenamientos serán más exigentes.' : ''}</div>
+    <button class="btn acc sm" style="margin-top:8px" onclick="setFtp(${est.w})">Usar ${est.w} W como mi FTP</button></div></div>`;
 }
 function allTimeBest(excludeId){
   const b = {};
@@ -1609,6 +1647,7 @@ function finalize(start, name, wkId, rec, sessKey){
   const meta = Object.assign({id, date:id, name, wkId, dist:Math.round(meters / 10) / 100, ftp:S.ftp, strava:null, rpe:null, note:''}, calcStats(rec, S.ftp));
   const prev = allTimeBest(id);
   meta.prs = BEST_D.filter(d => meta.best[d] && (!prev[d] || meta.best[d] > prev[d].w) && ACTS.length > 0);
+  meta.prPrev = {}; meta.prs.forEach(d => { if (prev[d]) meta.prPrev[d] = prev[d].w; });
   LS.set('ht_act_' + id, rec);
   ACTS = ACTS.filter(a => a.id !== id); ACTS.push(meta); ACTS.sort((a, b) => b.date - a.date); saveActs();
   // plan
@@ -1649,7 +1688,8 @@ function showAct(id, fresh){
     ${fresh ? '<img class="mascot-big" src="mascota/logro.webp" alt=""><div class="small" style="color:var(--ok);font-weight:700;margin-bottom:4px">✓ Sesión guardada</div>' : ''}
     <h2 style="margin-right:40px">${esc(a.name)}</h2>
     <div class="small mut" style="margin-top:-6px">${fdate(a.date)}, ${ftime(a.date)}, con FTP de ${a.ftp} W</div>
-    ${a.prs && a.prs.length ? `<div class="tags" style="margin-top:10px">${a.prs.map(d => `<span class="tag acc">🏆 Récord ${BEST_L[d]}: ${a.best[d]} W</span>`).join('')}</div>` : ''}
+    ${a.prs && a.prs.length ? (fresh ? prCard(a) : `<div class="tags" style="margin-top:10px">${a.prs.map(d => `<span class="tag acc">🏆 Récord ${BEST_L[d]}: ${a.best[d]} W</span>`).join('')}</div>`) : ''}
+    ${fresh && !testBox && (() => { const e = ftpEstimate(); return e && e.w >= S.ftp * 1.03 ? ftpCard(e, true) : ''; })() || ''}
     ${testBox}
     <div class="kv">
       <div><span>Tiempo</span><b>${clock(a.dur)}</b></div>
@@ -1666,13 +1706,14 @@ function showAct(id, fresh){
       <div><span>Distancia</span><b>${dec(a.dist)} km</b></div>
     </div>
     ${rec ? actChart(rec) : ''}
-    ${a.zt ? `<h3 style="margin-top:16px">Tiempo en zonas</h3>${zoneBars(a.zt)}` : ''}
+    ${a.zt ? `<h3 style="margin-top:16px">Tiempo en zonas de potencia</h3>${zoneBars(a.zt)}` : ''}
+    ${(() => { const hz = a.hz || (rec ? hrZones(rec.hr) : null); return hz ? `<h3 style="margin-top:16px">Tiempo en zonas de pulso</h3>${hrBars(hz)}` : ''; })()}
     ${bests.length ? `<h3 style="margin-top:16px">Mejores potencias</h3>
       <div class="row wrap" style="gap:8px">${bests.map(k => `<span class="tag" style="font-size:13px">${BEST_L[k]}: <b style="color:var(--txt)">${a.best[k]} W</b></span>`).join('')}</div>` : ''}
     <h3 style="margin-top:16px">¿Cómo ha ido? (esfuerzo 1-10)</h3>
     <div class="rpe">${[1,2,3,4,5,6,7,8,9,10].map(v => `<button onclick="setRPE(${a.id},${v})" style="${a.rpe === v ? `background:${rpeCol(v)};color:#111;border-color:transparent` : ''}">${v}</button>`).join('')}</div>
     <textarea placeholder="Notas: sensaciones, piernas, sueño…" style="margin-top:8px" onchange="setNote(${a.id},this.value)">${esc(a.note || '')}</textarea>
-    <button class="btn block" style="margin-top:16px" onclick="closeSheet();openCoach('Analiza esta sesión: ${esc(a.name).replace(/'/g, '')} del ${dkey(a.date)}. ¿Cómo la he hecho y qué saco de ella?', ${a.id})">${ICON.coach} Pedir opinión al entrenador</button>
+    <button class="btn block" style="margin-top:16px" onclick="closeSheet();openCoach('Analiza esta sesión: ${esc(a.name).replace(/'/g, '')} del ${dkey(a.date)}. ¿Cómo la he hecho y qué saco de ella?', ${a.id})">${ICON.coach} Pedir opinión a Brinco</button>
     <div class="grid2" style="margin-top:10px">
       ${a.strava ? `<a class="btn" style="text-align:center;text-decoration:none;color:#fc6a2c" href="https://www.strava.com/activities/${a.strava}" target="_blank">Ver en Strava</a>`
                  : `<button class="btn acc" id="upBtn" onclick="stravaUpload(${a.id})">Subir a Strava</button>`}
@@ -1685,6 +1726,13 @@ const rpeCol = v => v <= 3 ? '#3ecf8e' : v <= 6 ? '#f5c518' : v <= 8 ? '#ff8a1a'
 function testCard(txt, f){
   return `<div class="card" style="margin:12px 0;border-color:#8a6216"><div class="small mut">${txt}</div><div style="font:800 28px var(--hf)">FTP estimado: ${f} W · ${dec(f / S.peso, 2)} W/kg</div>
     <button class="btn acc block" style="margin-top:8px" onclick="setFtp(${f})">Usar ${f} W como mi FTP</button></div>`;
+}
+function prCard(a){
+  const main = a.prs.slice().sort((x, y) => y - x);
+  return `<div class="card" style="margin:12px 0;border:1px solid var(--acc)"><b style="font-size:17px">🏆 ${a.prs.length === 1 ? '¡Nuevo récord!' : '¡' + a.prs.length + ' récords nuevos!'}</b>
+    <div class="small mut" style="margin:2px 0 8px">Brinco está dando saltos de alegría.</div>
+    ${main.slice(0, 3).map(d => `<div class="pr"><span><b>${BEST_L[d]}</b></span><span style="text-align:right"><b>${a.best[d]}</b> <span class="mut">W</span>${a.prPrev && a.prPrev[d] ? `<div class="small" style="color:var(--ok)">+${a.best[d] - a.prPrev[d]} W (antes ${a.prPrev[d]})</div>` : ''}</span></div>`).join('')}
+    ${main.length > 3 ? `<div class="small mut" style="margin-top:6px">Y también: ${main.slice(3).map(d => BEST_L[d] + ' ' + a.best[d] + ' W').join(', ')}.</div>` : ''}</div>`;
 }
 function setRPE(id, v){ const a = ACTS.find(x => x.id === id); if (!a) return; a.rpe = v; saveActs(); showAct(id); }
 function setNote(id, t){ const a = ACTS.find(x => x.id === id); if (!a) return; a.note = t; saveActs(); toast('Nota guardada'); }
@@ -2356,13 +2404,15 @@ function anaLogros(){
   const ds = BEST_D.filter(d => all[d]);
   const curve = lineChart({h:200, yMin:0, yMax:Math.ceil(Math.max(...ds.map(d => all[d].w)) * 1.1 / 50) * 50, xLabels:ds.map((d, i) => ({i, t:BEST_L[d].replace(' min', "'").replace(' s', '"')})),
     series:[{vals:ds.map(d => all[d].w), color:'var(--acc)', w:2.5, dots:true}, {vals:ds.map(d => six[d] ? six[d].w : null), color:'#8b93a3', w:1.5, dash:true}]});
-  const est = all[1200] ? Math.round(all[1200].w * .95) : null;
-  $('anaBox').innerHTML = `<div class="card"><h2>Curva de potencia</h2>${curve}${legend([['var(--acc)', 'Histórico'], ['#8b93a3', 'Últimos 6 meses']])}</div>
+  const est = ftpEstimate();
+  const recent = ACTS.filter(a => a.prs && a.prs.length && a.date > now() - 30 * DAY).slice(0, 6);
+  $('anaBox').innerHTML = (recent.length ? `<div class="card"><h2>Récords recientes</h2>${recent.map(a => `<div class="pr" onclick="showAct(${a.id})" style="cursor:pointer"><span><b>${esc(a.name)}</b><div class="small mut">${fdate(a.date)}</div></span>
+      <span style="text-align:right">${a.prs.map(d => `<span class="tag acc" style="margin:2px">🏆 ${BEST_L[d]} ${a.best[d]} W</span>`).join('')}</span></div>`).join('')}</div>` : '') + `<div class="card"><h2>Curva de potencia</h2>${curve}${legend([['var(--acc)', 'Histórico'], ['#8b93a3', 'Últimos 6 meses']])}</div>
     <div class="card"><h2>Mejores intervalos</h2>${ds.map(d => `<div class="pr"><span><b style="font-size:20px">${BEST_L[d]}</b><div class="small mut">${fdate(all[d].date)}${six[d] && six[d].w !== all[d].w ? ` · 6 meses: ${six[d].w} W` : ''}</div></span>
       <span style="text-align:right"><b>${all[d].w}</b> <span class="mut">W</span><div class="small mut">${dec(all[d].w / S.peso, 2)} W/kg</div></span></div>`).join('')}</div>
     <div class="card"><h2>FTP</h2>
       <div class="pr"><span>Actual</span><span><b>${S.ftp}</b> <span class="mut">W · ${dec(S.ftp / S.peso, 2)} W/kg</span></span></div>
-      ${est && est !== S.ftp ? `<div class="pr"><span>Estimado (95 % del mejor 20')</span><span><b>${est}</b> <span class="mut">W</span></span></div><button class="btn sm" style="margin-top:6px" onclick="setFtp(${est})">Usar ${est} W</button>` : ''}
+      ${est ? `<div class="pr"><span>Estimado<div class="small mut">${est.basis}, últimos 90 días</div></span><span><b>${est.w}</b> <span class="mut">W</span></span></div>${est.w !== S.ftp ? `<button class="btn sm" style="margin-top:6px" onclick="setFtp(${est.w})">Usar ${est.w} W</button>` : ''}` : '<div class="small mut">Para estimarlo necesito un esfuerzo fuerte de 10, 20 o 60 minutos en los últimos 90 días.</div>'}
       <h3 style="margin-top:14px">Histórico</h3>${S.ftpHist.slice().reverse().map(h => `<div class="pr"><span class="mut">${fdate(h.date)}</span><b style="font-size:20px">${h.ftp} W</b></div>`).join('')}</div>`;
 }
 
