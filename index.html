@@ -19,6 +19,7 @@
   --viz:#1f242e;--today:#2e2a26;--accbg:#3d2c20;--okbg:#1c3a32;--warnbg:#3a3220;--warnbd:#6b5822;--warntx:#f6d98a;--grid:#38404e;--dash:#5a6273;
   --navbg:rgba(27,32,41,.94);--scrim:rgba(8,10,14,.6);--adv:#cfd4dd;--ontint:#1d1006;
   --acc:#ff7a1a;--ok:#2bc48a;--err:#ff5d6c;--hr:#ff5c7a;--ctl:#2bc48a;--atl:#f2a33a;--tsb:#5aa5ff;--warnc:#f2c230;--strava:#fc5200;
+  --sky1:#232b3a;--sky2:#3b3550;--mnt1:#343d50;--mnt2:#2b3343;--sun:#ff9a4a;
   --num:'Barlow Condensed',system-ui,sans-serif;--body:'Barlow',system-ui,-apple-system,Roboto,sans-serif;
   --r1:20px;--r2:14px;
 }
@@ -26,11 +27,13 @@
   --bg:#101318;--s1:#171b22;--s2:#1f242d;--s3:#2a303b;--line:#262c36;--txt:#edeff3;--mut:#8c94a3;--dim:#5d6472;
   --viz:#13171d;--today:#1e1a16;--accbg:#33241a;--okbg:#15302a;--warnbg:#2a2312;--warnbd:#5c4a18;--warntx:#f6d98a;--grid:#2a303c;--dash:#4a5161;
   --navbg:rgba(16,19,24,.94);--scrim:rgba(4,6,10,.7);--adv:#c7ccd6;
+  --sky1:#0a0d13;--sky2:#172033;--mnt1:#161c29;--mnt2:#10151e;--sun:#e8e2c8;
 }
 [data-theme="claro"]{
   --bg:#eef1f5;--s1:#ffffff;--s2:#f1f3f7;--s3:#e2e6ed;--line:#e6e9ef;--txt:#151a22;--mut:#5f6878;--dim:#9aa2b1;
   --viz:#f5f7fa;--today:#fff3e8;--accbg:#ffe9d8;--okbg:#ddf5ec;--warnbg:#fff6dd;--warnbd:#f0d98a;--warntx:#6b5212;--grid:#e3e7ee;--dash:#b9c0cc;
   --navbg:rgba(255,255,255,.95);--scrim:rgba(20,26,34,.35);--adv:#3a4250;
+  --sky1:#a9d4ff;--sky2:#eef5fc;--mnt1:#c6d3e2;--mnt2:#aebfd3;--sun:#ffc861;
   --err:#e5384a;--ctl:#1fa774;--atl:#e08a12;--tsb:#2f7fe0;--warnc:#c99a00;
 }
 [data-theme="claro"] .card,[data-theme="claro"] .group,[data-theme="claro"] .hero,[data-theme="claro"] .wkc,[data-theme="claro"] .plc,[data-theme="claro"] .devs,[data-theme="claro"] .quick button,[data-theme="claro"] .pint,[data-theme="claro"] .pstats,[data-theme="claro"] .pctl .btn,[data-theme="claro"] #pChart{box-shadow:0 1px 2px rgba(20,30,50,.06),0 0 0 1px rgba(20,30,50,.05)}
@@ -249,18 +252,46 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .pint .t{font:700 50px/1 var(--num);font-variant-numeric:tabular-nums;margin-top:2px}
 .pint .ibar{height:4px;background:var(--s2);margin:12px -14px 0}
 .pint .ibar i{display:block;height:100%;background:var(--acc);width:0;transition:width 1s linear}
-.ptile{text-align:center;padding:14px 0 6px;position:relative}
-.ptile .zl{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--mut)}
-.pw{font:700 132px/.9 var(--num);font-variant-numeric:tabular-nums;transition:color .3s;margin-top:4px}
-.pw small{font-size:30px;color:var(--mut);margin-left:4px;font-weight:600}
-.pstate{font:600 15px var(--body);color:var(--mut);min-height:22px;margin-top:4px}
-.pstats{display:grid;grid-template-columns:repeat(3,1fr);background:var(--s1);border-radius:16px;margin:8px 0}
-.pstats div{text-align:center;padding:11px 4px;border-left:1px solid var(--line)}
-.pstats div:first-child{border-left:0}
-.pstats b{font:700 34px/1 var(--num);display:block;font-variant-numeric:tabular-nums}
+.ptile{text-align:center;padding:10px 0 4px;position:relative}
+.ptile .zl{display:inline-flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:var(--mut)}
+.pw{font:700 clamp(110px,34vw,230px)/.88 var(--num);font-variant-numeric:tabular-nums;transition:color .3s;margin-top:2px;letter-spacing:-.02em}
+.pw small{font-size:.24em;color:var(--mut);margin-left:4px;font-weight:600;letter-spacing:0}
+.pstate{font:700 17px var(--body);color:var(--mut);min-height:24px;margin-top:4px}
+.pstats{display:grid;grid-template-columns:repeat(3,1fr);background:var(--s1);border-radius:16px;margin:8px 0;overflow:hidden}
+.pstats>div{text-align:center;padding:11px 4px 10px;border-left:1px solid var(--line);cursor:pointer;position:relative}
+.pstats>div:nth-child(3n+1){border-left:0}
+.pstats>div:nth-child(n+4){border-top:1px solid var(--line)}
+.pstats b{font:700 clamp(32px,10vw,46px)/1 var(--num);display:block;font-variant-numeric:tabular-nums;white-space:nowrap}
 .pstats span{font-size:12px;color:var(--mut)}
+.pstats .wb{position:absolute;left:10px;right:10px;bottom:4px;height:3px;border-radius:2px;background:var(--s3);overflow:hidden}
+.pstats .wb i{display:block;height:100%}
+.pstats.six b{font-size:clamp(26px,8vw,36px)}
+.pint .t{font-size:clamp(46px,15vw,76px);white-space:nowrap}
+.pint .t small{font-size:.5em;margin-left:3px}
+.pnext{font:600 15px var(--body);color:var(--mut);margin:8px 2px 0;min-height:20px;padding:0;border-radius:12px;transition:background .3s,color .3s,padding .3s}
+.pnext.soon{background:var(--acc);color:var(--ontint);padding:10px 14px;font:700 22px/1.1 var(--num);letter-spacing:.01em}
 #pChart{width:100%;height:110px;display:block;background:var(--s1);border-radius:14px}
-.pnext{font-size:13px;color:var(--mut);margin:8px 2px 0;min-height:18px}
+#player::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;background-color:var(--zt,transparent);opacity:.2;transition:background-color 1.2s;-webkit-mask-image:radial-gradient(120% 70% at 50% 35%,#000 0,transparent 80%);mask-image:radial-gradient(120% 70% at 50% 35%,#000 0,transparent 80%)}
+[data-theme="claro"] #player::before{opacity:.16}
+.scene{position:relative;border-radius:14px;overflow:hidden;background:var(--s1)}
+.scene svg{display:block;width:100%;height:150px}
+.scene .mk{position:absolute;transform:translate(-50%,-100%);width:34px;height:34px;border-radius:50%;border:3px solid var(--acc);background:var(--s1) center/cover;box-shadow:0 3px 8px rgba(0,0,0,.35);transition:left 1s linear,top 1s linear;z-index:2}
+.scene .mk.gh{border-color:var(--mut);border-style:dashed;opacity:.6;filter:grayscale(1);z-index:1}
+.scene .lbl{position:absolute;bottom:4px;font:700 11px var(--body);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);transform:translateX(-50%)}
+.scene .gap{position:absolute;left:8px;top:6px;font:700 13px var(--body);padding:3px 8px;border-radius:8px;background:var(--s1);opacity:.92}
+.lost{display:flex;gap:12px;align-items:center;background:var(--warnbg);border:2px solid var(--warnbd);color:var(--warntx);border-radius:16px;padding:12px 14px;margin:10px 0 0}
+.lost img{width:58px;height:58px;object-fit:contain;flex:none}
+.lost b{font:700 20px/1.1 var(--num);display:block}
+.bri img.pose{width:64px;height:64px;object-fit:contain;border-radius:0}
+@media (orientation:landscape) and (min-width:640px){
+  .pmain{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;align-items:start}
+  .pw{font-size:clamp(100px,30vh,210px)}
+  .pint .t{font-size:clamp(40px,12vh,66px)}
+  .scene svg{height:120px}
+  #pChart{height:90px}
+  .pctl{margin-top:8px}
+  .pctl .btn{padding:9px 4px}
+}
 .pctl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
 .pctl .btn{padding:12px 4px;font-size:13px;flex-direction:column;gap:4px;border:0;background:var(--s1);border-radius:14px}
 .pctl .btn svg{color:var(--txt)}
@@ -380,7 +411,13 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     <label>Pantalla siempre encendida</label>
     <button class="btn ghost block" onclick="testWake()">Probar pantalla encendida (3 min)</button>
     <div class="small" id="wakeRes" style="margin-top:8px"></div>
-    <div class="small mut" style="margin-top:8px">Calibra el X3 con su app antes de las sesiones importantes, tras 10 minutos de calentamiento y siempre con la misma presión de rueda.</div>
+    <label>Fondo de la sesión según la zona</label>
+    <select id="iZbg"><option value="1">Sí, que se tiña del color de la zona</option><option value="0">No</option></select>
+    <label>Pantalla completa al empezar</label>
+    <select id="iFs"><option value="1">Sí</option><option value="0">No</option></select>
+    <label>W' (reserva anaeróbica, julios)</label>
+    <div class="row" style="gap:8px"><input type="number" id="iWp" inputmode="numeric" style="flex:1"><button class="btn sm" onclick="wpEstimate()">Estimar</button></div>
+    <div class="small mut" style="margin-top:8px">El W' es la energía que puedes gastar por encima de tu FTP antes de vaciarte. Lo normal en aficionados está entre 12.000 y 25.000 J. Durante la sesión verás cuánto te queda. Los datos de la pantalla de sesión se cambian tocándolos.</div>
   </div>
   <div class="card">
     <h2>Entrenador IA</h2>
@@ -427,33 +464,35 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <!-- ================= PLAYER ================= -->
 <div id="player">
-  <div class="bri" id="pBri" onclick="this.classList.remove('on')"><img src="mascota/avatar.webp" alt="Brinco"><div id="pBriT"></div></div>
+  <div class="bri" id="pBri" onclick="this.classList.remove('on')"><img id="pBriImg" src="mascota/avatar.webp" alt="Brinco"><div id="pBriT"></div></div>
   <div class="ptop">
     <div style="min-width:0"><div class="nm" id="pName"></div><div class="small mut" id="pSub"></div></div>
     <div class="row" style="gap:14px"><div class="tt"><b id="pTime">0:00</b><span>tiempo</span></div><button class="btn sm" onclick="askEnd()">Terminar</button></div>
   </div>
   <div class="pprog"><i id="pProg"></i></div>
   <div id="pWarn"></div>
-  <div class="pint" id="pIntBox">
-    <div class="top2">
-      <div><div class="lab" id="pIntName"></div><div class="t" id="pIntT">--:--</div></div>
-      <div style="text-align:right"><div class="lab" id="pTgtLab">Objetivo</div><div class="t" id="pTgt" style="color:var(--acc)">--</div></div>
+  <div class="pmain">
+    <div>
+      <div class="pint" id="pIntBox">
+        <div class="top2">
+          <div><div class="lab" id="pIntName"></div><div class="t" id="pIntT">--:--</div></div>
+          <div style="text-align:right"><div class="lab" id="pTgtLab">Objetivo</div><div class="t" id="pTgt" style="color:var(--acc)">--</div></div>
+        </div>
+        <div class="ibar"><i id="pIntProg"></i></div>
+      </div>
+      <div class="pnext" id="pNext"></div>
+      <div class="ptile">
+        <div class="zl" id="pZone"></div>
+        <div class="pw" id="pPow">0<small>W</small></div>
+        <div class="pstate" id="pState"></div>
+      </div>
     </div>
-    <div class="ibar"><i id="pIntProg"></i></div>
+    <div>
+      <div class="pstats" id="pStats"></div>
+      <div id="pChartBox"></div>
+      <div class="pctl" id="pCtl"></div>
+    </div>
   </div>
-  <div class="ptile">
-    <div class="zl" id="pZone"></div>
-    <div class="pw" id="pPow">0<small>W</small></div>
-    <div class="pstate" id="pState"></div>
-  </div>
-  <div class="pstats">
-    <div><b id="pHR" style="color:var(--hr)">--</b><span>pulso</span></div>
-    <div><b id="pCad">--</b><span id="pCadLab">cadencia</span></div>
-    <div><b id="pX">--</b><span id="pXLab">restante</span></div>
-  </div>
-  <div id="pChartBox"></div>
-  <div class="pnext" id="pNext"></div>
-  <div class="pctl" id="pCtl"></div>
 </div>
 
 <div id="coach">
@@ -471,7 +510,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.12.0';
+const VER = '0.13.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -798,7 +837,10 @@ function kmProfileSVG(r){
   const unit = r.dist > 60000 ? 5000 : r.dist > 30000 ? 2000 : 1000;
   const n = Math.ceil(r.dist / unit), emin = Math.min(...r.e), emax = Math.max(...r.e), span = Math.max(60, emax - emin);
   const X = x => L + x / r.dist * iw, Y = v => T + ih - (v - emin) / span * ih;
-  let g = `<line x1="${L}" x2="${W - Rr}" y1="${T + ih}" y2="${T + ih}" stroke="var(--grid)"/>`;
+  let g = `${skyDefs('skyK')}<rect x="0" y="0" width="${W}" height="${H - B + 2}" rx="10" fill="url(#skyK)" opacity=".9"/><circle cx="${W * .16}" cy="${T + 16}" r="9" style="fill:var(--sun)" opacity=".5"/>`;
+  { let m1 = `M0,${T + ih}`, m2 = `M0,${T + ih}`; for (let i = 0; i <= 36; i++){ const u = i / 36 * W; m1 += `L${u.toFixed(1)},${(T + ih * .45 - ridge(u * 9, .9) * ih * .22).toFixed(1)}`; m2 += `L${u.toFixed(1)},${(T + ih * .7 - ridge(u * 14 + 4000, 1.4) * ih * .15).toFixed(1)}`; }
+    g += `<path d="${m1}L${W},${T + ih}Z" style="fill:var(--mnt1)"/><path d="${m2}L${W},${T + ih}Z" style="fill:var(--mnt2)"/>`; }
+  g += `<line x1="${L}" x2="${W - Rr}" y1="${T + ih}" y2="${T + ih}" stroke="var(--grid)"/>`;
   for (let k = 0; k < n; k++){
     const x0 = k * unit, x1 = Math.min(r.dist, (k + 1) * unit);
     const e0 = routeEle(r, x0), e1 = routeEle(r, x1), gr = (e1 - e0) / Math.max(1, x1 - x0) * 100;
@@ -838,6 +880,41 @@ function routeSVG(r, cls = '', pos = null, H = 100){
   }
   if (pos != null) out += `<line x1="${pos}" x2="${pos}" y1="0" y2="${H}" stroke="var(--txt)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   return `<svg class="${cls}" viewBox="0 0 ${r.dist} ${H}" preserveAspectRatio="none">${out}</svg>`;
+}
+// Montañas de fondo deterministas (silueta según la posición en el mundo)
+const ridge = (x, k) => Math.sin(x / 900 * k + k) * .5 + Math.sin(x / 370 * k + 2 * k) * .3 + Math.sin(x / 150 + k * 3) * .2;
+function skyDefs(id){
+  return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sky1)"/><stop offset="1" style="stop-color:var(--sky2)"/></linearGradient></defs>`;
+}
+// Escena del reproductor: ventana de unos 3 km alrededor de tu posición, con cielo, montañas en paralaje, terreno coloreado por pendiente, Brinco y tu fantasma
+function routeScene(r, pos, gpos){
+  const W = 400, H = 150, span = Math.min(r.dist, 3000), x0 = Math.max(0, Math.min(r.dist - span, pos - span * .22));
+  const X = x => (x - x0) / span * W;
+  let emin = 1e9, emax = -1e9;
+  for (let x = x0; x <= x0 + span; x += STEP){ const e = routeEle(r, x); if (e < emin) emin = e; if (e > emax) emax = e; }
+  const rng_ = Math.max(35, emax - emin), Y = e => H - 18 - (e - emin) / rng_ * (H * .48);
+  let m1 = `M0,${H}`, m2 = `M0,${H}`;
+  for (let i = 0; i <= 40; i++){ const u = i / 40 * W, wx = x0 + u / W * span;
+    m1 += `L${u.toFixed(1)},${(H * .42 - ridge(wx * .25 + 5000, 1.3) * H * .16).toFixed(1)}`;
+    m2 += `L${u.toFixed(1)},${(H * .58 - ridge(wx * .5 + 9000, 2.1) * H * .14).toFixed(1)}`; }
+  m1 += `L${W},${H}Z`; m2 += `L${W},${H}Z`;
+  let ground = '', road = '';
+  const sl = 50;
+  for (let x = x0; x < x0 + span; x += sl){ const x1 = Math.min(x0 + span, x + sl), e0 = routeEle(r, x), e1 = routeEle(r, x1), g = (e1 - e0) / Math.max(1, x1 - x) * 100;
+    ground += `<path d="M${X(x).toFixed(1)},${H}L${X(x).toFixed(1)},${Y(e0).toFixed(1)}L${X(x1).toFixed(1)},${Y(e1).toFixed(1)}L${X(x1).toFixed(1)},${H}Z" fill="${gcol(g)}" stroke="${gcol(g)}" stroke-width=".8"/>`;
+    road += (road ? 'L' : 'M') + X(x).toFixed(1) + ',' + Y(e0).toFixed(1); }
+  road += `L${W},${Y(routeEle(r, x0 + span)).toFixed(1)}`;
+  const done = `<rect x="0" y="0" width="${Math.max(0, X(pos)).toFixed(1)}" height="${H}" fill="var(--sky1)" opacity=".28"/>`;
+  let lbl = '', step = span > 2000 ? 1000 : 500;
+  for (let k = Math.ceil(x0 / step) * step; k <= x0 + span; k += step) if (X(k) > 20 && X(k) < W - 20) lbl += `<div class="lbl" style="left:${(X(k) / W * 100).toFixed(2)}%">${dec(k / 1000, step < 1000 ? 1 : 0)} km</div>`;
+  const mk = (x, cls) => `<div class="mk${cls}" style="left:${(X(x) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, x)) / H * 100).toFixed(2)}%;background-image:url(mascota/avatar.webp)"></div>`;
+  const gp = gpos != null ? ghostGap() : null;
+  return `<div class="scene"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${skyDefs('skyP')}
+      <rect width="${W}" height="${H}" fill="url(#skyP)"/><circle cx="${W * .8}" cy="${H * .22}" r="11" style="fill:var(--sun)" opacity=".55"/>
+      <path d="${m1}" style="fill:var(--mnt1)"/><path d="${m2}" style="fill:var(--mnt2)"/>
+      ${ground}<path d="${road}" fill="none" style="stroke:var(--txt)" stroke-width="1.4" opacity=".55" vector-effect="non-scaling-stroke"/>${done}</svg>
+    ${lbl}${gpos != null && gpos >= x0 && gpos <= x0 + span ? mk(gpos, ' gh') : ''}${mk(pos, '')}
+    ${gp ? `<div class="gap" style="color:${gp.s <= 0 ? 'var(--ok)' : 'var(--err)'}">Fantasma: ${gp.s <= 0 ? 'vas ' + clock(-gp.s) + ' por delante' : 'vas ' + clock(gp.s) + ' por detrás'}</div>` : ''}</div>`;
 }
 function routeIdx(r, x){ return Math.max(0, Math.min(r.d.length - 1, Math.round(x / STEP))); }
 const routeGrade = (r, x) => r.g[routeIdx(r, x)];
@@ -894,6 +971,10 @@ function openRoute(id){
       <div><span>Km más duro</span><b>${dec(best.g)} %</b></div>
       <div><span>Tiempo a ${Math.round(S.ftp * .75)} W</span><b>${dur(routeETA(r, S.ftp * .75))}</b></div>
     </div>
+    ${(() => { const g = ghostOf(r.id); return g ? `<div class="card" style="margin:12px 0;display:flex;gap:12px;align-items:center"><div style="width:44px;height:44px;border-radius:50%;border:3px dashed var(--mut);background:url(mascota/avatar.webp) center/cover;filter:grayscale(1);opacity:.7;flex:none"></div>
+      <div style="flex:1;min-width:0"><b>Tu mejor vez: ${clock(g.dur)}</b><div class="small mut">${fdate(g.date)}. Tu fantasma sale contigo y verás si vas por delante o por detrás.</div>
+      <div class="seg" id="ghSeg" style="margin:8px 0 0">${[[1, 'Con fantasma'], [0, 'Sin fantasma']].map(([v, t]) => `<button data-v="${v}" class="${+ROUTE_GHOST === v ? 'on' : ''}" onclick="ROUTE_GHOST=${!!v};document.querySelectorAll('#ghSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===${v}))">${t}</button>`).join('')}</div></div></div>`
+      : `<div class="small mut" style="margin:10px 0">Cuando lo completes, la próxima vez correrás contra tu fantasma: tu mejor vez en este trayecto.</div>`; })()}
     <h3>Dificultad de las pendientes</h3>
     <div class="seg" id="diffSeg" style="margin-bottom:6px">${[.5, .75, 1].map(v => `<button class="${ROUTE_DIFF === v ? 'on' : ''}" onclick="ROUTE_DIFF=${v};document.querySelectorAll('#diffSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===${v}))" data-v="${v}">${v * 100} %</button>`).join('')}</div>
     <div class="small mut">Al 50 % una rampa del 10 % se nota como un 5 %. La velocidad y el tiempo se calculan siempre con la pendiente real. Un rodillo de rueda como el X3 no llega a simular rampas muy duras: por encima del 8-10 % notarás el tope.</div>
@@ -1229,19 +1310,39 @@ async function setupTrainer(dev){
     BT.fecTx = await s.getCharacteristic(FEC_TX); ok = true;
   }catch(e){ BT.fecTx = null; }
   if (!ok) throw new Error('el rodillo no ofrece datos compatibles');
-  BT.dev = dev;
+  BT.dev = dev; if (dev.id && S.trainerId !== dev.id){ S.trainerId = dev.id; saveS(); }
   sendUserCfg();
   updateConn();
+}
+// Conexión sin selector a un aparato ya emparejado (Chrome con getDevices); espera a que anuncie hasta 'ms'
+async function quickConnect(id, setup, name, ms = 8000){
+  if (!btOK() || !id || !navigator.bluetooth.getDevices) return false;
+  try{
+    const d = (await navigator.bluetooth.getDevices()).find(x => x.id === id); if (!d) return false;
+    if (!d._lis){ d._lis = 1; d.addEventListener('gattserverdisconnected', () => onLost(d, setup, name)); }
+    if (d.watchAdvertisements){
+      const ctl = new AbortController();
+      await new Promise(res => { const t = setTimeout(res, ms); d.addEventListener('advertisementreceived', () => { clearTimeout(t); res(); }, {once:true}); d.watchAdvertisements({signal:ctl.signal}).catch(res); });
+      ctl.abort();
+    }
+    await Promise.race([setup(d), sleep(ms).then(() => { throw new Error('tiempo'); })]);
+    return true;
+  }catch(e){ return false; }
 }
 async function connectTrainer(){
   if (!btOK()) return toast('Abre la app en Chrome (Android o PC) desde https');
   if (trainerOn()) return toast('El rodillo ya está conectado');
+  if (S.trainerId && navigator.bluetooth.getDevices){
+    setChip('cTrainer', 'wait', 'Buscando…');
+    if (await quickConnect(S.trainerId, setupTrainer, 'Rodillo', 4000)){ toast('Rodillo conectado'); afterReconnect(BT.dev); return; }
+    updateConn();
+  }
   try{
     const dev = await navigator.bluetooth.requestDevice({
       filters:[{namePrefix:'Think'}, {services:[FEC_SVC]}, {services:[0x1826]}],
       optionalServices:[FEC_SVC, 0x1818, 0x180a]
     });
-    dev.addEventListener('gattserverdisconnected', () => onLost(dev, setupTrainer, 'Rodillo'));
+    if (!dev._lis){ dev._lis = 1; dev.addEventListener('gattserverdisconnected', () => onLost(dev, setupTrainer, 'Rodillo')); }
     setChip('cTrainer', 'wait', 'Conectando…');
     await setupTrainer(dev);
     toast('Rodillo conectado');
@@ -1253,14 +1354,15 @@ async function setupHR(d){
   const ch = await sv.getCharacteristic('heart_rate_measurement');
   ch.addEventListener('characteristicvaluechanged', e => parseHR(e.target.value));
   await ch.startNotifications();
-  BT.hrDev = d; updateConn();
+  BT.hrDev = d; if (d.id && S.hrId !== d.id){ S.hrId = d.id; saveS(); } updateConn();
 }
 async function connectHR(){
   if (!btOK()) return toast('Abre la app en Chrome desde https');
   if (BT.hrDev && BT.hrDev.gatt.connected) return toast('El pulso ya está conectado');
+  if (S.hrId && navigator.bluetooth.getDevices){ setChip('cHR', 'wait', 'Buscando…'); if (await quickConnect(S.hrId, setupHR, 'Pulsómetro', 4000)){ toast('Pulso conectado'); return; } updateConn(); }
   try{
     const d = await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
-    d.addEventListener('gattserverdisconnected', () => onLost(d, setupHR, 'Pulsómetro'));
+    if (!d._lis){ d._lis = 1; d.addEventListener('gattserverdisconnected', () => onLost(d, setupHR, 'Pulsómetro')); }
     setChip('cHR', 'wait', 'Conectando…');
     await setupHR(d); toast('Pulso conectado');
   }catch(e){ updateConn(); if (e.name !== 'NotFoundError') toast('Pulso: ' + e.message); }
@@ -1290,18 +1392,42 @@ async function connectCad(){
     await setupCad(d); toast('Cadencia conectada');
   }catch(e){ updateConn(); if (e.name !== 'NotFoundError') toast('Cadencia: ' + e.message); }
 }
+// Reconexión: durante una sesión lo intenta sin límite (la sesión queda en pausa y no se pierde nada); fuera de ella, unos 2 minutos
 async function onLost(dev, setup, name){
-  if (dev === BT.dev) BT.fecTx = null;
+  const isT = setup === setupTrainer;
+  if (isT && dev === BT.dev) BT.fecTx = null;
+  dev._tries = 0; dev._lostAt = now();
   updateConn(); renderPlayerWarn();
+  if (isT && P.on && P.rec && P.rec.p.length){ brSay('¡Se ha soltado el rodillo! Tranquilo, lo reconecto y no pierdes nada.', 'cable'); buzz([300, 100, 300]); beep(440, 400); }
   if (dev._retrying) return; dev._retrying = true;
-  for (let i = 0; i < 20; i++){
-    await sleep(2500);
-    if (dev.gatt.connected) break;
-    try{ await setup(dev); toast(name + ' reconectado'); if (dev === BT.dev) resendCmd(); break; }catch(e){}
+  while (true){
+    if (!P.on && dev._tries >= 25) break;
+    if (isT && BT.dev !== dev && trainerOn()) break;          // se conectó otro rodillo
+    if (!isT && BT.hrDev !== dev && BT.hrDev && BT.hrDev.gatt.connected) break;
+    await sleep(Math.min(8000, 2000 + dev._tries * 400));
+    if (dev.gatt.connected && (!isT || BT.fecTx)) break;
+    dev._tries++; renderPlayerWarn();
+    try{ await setup(dev); toast(name + ' reconectado'); if (isT) afterReconnect(dev); break; }catch(e){}
   }
   dev._retrying = false;
   updateConn(); renderPlayerWarn();
   if (!dev.gatt.connected) toast(name + ': no se pudo reconectar');
+}
+// Al volver el rodillo: recupera lo que tocaba (vatios, pendiente o trayecto)
+function afterReconnect(dev){
+  if (dev !== BT.dev) return;
+  if (!P.on){ resendCmd(); return; }
+  if (P.route){ P.gSent = null; routeGradeSend(true); }
+  else if (P.mode === 'grade') sendGrade(P.grade);
+  else { P.lastSent = null; applyTarget(true); }
+  if (P.rec && P.rec.p.length){ brSay('¡Rodillo de vuelta! Seguimos donde lo dejamos.'); beep(990, 200); }
+  renderPlayerWarn();
+}
+async function reconnectNow(){
+  const d = BT.dev;
+  if (d){ try{ await setupTrainer(d); toast('Rodillo reconectado'); afterReconnect(d); return; }catch(e){} }
+  await connectTrainer();
+  if (trainerOn()) afterReconnect(BT.dev);
 }
 function setChip(id, state, text){
   const c = $(id); c.classList.toggle('on', state === 'on'); c.classList.toggle('wait', state === 'wait');
@@ -1375,13 +1501,15 @@ function startSession(wk, sessKey, route){
     on:true, wk, route:route || null, mult:(S.todayMult && S.todayMult.date === today() && wk) ? S.todayMult.mult : 1, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
     wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
     start:null, rec:newRec(), dist:0, cum:[0], prRef:liveRef(), prSaid:{}, brAt:0, brStart:0, brHalf:0, brKm:0, brRamp:0, lastSent:null, lastChart:0, p3:[],
+    w0:wPrime(), wbal:wPrime(), wLow:0, np4:0, npN:0, ghost:route && ROUTE_GHOST ? ghostOf(route.id) : null, gSide:null, brGh:0,
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
     total: wk ? wkDur(wk) : 0
   });
   $('pName').textContent = wk ? wk.name : route ? route.name : 'Rodar libre';
   $('pSub').textContent = wk ? (wk.test === 'rampa' ? 'Test · hasta agotarte' : dur(P.total) + ' con FTP de ' + S.ftp + ' W') : route ? kmTxt(route.dist) + ', +' + route.gain + ' m' + (P.diff !== 1 ? ', dificultad ' + Math.round(P.diff * 100) + ' %' : '') : 'Controla tú la resistencia';
   $('player').classList.add('on');
-  renderCtl();
+  if (S.fullscreen !== 0 && document.fullscreenEnabled && !document.fullscreenElement && !matchMedia('(display-mode: standalone)').matches){ try{ document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(() => {}); }catch(e){} }
+  renderCtl(); renderPlayerWarn();
   wake();
   if (P.route) routeGradeSend(true); else if (P.mode === 'grade') sendGrade(P.grade); else applyTarget(true);
   clearInterval(P.tick); P.tick = setInterval(tick, 1000);
@@ -1394,11 +1522,9 @@ function routeGradeSend(force){
 function renderRoute(){
   const r = P.route, g = routeGrade(r, P.rDist), left = Math.max(0, r.dist - P.rDist);
   $('pIntName').textContent = 'Pendiente';
-  $('pIntT').innerHTML = `<span style="color:${gcol(g)}">${dec(g)} %</span>`;
-  $('pTgtLab').textContent = 'Quedan'; $('pTgt').textContent = kmTxt(left);
+  $('pIntT').innerHTML = `<span style="color:${gcol(g)}">${dec(g)}<small>%</small></span>`;
+  $('pTgtLab').textContent = 'Quedan'; $('pTgt').innerHTML = kmTxt(left).replace(' km', '<small>km</small>');
   const pc = P.rDist / r.dist * 100; $('pIntProg').style.width = pc + '%'; $('pProg').style.width = pc + '%';
-  $('pCadLab').textContent = 'km/h'; $('pCad').textContent = dec(P.vSpd * 3.6);
-  $('pXLab').textContent = 'desnivel (m)'; $('pX').textContent = '+' + Math.round(P.gain);
   const ahead = Math.min(500, left), gA = ahead > 50 ? (routeEle(r, P.rDist + ahead) - routeEle(r, P.rDist)) / ahead * 100 : 0;
   $('pNext').textContent = ahead > 50 ? `Próximos ${Math.round(ahead)} m: media del ${dec(gA)} %` : 'Últimos metros';
 }
@@ -1408,6 +1534,9 @@ const BR = {
   hard:['¡Toca apretar! {d} a {w} W. Respira hondo.', 'Bloque duro: {d} a {w} W. ¡Tú puedes!', '¡Al lío! {w} W durante {d}. Cadencia alta.'],
   thr:['Umbral: {d} a {w} W. Constante, sin cebarte al principio.', 'Ritmo de umbral, {d}. Hombros sueltos y aguanta.'],
   tempo:['Bloque de {d} a {w} W. Firme pero controlado.', '{d} a {w} W. Incómodo pero sostenible.'],
+  wlow:['Te queda poca reserva (W\'). Aguanta el ritmo, no lo subas.', 'Depósito casi vacío. Constante y respira, que ya queda poco.'],
+  gpass:['¡Has adelantado a tu fantasma! Vas por delante de tu mejor vez.', '¡Croac! Le has pasado a tu mejor vez. Mantén.'],
+  glost:['Tu fantasma te pasa. ¡Aprieta un poco!', 'Tu mejor vez va por delante. ¡A por ella!'],
   easy:['Recupera: suelta piernas y bebe un trago.', 'Respira. Aprovecha para beber y relajar los hombros.', 'Recuperación. Baja pulsaciones, que viene más.'],
   last:['¡Último bloque duro! Vacía el depósito.', '¡El último! Aquí se gana la forma.', 'Último esfuerzo, ¡a por él!'],
   cool:['Vuelta a la calma. ¡Buen trabajo!', 'Ya está lo duro. Gira suave y estira después.'],
@@ -1420,9 +1549,14 @@ const brPick = (k, v = {}) => { const a = BR[k]; return a[Math.floor(Math.random
 const fmtD = s => s < 60 ? s + ' s' : s % 60 ? Math.floor(s / 60) + ' min ' + (s % 60) + ' s' : (s / 60) + ' min';
 const segInt = x => x.w != null ? x.w / S.ftp : x.p != null ? x.p : (x.p0 + x.p1) / 2;
 let brT = null;
-function brSay(txt){
+// Poses extra de Brinco: se usan solo si la imagen existe en mascota/ (si no, el avatar)
+const POSES = ['bebe', 'puerto', 'cable', 'meta'], POSE_OK = {};
+POSES.forEach(k => { const im = new Image(); im.onload = () => { POSE_OK[k] = 1; }; im.src = 'mascota/' + k + '.webp'; });
+const poseSrc = k => k && POSE_OK[k] ? 'mascota/' + k + '.webp' : 'mascota/avatar.webp';
+function brSay(txt, pose){
   if (S.brinco === 0 || !txt) return;
   P.brAt = now(); $('pBriT').textContent = txt; const b = $('pBri'); b.classList.add('on');
+  const im = $('pBriImg'); im.src = poseSrc(pose); im.classList.toggle('pose', !!(pose && POSE_OK[pose]));
   clearTimeout(brT); brT = setTimeout(() => b.classList.remove('on'), 6500);
 }
 function brSeg(){
@@ -1437,7 +1571,7 @@ function brSeg(){
   else return;
   // en series cortas no hablar en cada cambio
   if (s.d < 60 && k !== 'last' && k !== 'cool' && now() - P.brAt < 90000) return;
-  brSay(brPick(k, {d:fmtD(s.d), w}));
+  brSay(brPick(k, {d:fmtD(s.d), w}), k === 'easy' ? 'bebe' : null);
 }
 const PR_LIVE = [60, 300, 1200];
 function liveRef(){ if (!ACTS.length) return {}; const b = allTimeBest(null), r = {}; PR_LIVE.forEach(d => { if (b[d]) r[d] = b[d].w; }); return r; }
@@ -1453,12 +1587,105 @@ function brTick(){
   brPR();
   if (P.wk && P.total >= 1200 && !P.brHalf && P.wt >= P.total / 2 && now() - P.brAt > 20000){ P.brHalf = 1; brSay(brPick('half')); }
   if (P.route){
-    if (!P.brKm && P.route.dist > 3000 && P.route.dist - P.rDist <= 1000){ P.brKm = 1; brSay(brPick('lastkm')); }
+    if (!P.brKm && P.route.dist > 3000 && P.route.dist - P.rDist <= 1000){ P.brKm = 1; brSay(brPick('lastkm'), 'puerto'); }
     const g = routeGrade(P.route, P.rDist) * P.diff;
-    if (g >= 8 && now() - P.brRamp > 180000 && now() - P.brAt > 20000){ P.brRamp = now(); brSay(brPick('ramp', {g:Math.round(g)})); }
+    if (g >= 8 && now() - P.brRamp > 180000 && now() - P.brAt > 20000){ P.brRamp = now(); brSay(brPick('ramp', {g:Math.round(g)}), 'puerto'); }
+    brGhost();
   }
-  if (!P.wk && P.wt > 0 && P.wt % 1200 === 0) brSay(brPick('drink'));
+  if (!P.wk && P.wt > 0 && P.wt % 1200 === 0) brSay(brPick('drink'), 'bebe');
+  if (P.wbal != null && P.wk && P.wbal / P.w0 < .2 && !P.wLow && now() - P.brAt > 15000){ P.wLow = 1; brSay(brPick('wlow')); }
+  if (P.wbal != null && P.wLow && P.wbal / P.w0 > .6) P.wLow = 0;
 }
+// ================= FANTASMA (mejor vez en cada trayecto) =================
+// ht_ghost: {routeId: {t:[segundo en que pasó por cada 100 m], dur, date, actId}}
+let GHOSTS = LS.get('ht_ghost', {});
+const saveGhosts = () => LS.set('ht_ghost', GHOSTS);
+let ROUTE_GHOST = true;
+function ghostFromRec(rec, dist){
+  const rd = rec && rec.rd; if (!rd || !rd.length || rd[rd.length - 1] < dist - 30) return null;
+  const t = [0]; let k = 1;
+  for (let i = 0; i < rd.length; i++) while (k * 100 <= rd[i] && k * 100 <= dist){ t.push(i + 1); k++; }
+  return {t, dur:rd.length};
+}
+// mejor vez del trayecto; si no hay, la busca una vez en las sesiones guardadas
+function ghostOf(id){
+  if (GHOSTS[id] !== undefined) return GHOSTS[id];
+  const r = routeById(id); let best = null;
+  if (r) ACTS.filter(a => a.wkId === 'route:' + id).forEach(a => { const g = ghostFromRec(LS.get('ht_act_' + a.id, null), r.dist); if (g && (!best || g.dur < best.dur)) best = Object.assign(g, {date:a.date, actId:a.id}); });
+  GHOSTS[id] = best; saveGhosts(); return best;
+}
+// distancia del fantasma en el segundo T y segundo en que el fantasma pasó por la distancia x
+function ghostDist(g, T){
+  const t = g.t; if (T >= t[t.length - 1]) return (t.length - 1) * 100;
+  let lo = 0, hi = t.length - 1; while (hi - lo > 1){ const m = (lo + hi) >> 1; if (t[m] <= T) lo = m; else hi = m; }
+  return (lo + (T - t[lo]) / Math.max(1, t[hi] - t[lo])) * 100;
+}
+function ghostTime(g, x){
+  const t = g.t, k = Math.min(t.length - 1, Math.floor(x / 100)); if (k >= t.length - 1) return t[t.length - 1];
+  return t[k] + (t[k + 1] - t[k]) * (x / 100 - k);
+}
+// diferencia: s > 0 = vas por detrás (segundos), m > 0 = vas por delante (metros)
+function ghostGap(){
+  const g = P.ghost; if (!g || P.rDist < 50) return null;
+  const T = P.rec.p.length; return {s:Math.round(T - ghostTime(g, P.rDist)), m:Math.round(P.rDist - ghostDist(g, T))};
+}
+function brGhost(){
+  const gp = ghostGap(); if (!gp || P.rDist < 300) return;
+  const ahead = gp.s < -2, behind = gp.s > 2;
+  if (P.gSide != null && now() - P.brGh > 120000 && now() - P.brAt > 20000){
+    if (ahead && P.gSide === 'b'){ P.brGh = now(); brSay(brPick('gpass')); buzz([80, 50, 80]); }
+    else if (behind && P.gSide === 'a'){ P.brGh = now(); brSay(brPick('glost')); }
+  }
+  if (ahead) P.gSide = 'a'; else if (behind) P.gSide = 'b';
+}
+const gapTxt = s => (s > 0 ? '+' : s < 0 ? '−' : '') + clock(Math.abs(s));
+
+// ================= W' (reserva anaeróbica, modelo de Skiba con CP = FTP) =================
+const wPrime = () => S.wprime > 0 ? S.wprime : 20000;
+function wStep(bal, w, cp, w0){ return w > cp ? bal - (w - cp) : bal + (cp - w) * (w0 - bal) / w0; }
+function wMinOf(p, ftp){ const w0 = wPrime(); let b = w0, m = w0; for (const w of p){ b = Math.min(w0, wStep(b, w, ftp, w0)); if (b < m) m = b; } return Math.max(0, m / w0); }
+// estimación con tus récords: trabajo = CP·t + W' entre el mejor 5 min y el mejor 20 min
+function wPrimeEstimate(){ const b = allTimeBest(null); if (!b[300] || !b[1200] || b[300].w <= b[1200].w) return null; return Math.round((b[300].w - b[1200].w) * 400 / 500) * 500; }
+const wcol = f => f > .6 ? 'var(--ok)' : f > .3 ? 'var(--warnc)' : 'var(--err)';
+
+// ================= DATOS EN SESIÓN (configurables) =================
+const avgArr = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0;
+const pw3 = () => P.p3.length ? Math.round(P.p3.reduce((a, b) => a + b, 0) / P.p3.length) : 0;
+const FIELDS = {
+  hr:   {n:'Pulso', f:() => [curHR() || '--', 'pulso', 'var(--hr)']},
+  hrz:  {n:'Zona de pulso', f:() => { const h = curHR(); return [h && S.lthr ? 'Z' + hrZone(h) : '--', 'zona pulso', 'var(--hr)']; }},
+  cad:  {n:'Cadencia (con sensor)', f:() => [BT.cadSeen ? Math.round(curCad()) || 0 : '--', 'cadencia']},
+  wbal: {n:"W' (reserva anaeróbica)", f:() => { const fr = P.wbal == null ? 1 : Math.max(0, P.wbal / P.w0); return [Math.round(fr * 100) + ' %', "reserva W'", wcol(fr), fr]; }},
+  pct:  {n:'% del FTP', f:() => [pw3() ? Math.round(pw3() / S.ftp * 100) + ' %' : '--', '% FTP']},
+  wkg:  {n:'W/kg', f:() => [pw3() ? dec(pw3() / S.peso, 1) : '--', 'W/kg']},
+  avg:  {n:'Potencia media', f:() => [P.rec.p.length ? avgArr(P.rec.p) : '--', 'media W']},
+  np:   {n:'Potencia normalizada', f:() => [P.npN ? Math.round(Math.pow(P.np4 / P.npN, .25)) : '--', 'NP']},
+  tss:  {n:'TSS acumulado', f:() => { const n = P.rec.p.length, np = P.npN ? Math.pow(P.np4 / P.npN, .25) : 0; return [n ? Math.round(n / 3600 * Math.pow(np / S.ftp, 2) * 100) : 0, 'TSS']; }},
+  kj:   {n:'Trabajo (kJ)', f:() => [Math.round(P.rec.p.reduce((a, b) => a + b, 0) / 1000), 'kJ']},
+  left: {n:'Lo que queda', f:() => P.route ? [kmTxt(Math.max(0, P.route.dist - P.rDist)), 'quedan'] : P.wk ? [P.wk.test === 'rampa' ? '--' : clock(P.total - P.wt), 'restante'] : ['--', 'restante']},
+  spd:  {n:'Velocidad', f:() => [dec(P.route ? P.vSpd * 3.6 : curSpd()), 'km/h']},
+  dist: {n:'Distancia', f:() => [dec((P.route ? P.rDist : P.dist) / 1000, 1), 'km']},
+  gain: {n:'Desnivel subido', f:() => ['+' + Math.round(P.gain || 0), 'desnivel (m)']},
+  ghost:{n:'Fantasma (mejor vez)', f:() => { const gp = ghostGap(); if (!P.ghost) return ['+' + Math.round(P.gain || 0), 'desnivel (m)']; if (!gp) return ['0:00', 'vs mejor vez']; return [gapTxt(gp.s), gp.s <= 0 ? 'por delante' : 'por detrás', gp.s <= 0 ? 'var(--ok)' : 'var(--err)']; }},
+  time: {n:'Tiempo total', f:() => [clock(P.rec.p.length), 'tiempo']}
+};
+const FIELD_DEF = {wk:['hr', 'wbal', 'left', 'np', 'tss', 'kj'], route:['hr', 'spd', 'ghost', 'left', 'gain', 'wbal'], free:['hr', 'avg', 'kj', 'np', 'tss', 'wbal']};
+const fctx = () => P.route ? 'route' : P.wk ? 'wk' : 'free';
+function curFields(){ const c = fctx(), a = (S.fields && S.fields[c]) || FIELD_DEF[c]; return FIELD_DEF[c].map((d, i) => FIELDS[a[i]] ? a[i] : d).slice(0, +S.nFields === 6 ? 6 : 3); }
+function renderStats(){
+  const fs = curFields(), box = $('pStats'); box.classList.toggle('six', fs.length === 6);
+  box.innerHTML = fs.map((id, i) => { const [v, l, c, bar] = FIELDS[id].f();
+    return `<div onclick="pickField(${i})"><b${c ? ` style="color:${c}"` : ''}>${v}</b><span>${l}</span>${bar != null ? `<div class="wb"><i style="width:${Math.max(0, bar * 100).toFixed(0)}%;background:${c}"></i></div>` : ''}</div>`; }).join('');
+}
+function pickField(i){
+  const c = fctx(), cur = curFields();
+  openSheet(`<h2>Dato ${i + 1}</h2><div class="small mut" style="margin:-4px 0 12px">Elige qué ves en este hueco. Se guarda para ${c === 'route' ? 'los trayectos' : c === 'wk' ? 'los workouts' : 'rodar libre'}.</div>
+    <div class="grid2">${Object.entries(FIELDS).filter(([k]) => c === 'route' || !['ghost', 'gain'].includes(k)).map(([k, f]) => `<button class="btn${cur[i] === k ? ' acc' : ''}" style="justify-content:flex-start;text-align:left" onclick="setField(${i},'${k}')">${f.n}</button>`).join('')}</div>
+    <h3 style="margin-top:16px">Cuántos datos</h3>
+    <div class="seg">${[3, 6].map(n => `<button class="${(+S.nFields === 6 ? 6 : 3) === n ? 'on' : ''}" onclick="S.nFields=${n};saveS();closeSheet();renderStats()">${n} datos</button>`).join('')}</div>`);
+}
+function setField(i, k){ const c = fctx(); S.fields = S.fields || {}; const a = curFields().concat(FIELD_DEF[c].slice(curFields().length)); a[i] = k; S.fields[c] = a; saveS(); closeSheet(); renderStats(); }
+
 function curSeg(){
   if (!P.wk) return null;
   while (P.segI < P.wk.segs.length - 1 && P.wt >= P.starts[P.segI + 1]) P.segI++;
@@ -1495,7 +1722,9 @@ function tick(){
     r.p.push(Math.round(pw)); r.hr.push(curHR()); r.c.push(Math.round(curCad())); r.s.push(Math.round(vs * 10)); r.wt.push(P.wt);
     P.dist += vs / 3.6;
     P.wt++;
+    P.wbal = Math.min(P.w0, wStep(P.wbal, pw, S.ftp, P.w0));
     brTick();
+    { const n = P.rec.p.length; if (n >= 30){ const a30 = (P.cum[n] - P.cum[n - 30]) / 30; P.np4 += a30 ** 4; P.npN++; } }
     if (P.route && P.rDist >= P.route.dist){ beep(660, 500); toast('¡Trayecto completado!'); return endSession(); }
     if (P.wk && P.wt >= P.total){ beep(660, 500); toast(P.wk.test ? 'Fin del test' : '¡Entreno completado!'); return endSession(); }
     if (P.wk){
@@ -1511,24 +1740,26 @@ function tick(){
   render();
 }
 function render(){
-  const pw = P.p3.length ? Math.round(P.p3.reduce((a, b) => a + b, 0) / P.p3.length) : 0;
+  const pw = pw3();
   const tgt = (P.mode === 'erg' || P.wk) ? target() : null;
   $('pPow').innerHTML = pw + '<small>W</small>';
   $('pPow').style.color = pw > 0 ? zcol(pw) : 'var(--txt)';
   const z = pw > 0 ? zone(pw / S.ftp) : 0;
-  $('pZone').innerHTML = z ? `<i class="tdot" style="background:${ZH[z]}"></i>${ZN[z]}` : '&nbsp;';
-  const hr = curHR(); $('pHR').textContent = hr || '--';
-  if (BT.cadSeen){ $('pCadLab').textContent = 'cadencia'; $('pCad').textContent = Math.round(curCad()) || 0; }
-  else { $('pCadLab').textContent = 'media W'; const p = P.rec.p; $('pCad').textContent = p.length ? Math.round(p.reduce((a, b) => a + b, 0) / p.length) : '--'; }
+  $('pZone').innerHTML = z ? `<i class="tdot" style="background:${ZH[z]};width:10px;height:10px"></i>${ZN[z]}` : '&nbsp;';
+  // fondo teñido con la zona: la del objetivo en workouts (estable), la de tu potencia si no
+  const zb = S.zoneBg === 0 ? 0 : (P.wk && tgt && P.mode === 'erg' ? zone(tgt / S.ftp) : z);
+  $('player').style.setProperty('--zt', zb ? ZH[zb] : 'transparent');
   $('pTime').textContent = clock(P.rec.p.length);
   let st = '';
   if (P.manual) st = 'En pausa';
+  else if (!trainerOn()) st = 'Esperando al rodillo';
   else if (!P.running) st = P.rec.p.length ? 'Pausa automática. Pedalea para seguir' : 'Empieza a pedalear';
   else if (P.route && P.diff !== 1) st = 'Dificultad al ' + Math.round(P.diff * 100) + ' %';
   else if (P.mode === 'grade' && P.wk) st = 'Modo pendiente, ' + dec(P.grade) + ' %';
   else if (P.wk && P.mult !== 1) st = 'Intensidad al ' + Math.round(P.mult * 100) + ' %';
   else if (P.mode === 'erg' && tgt && pw > 0) { const dlt = pw - tgt; st = Math.abs(dlt) <= 5 ? 'En el objetivo' : (dlt > 0 ? '+' : '') + dlt + ' W del objetivo'; }
   $('pState').textContent = st;
+  const nxEl = $('pNext'); let soon = false;
   if (P.route) renderRoute();
   else if (P.wk){
     const seg = curSeg(), el = P.wt - P.starts[P.segI], left = seg.d - el;
@@ -1538,19 +1769,21 @@ function render(){
     $('pTgt').textContent = tgt + ' W';
     $('pIntProg').style.width = (el / seg.d * 100) + '%';
     $('pProg').style.width = (P.wt / P.total * 100) + '%';
-    $('pXLab').textContent = 'restante'; $('pX').textContent = P.wk.test === 'rampa' ? '--' : clock(P.total - P.wt);
     const nx = P.wk.segs[P.segI + 1];
-    $('pNext').textContent = nx ? `Después: ${nx.n}, ${clock(nx.d)} a ${segW(nx, 0, P.mult)}${nx.p0 != null ? '-' + segW(nx, nx.d, P.mult) : ''} W` : 'Último intervalo';
+    const nw = nx ? segW(nx, 0, P.mult) + (nx.p0 != null ? '-' + segW(nx, nx.d, P.mult) : '') : '';
+    soon = !!nx && left <= 10 && P.running && P.wk.test !== 'rampa';
+    nxEl.textContent = !nx ? 'Último intervalo' : soon ? `En ${left} s → ${nw} W · ${nx.n}` : `Después: ${nx.n}, ${clock(nx.d)} a ${nw} W`;
   } else {
     $('pIntName').textContent = 'Distancia';
     $('pIntT').textContent = dec(P.dist / 1000) + ' km';
     $('pTgtLab').textContent = P.mode === 'erg' ? 'Vatios' : 'Pendiente';
     $('pTgt').textContent = P.mode === 'erg' ? P.ergW + ' W' : dec(P.grade) + ' %';
     $('pIntProg').style.width = '0'; $('pProg').style.width = '0';
-    const p = P.rec.p; $('pXLab').textContent = 'kJ'; $('pX').textContent = Math.round(p.reduce((a, b) => a + b, 0) / 1000);
-    $('pNext').textContent = '';
+    nxEl.textContent = '';
   }
-  if (now() - P.lastChart > 2000){ P.lastChart = now(); drawPlayerChart(); }
+  nxEl.classList.toggle('soon', soon);
+  renderStats();
+  if (P.route || now() - P.lastChart > 2000){ P.lastChart = now(); drawPlayerChart(); }
 }
 function polyline(xs, ys, top, H, color, w){
   const n = xs.length; if (n < 2) return '';
@@ -1559,7 +1792,7 @@ function polyline(xs, ys, top, H, color, w){
   return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${w}" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
 }
 function drawPlayerChart(){
-  if (P.route){ $('pChartBox').innerHTML = routeSVG(P.route, '', P.rDist).replace('<svg ', '<svg id="pChart" '); return; }
+  if (P.route){ $('pChartBox').innerHTML = routeScene(P.route, P.rDist, P.ghost ? ghostDist(P.ghost, P.rec.p.length) : null); return; }
   const H = 100, r = P.rec;
   let svg;
   if (P.wk){
@@ -1621,9 +1854,15 @@ function toggleMode(){
 function renderPlayerWarn(){
   if (!P.on){ $('pWarn').innerHTML = ''; return; }
   const w = [];
-  if (!trainerOn()) w.push('Rodillo desconectado · intentando reconectar…');
+  let lost = '';
+  if (!trainerOn()){
+    const d = BT.dev, n = d && d._tries || 0, ago = d && d._lostAt ? Math.round((now() - d._lostAt) / 1000) : 0;
+    lost = `<div class="lost"><img src="${poseSrc('cable')}" alt=""><div style="flex:1;min-width:0"><b>Rodillo desconectado</b>
+      <div class="small">${d ? 'Reconectando' + (n ? ' (intento ' + n + (ago ? ', ' + clock(ago) : '') + ')' : '') + '…' : 'Sin rodillo.'} La sesión está en pausa y no pierdes nada. Pedalea un poco para despertarlo.</div>
+      <button class="btn sm acc" style="margin-top:8px" onclick="reconnectNow()">Reconectar ahora</button></div></div>`;
+  }
   if (!wlOK) w.push('La pantalla puede apagarse sola (' + (wlInfo.lock || '') + '). Desactiva el ahorro de batería o alarga el tiempo de pantalla.');
-  $('pWarn').innerHTML = w.map(x => `<div class="warn" style="margin:8px 0 0">${x}</div>`).join('');
+  $('pWarn').innerHTML = lost + w.map(x => `<div class="warn" style="margin:8px 0 0">${x}</div>`).join('');
 }
 setInterval(() => { if (P.on && P.running && BT.cmd) resendCmd(); }, 10000);
 function askEnd(){
@@ -1641,7 +1880,18 @@ function endSession(){
   LS.del('ht_live');
   renderPlayerWarn();
   if (P.rec.p.length < 30){ toast('Sesión muy corta: no se guarda'); renderHome(); return; }
+  const prevG = P.route ? ghostOf(P.route.id) : null;
   const meta = finalize(P.start, $('pName').textContent, P.wk ? P.wk.id : P.route ? 'route:' + P.route.id : null, P.rec, P.sessKey);
+  if (P.route){
+    const g = ghostFromRec(P.rec, P.route.dist);
+    if (g){
+      const prev = prevG, best = !prev || g.dur < prev.dur;
+      meta.ghostRes = {best, dur:g.dur, prev:prev ? prev.dur : null, prevDate:prev ? prev.date : null};
+      if (best){ GHOSTS[P.route.id] = Object.assign(g, {date:meta.date, actId:meta.id}); saveGhosts(); }
+      saveActs();
+    }
+  }
+  if (document.fullscreenElement){ try{ document.exitFullscreen().catch(() => {}); }catch(e){} }
   renderHome();
   showAct(meta.id, true);
 }
@@ -1675,7 +1925,7 @@ function calcStats(rec, ftp){
     avgHr: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null,
     maxHr: hrs.length ? Math.max(...hrs) : null,
     avgC: cads.length ? Math.round(cads.reduce((a, b) => a + b, 0) / cads.length) : null,
-    kj: Math.round(sum / 1000), zt, best, hz
+    kj: Math.round(sum / 1000), zt, best, hz, wMin: n ? Math.round(wMinOf(p, ftp) * 100) / 100 : null
   };
 }
 // Zonas de pulso de Friel sobre la FC umbral (LTHR)
@@ -1753,12 +2003,14 @@ function showAct(id, fresh){
   if (wk && wk.test === '20' && a.best && a.best[1200]){ const f = Math.round(a.best[1200] * .95); testBox = testCard('Media de 20 min: ' + a.best[1200] + ' W', f); }
   const bests = [5, 60, 300, 1200, 3600].filter(k => a.best && a.best[k]);
   openSheet(`
-    ${fresh ? '<img class="mascot-big" src="mascota/logro.webp" alt=""><div class="small" style="color:var(--ok);font-weight:700;margin-bottom:4px">✓ Sesión guardada</div>' : ''}
+    ${fresh ? `<img class="mascot-big" src="${a.ghostRes && a.ghostRes.best && POSE_OK.meta ? 'mascota/meta.webp' : 'mascota/logro.webp'}" alt=""><div class="small" style="color:var(--ok);font-weight:700;margin-bottom:4px">✓ Sesión guardada</div>` : ''}
     <h2 style="margin-right:40px">${esc(a.name)}</h2>
     <div class="small mut" style="margin-top:-6px">${fdate(a.date)}, ${ftime(a.date)}, con FTP de ${a.ftp} W</div>
     ${a.prs && a.prs.length ? (fresh ? prCard(a) : `<div class="tags" style="margin-top:10px">${a.prs.map(d => `<span class="tag acc">🏆 Récord ${BEST_L[d]}: ${a.best[d]} W</span>`).join('')}</div>`) : ''}
     ${fresh && !testBox && (() => { const e = ftpEstimate(); return e && e.w >= S.ftp * 1.03 ? ftpCard(e, true) : ''; })() || ''}
     ${testBox}
+    ${a.ghostRes ? `<div class="card" style="margin:12px 0;${a.ghostRes.best ? 'border:1px solid var(--acc)' : ''}"><b style="font-size:17px">${a.ghostRes.best ? (a.ghostRes.prev ? '⏱️ ¡Nueva mejor vez! ' + clock(a.ghostRes.dur) : '⏱️ Primera vez completado: ' + clock(a.ghostRes.dur)) : '⏱️ ' + clock(a.ghostRes.dur) + ' en este trayecto'}</b>
+      <div class="small mut">${a.ghostRes.prev ? (a.ghostRes.best ? clock(a.ghostRes.prev - a.ghostRes.dur) + ' menos que tu anterior mejor vez (' + clock(a.ghostRes.prev) + ').' : 'Tu mejor vez sigue siendo ' + clock(a.ghostRes.prev) + ' (' + clock(a.ghostRes.dur - a.ghostRes.prev) + ' más).') : 'La próxima vez correrás contra este tiempo.'}</div></div>` : ''}
     <div class="kv">
       <div><span>Tiempo</span><b>${clock(a.dur)}</b></div>
       <div><span>TSS</span><b>${a.tss}</b></div>
@@ -1772,6 +2024,7 @@ function showAct(id, fresh){
       ${a.avgC ? `<div><span>Cadencia</span><b>${a.avgC}</b></div>` : ''}
       <div><span>W/kg (NP)</span><b>${dec(a.np / S.peso, 2)}</b></div>
       <div><span>Distancia</span><b>${dec(a.dist)} km</b></div>
+      ${a.wMin != null ? `<div><span>W' mínimo</span><b style="color:${wcol(a.wMin)}">${Math.round(a.wMin * 100)} %</b></div>` : ''}
     </div>
     ${rec ? actChart(rec) : ''}
     ${a.zt ? `<h3 style="margin-top:16px">Tiempo en zonas de potencia</h3>${zoneBars(a.zt)}` : ''}
@@ -1787,8 +2040,68 @@ function showAct(id, fresh){
                  : `<button class="btn acc" id="upBtn" onclick="stravaUpload(${a.id})">Subir a Strava</button>`}
       <button class="btn" onclick="downloadTCX(${a.id})">Descargar TCX</button>
     </div>
+    <button class="btn block" style="margin-top:10px" onclick="shareCard(${a.id})">📸 Compartir imagen</button>
     <button class="btn red block" style="margin-top:10px" onclick="delAct(${a.id})">Borrar sesión</button>
   `);
+}
+// ================= TARJETA PARA COMPARTIR (imagen 1080×1350) =================
+const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+async function shareCard(id){
+  const a = ACTS.find(x => x.id === id); if (!a) return;
+  toast('Preparando la imagen…');
+  const rec = LS.get('ht_act_' + id, null), route = a.wkId && a.wkId.startsWith('route:') ? routeById(a.wkId.slice(6)) : null;
+  try{ await document.fonts.ready; await document.fonts.load('700 80px "Barlow Condensed"'); await document.fonts.load('600 30px Barlow'); }catch(e){}
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const NUM = '"Barlow Condensed", sans-serif', BODY = 'Barlow, sans-serif';
+  const bg = x.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#232a36'); bg.addColorStop(1, '#12161d'); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  const dz = domZone(a) || 3; const glow = x.createRadialGradient(W * .8, 160, 20, W * .8, 160, 700); glow.addColorStop(0, ZH[dz] + '55'); glow.addColorStop(1, ZH[dz] + '00'); x.fillStyle = glow; x.fillRect(0, 0, W, H);
+  // cabecera
+  x.fillStyle = '#ff7a1a'; x.font = `700 46px ${NUM}`; x.fillText('UMBRAL', 72, 110);
+  x.fillStyle = '#a0a8b8'; x.font = `500 32px ${BODY}`; x.fillText(fdate(a.date) + ', ' + ftime(a.date), 72, 160);
+  x.fillStyle = '#f1f3f6'; x.font = `700 92px ${NUM}`;
+  const words = a.name.split(' '), lines = []; let ln = '';
+  words.forEach(w => { const t = ln ? ln + ' ' + w : w; if (x.measureText(t).width > W - 380 && ln){ lines.push(ln); ln = w; } else ln = t; }); lines.push(ln);
+  lines.slice(0, 2).forEach((l, i) => x.fillText(l, 72, 270 + i * 92));
+  const yG = 270 + Math.min(2, lines.length) * 92 + 10;
+  // gráfico
+  const gx = 72, gw = W - 144, gh = 300, gy = yG;
+  x.fillStyle = 'rgba(255,255,255,.04)'; x.beginPath(); x.roundRect(gx, gy, gw, gh, 28); x.fill();
+  if (route){
+    const n = route.d.length, emin = Math.min(...route.e), span = Math.max(40, Math.max(...route.e) - emin), bars = 120;
+    for (let b = 0; b < bars; b++){ const i0 = Math.floor(b * (n - 1) / bars), i1 = Math.floor((b + 1) * (n - 1) / bars), g = (route.e[i1] - route.e[i0]) / Math.max(1, route.d[i1] - route.d[i0]) * 100;
+      const X0 = gx + 20 + b / bars * (gw - 40), X1 = gx + 20 + (b + 1) / bars * (gw - 40), Y = e => gy + gh - 24 - (e - emin) / span * (gh - 70);
+      x.fillStyle = gcol(g); x.beginPath(); x.moveTo(X0, gy + gh - 24); x.lineTo(X0, Y(route.e[i0])); x.lineTo(X1, Y(route.e[i1])); x.lineTo(X1, gy + gh - 24); x.fill(); }
+  } else if (rec && rec.p.length > 30){
+    const p = rec.p, n = p.length, bars = 90, top = a.ftp * 1.3;
+    const avgs = []; for (let b = 0; b < bars; b++){ const i0 = Math.floor(b * n / bars), i1 = Math.max(i0 + 1, Math.floor((b + 1) * n / bars)); avgs.push(avgArr(p.slice(i0, i1))); }
+    const mx = Math.max(top, ...avgs) * 1.05, bw = (gw - 40) / bars;
+    avgs.forEach((v, b) => { const h = v / mx * (gh - 60); x.fillStyle = ZH[zone(v / a.ftp)] || ZH[1]; x.beginPath(); x.roundRect(gx + 20 + b * bw + 1, gy + gh - 24 - h, Math.max(2, bw - 2), h, 3); x.fill(); });
+    const fy = gy + gh - 24 - a.ftp / mx * (gh - 60); x.strokeStyle = 'rgba(245,197,24,.55)'; x.setLineDash([10, 8]); x.lineWidth = 3; x.beginPath(); x.moveTo(gx + 20, fy); x.lineTo(gx + gw - 20, fy); x.stroke(); x.setLineDash([]);
+    x.fillStyle = 'rgba(245,197,24,.8)'; x.font = `600 24px ${BODY}`; x.fillText('FTP ' + a.ftp + ' W', gx + 26, fy - 10);
+  }
+  // datos
+  const st = route ? [['Tiempo', clock(a.dur)], ['Distancia', dec(a.dist) + ' km'], ['Desnivel', '+' + route.gain + ' m'], ['Media', a.avgP + ' W'], ['NP', a.np + ' W'], ['FC media', a.avgHr || '--']]
+                   : [['Tiempo', clock(a.dur)], ['TSS', a.tss], ['NP', a.np + ' W'], ['Media', a.avgP + ' W'], ['FC media', a.avgHr || '--'], ['Trabajo', a.kj + ' kJ']];
+  const sy = gy + gh + 50;
+  st.forEach(([l, v], i) => { const cx = 72 + (i % 3) * ((W - 144) / 3), cy = sy + Math.floor(i / 3) * 150;
+    x.fillStyle = '#a0a8b8'; x.font = `500 30px ${BODY}`; x.fillText(l, cx, cy + 30);
+    x.fillStyle = '#f1f3f6'; x.font = `700 80px ${NUM}`; x.fillText(String(v), cx, cy + 108); });
+  // destacados
+  let hy = sy + 330; x.font = `700 36px ${BODY}`;
+  const hl = [];
+  if (a.ghostRes && a.ghostRes.best && a.ghostRes.prev) hl.push('⏱️ Nueva mejor vez: ' + clock(a.ghostRes.prev - a.ghostRes.dur) + ' menos');
+  if (a.prs && a.prs.length){ const d = a.prs.slice().sort((p, q) => q - p)[0]; hl.push('🏆 Récord de ' + BEST_L[d] + ': ' + a.best[d] + ' W' + (a.prs.length > 1 ? ' y ' + (a.prs.length - 1) + ' más' : '')); }
+  hl.slice(0, 2).forEach(t => { x.fillStyle = '#ff7a1a'; x.fillText(t, 72, hy); hy += 54; });
+  // Brinco
+  const im = await loadImg(a.ghostRes && a.ghostRes.best && POSE_OK.meta ? 'mascota/meta.webp' : 'mascota/logro.webp');
+  if (im){ const s_ = 300 / Math.max(im.width, im.height); x.drawImage(im, W - 72 - im.width * s_, 70, im.width * s_, im.height * s_); }
+  x.fillStyle = '#6d7587'; x.font = `500 26px ${BODY}`; x.fillText('Entrenado en rodillo con Umbral', 72, H - 60);
+  const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+  const file = new File([blob], 'umbral-' + dkey(a.date) + '.png', {type:'image/png'});
+  try{
+    if (navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:a.name}); return; }
+  }catch(e){ if (e.name === 'AbortError') return; }
+  downloadBlob(blob, file.name); toast('Imagen descargada');
 }
 const rpeCol = v => v <= 3 ? '#3ecf8e' : v <= 6 ? '#f5c518' : v <= 8 ? '#ff8a1a' : '#ff4d5e';
 function testCard(txt, f){
@@ -1811,6 +2124,7 @@ function setFtp(v){
 function delAct(id){
   if (!confirm('¿Borrar esta sesión? No se puede deshacer.')) return;
   ACTS = ACTS.filter(a => a.id !== id); saveActs(); LS.del('ht_act_' + id);
+  Object.keys(GHOSTS).forEach(k => { if (GHOSTS[k] && GHOSTS[k].actId === id) delete GHOSTS[k]; }); saveGhosts();
   if (PLAN){ PLAN.sessions.forEach(s => { if (s.actId === id){ s.status = 'pend'; s.actId = null; } }); savePlan(); }
   closeSheet(); renderAna(); renderHome(); toast('Sesión borrada');
 }
@@ -2599,9 +2913,15 @@ function renderCfg(){
   }
   $('iModel').innerHTML = COACH_MODELS.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); $('iModel').value = S.coachModel; $('iKey').value = S.apiKey; $('iNotes').value = S.coachNotes;
   $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iBrinco').value = String(S.brinco == null ? 1 : +S.brinco); $('iWeek').value = String(S.weekAuto == null ? 1 : +S.weekAuto); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
+  $('iZbg').value = String(S.zoneBg === 0 ? 0 : 1); $('iFs').value = String(S.fullscreen === 0 ? 0 : 1); $('iWp').value = wPrime();
   $('cbDom').textContent = location.hostname || '(tu dominio)';
   $('stravaState').innerHTML = S.strava ? `<span style="color:var(--ok)">● Conectado${S.strava.who ? ' como ' + esc(S.strava.who) : ''}</span>${S.lastSync ? ' · sincronizado ' + fdate(S.lastSync) : ''}` : 'No conectado';
   $('ver').textContent = 'Umbral v' + VER + ' · ' + ACTS.length + ' sesiones · ' + CUSTOM.length + ' workouts propios';
+}
+function wpEstimate(){
+  const e = wPrimeEstimate();
+  if (!e) return toast('Necesito un récord de 5 min y otro de 20 min para estimarlo');
+  if (confirm(`Con tus récords de 5 y 20 minutos tu W' sale de unos ${e.toLocaleString('es-ES')} J. ¿Lo uso?`)){ S.wprime = e; saveS(); renderCfg(); toast('Guardado'); }
 }
 function readCfg(){
   const n = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : d; };
@@ -2609,11 +2929,12 @@ function readCfg(){
   S.ftp = Math.round(n('iFtp', S.ftp)); S.peso = n('iPeso', S.peso); S.fcmax = Math.round(n('iFc', S.fcmax)); S.lthr = Math.round(n('iLthr', S.lthr));
   S.apiKey = $('iKey').value.trim(); S.coachModel = $('iModel').value; S.coachNotes = $('iNotes').value.trim();
   S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.brinco = +$('iBrinco').value; S.weekAuto = +$('iWeek').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
+  S.zoneBg = +$('iZbg').value; S.fullscreen = +$('iFs').value; S.wprime = Math.round(Math.max(3000, Math.min(60000, n('iWp', wPrime()))));
   if (S.ftp !== oldFtp) S.ftpHist.push({date:now(), ftp:S.ftp});
   saveS();
   if (S.peso !== oldPeso && trainerOn()) sendUserCfg();
 }
-['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iBrinco', 'iWeek', 'iSid', 'iSsec'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
+['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iBrinco', 'iWeek', 'iSid', 'iSsec', 'iZbg', 'iFs', 'iWp'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
 async function exportData(share){
   const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, routes:ROUTES, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
   const name = 'umbral-copia-' + today() + '.json', blob = new Blob([JSON.stringify(data)], {type:'application/json'});
@@ -2692,6 +3013,8 @@ stravaCallback();
 // Strava al abrir y al volver a la app (cada 30 min como mucho, nunca durante una sesión)
 function autoSync(){ if (S.strava && !P.on && now() - (S.lastSync || 0) > 30 * 60e3) stravaSync(true); }
 setTimeout(autoSync, 1500);
+// Al abrir, intenta conectar sin selector el rodillo y el pulso de la última vez (si Chrome lo permite)
+setTimeout(async () => { if (!btOK() || !navigator.bluetooth.getDevices) return; if (S.trainerId && !trainerOn() && await quickConnect(S.trainerId, setupTrainer, 'Rodillo', 15000)) toast('Rodillo conectado'); if (S.hrId && !(BT.hrDev && BT.hrDev.gatt.connected) && await quickConnect(S.hrId, setupHR, 'Pulsómetro', 15000)) toast('Pulso conectado'); }, 1200);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(autoSync, 800); });
 // Pide al navegador que no borre los datos de la app por falta de espacio
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
