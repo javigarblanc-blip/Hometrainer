@@ -510,7 +510,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.13.5';
+const VER = '0.14.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -574,6 +574,7 @@ const Sx = (sec, p, n) => ({d:sec, p, n});
 const rep = (k, a) => Array.from({length:k}, () => a).flat();
 const WU = (m = 10) => [R(m, .45, .75, 'Calentamiento')];
 const WU2 = () => [R(10, .45, .75, 'Calentamiento'), ...rep(2, [M(1, 1.0, 'Activación'), M(1, .5, 'Suave')]), M(2, .55, 'Suave')];
+const WU3 = () => [R(7, .45, .75, 'Calentamiento'), ...rep(2, [M(1, 1.0, 'Activación'), M(1, .5, 'Suave')]), M(1, .55, 'Suave')];
 const CD = (m = 6) => [R(m, .55, .4, 'Vuelta a la calma')];
 const series = (k, onMin, onP, offMin, offP, n) => rep(k, [M(onMin, onP, n), M(offMin, offP, 'Recupera')]);
 const TIPOS = ['Recuperación', 'Resistencia', 'Tempo', 'Sweet Spot', 'Umbral', 'VO2max', 'Anaeróbico', 'Fuerza', 'Test'];
@@ -650,6 +651,56 @@ const BASE_WK = [
     segs:[...WU2(), ...rep(6,[Sx(12,1.8,'Arrancada'), Sx(168,.55,'Recupera')]), M(10,.7,'Z2'), ...CD()]},
   {id:'marcha_sim', name:'Simulación de marcha 90', tipo:'Tempo', desc:'Hora y media como una marcha: llanos en Z2, tres puertos en sweet spot y umbral, y bajadas para recuperar.',
     segs:[...WU(), M(10,.68,'Llano'), M(12,.88,'Puerto 1'), M(6,.55,'Bajada'), M(10,.7,'Llano'), M(15,.9,'Puerto 2'), M(6,.55,'Bajada'), M(8,.72,'Llano'), M(8,.95,'Puerto final'), ...CD(5)]},
+  // ---- Añadidos v0.14: sesiones de 40-45 minutos
+  {id:'z2_40', name:"Fondo Z2 40'", tipo:'Resistencia', desc:'Cuarenta minutos de base aeróbica constante. Para los días justos de tiempo.', segs:[R(5,.45,.65,'Calentamiento'), M(30,.68,'Z2'), R(5,.6,.45,'Vuelta a la calma')]},
+  {id:'z2_45cad', name:"Fondo Z2 45' con cadencia", tipo:'Resistencia', desc:'Z2 con cuatro bloques de 2 minutos a cadencia alta (100+ rpm) para mejorar la pedalada sin cansarte.',
+    segs:[...WU(6), ...rep(4,[M(5,.68,'Z2'), M(2,.68,'Cadencia alta (100+ rpm)')]), M(6,.68,'Z2'), ...CD(5)]},
+  {id:'z2_45acel', name:"Fondo con aceleraciones 45'", tipo:'Resistencia', desc:'Z2 con seis aceleraciones de 20 s. Base aeróbica con un poco de chispa.',
+    segs:[...WU(6), M(6,.68,'Z2'), ...rep(6,[Sx(20,1.25,'Aceleración'), Sx(220,.68,'Z2')]), M(4,.68,'Z2'), ...CD(5)]},
+  {id:'z2_45prog', name:"Progresivo 45'", tipo:'Resistencia', desc:'De muy cómodo a tempo alto en 45 minutos. Para dosificar y acabar fuerte.', segs:[...WU(6), M(10,.65,'Z2'), M(10,.72,'Z2 alta'), M(8,.8,'Tempo'), M(5,.86,'Tempo alto'), ...CD(6)]},
+  {id:'z2_tempo45', name:"Fondo con tempo 45'", tipo:'Tempo', desc:'Z2 con tres bloques de tempo de 6 minutos. El fondo largo de la semana en formato corto.', segs:[...WU(6), M(5,.68,'Z2'), ...rep(3,[M(6,.82,'Tempo'), M(4,.65,'Z2')]), ...CD(4)]},
+  {id:'tempo_3x8', name:"Tempo 3×8", tipo:'Tempo', desc:"Tres bloques de tempo en 45'. Buena entrada al ritmo sostenido.", segs:[...WU(8), ...series(3,8,.84,3,.55,'Tempo'), ...CD(4)]},
+  {id:'tempo_2x12', name:"Tempo 2×12", tipo:'Tempo', desc:"Dos bloques de 12 minutos de tempo. Resistencia muscular en 45'.", segs:[...WU(8), ...series(2,12,.82,4,.55,'Tempo'), ...CD(5)]},
+  {id:'tempo_30', name:"Tempo continuo 30", tipo:'Tempo', desc:'Media hora seguida a ritmo de tempo. Mental y muy útil para puertos.', segs:[...WU(8), M(30,.8,'Tempo'), ...CD(6)]},
+  {id:'ss_3x8', name:'Sweet Spot 3×8', tipo:'Sweet Spot', desc:"24 minutos de sweet spot en 45'. La sesión clave cuando hay poco tiempo.", segs:[...WU(8), ...series(3,8,.9,3,.55,'Sweet Spot'), ...CD(4)]},
+  {id:'ss_4x6', name:'Sweet Spot 4×6', tipo:'Sweet Spot', desc:'Cuatro bloques cortos con poca recuperación. Llevadero y muy efectivo.', segs:[...WU(8), ...series(4,6,.91,2,.55,'Sweet Spot'), ...CD(5)]},
+  {id:'ss_2x12', name:'Sweet Spot 2×12', tipo:'Sweet Spot', desc:"Dos bloques de 12 minutos al 90 %. Paso previo al sweet spot continuo.", segs:[...WU(8), ...series(2,12,.9,4,.55,'Sweet Spot'), ...CD(5)]},
+  {id:'ss_1x25', name:'Sweet Spot 25 minutos', tipo:'Sweet Spot', desc:'25 minutos seguidos al 89 %. La progresión natural del 2×12.', segs:[...WU(10), M(25,.89,'Sweet Spot'), ...CD(7)]},
+  {id:'ss_surges45', name:"Sweet Spot con cambios 45'", tipo:'Sweet Spot', desc:'Dos bloques de sweet spot con un cambio de 15 s cada 3 minutos, como en una grupeta.',
+    segs:[...WU(8), ...rep(2,[...rep(4,[Sx(15,1.3,'Cambio'), Sx(165,.88,'Sweet Spot')]), M(3,.55,'Recupera')]), ...CD(5)]},
+  {id:'um_4x5', name:'Umbral 4×5', tipo:'Umbral', desc:"Series de 5 minutos algo por encima del FTP. Entrada al umbral en 45'.", segs:[...WU3(), ...series(4,5,1.03,2,.55,'Umbral'), ...CD(5)]},
+  {id:'um_3x7', name:'Umbral 3×7', tipo:'Umbral', desc:'21 minutos al umbral con 3 de recuperación.', segs:[...WU3(), ...series(3,7,1.0,3,.55,'Umbral'), ...CD(3)]},
+  {id:'um_2x10', name:'Umbral 2×10', tipo:'Umbral', desc:"Dos bloques de 10 minutos al FTP. El clásico en formato 45'.", segs:[...WU3(), ...series(2,10,1.0,4,.55,'Umbral'), ...CD(5)]},
+  {id:'um_1x20', name:'Umbral 20 minutos', tipo:'Umbral', desc:'Veinte minutos seguidos al 97 %. La prueba de fuego cuando solo tienes 45 minutos.', segs:[...WU3(), M(20,.97,'Umbral sostenido'), M(4,.55,'Suave'), ...CD(8)]},
+  {id:'ou_2x9', name:'Over-unders 2×9', tipo:'Umbral', desc:'Dos bloques alternando 2 minutos al 95 % y 1 al 105 %.',
+    segs:[...WU3(), ...rep(2,[...rep(3,[M(2,.95,'Under'), M(1,1.05,'Over')]), M(4,.55,'Recupera')]), ...CD(6)]},
+  {id:'ou_3x6', name:'Over-unders 3×6', tipo:'Umbral', desc:'Minuto y medio al 95 % y 30 s al 108 %, sin parar, tres veces.',
+    segs:[...WU3(), ...rep(3,[...rep(3,[M(1.5,.95,'Under'), Sx(30,1.08,'Over')]), M(3,.55,'Recupera')]), ...CD(5)]},
+  {id:'vo2_4x3', name:'VO2 4×3', tipo:'VO2max', desc:"Cuatro series de 3 minutos muy fuertes. VO2 en 45'.", segs:[...WU3(), ...series(4,3,1.15,3,.5,'VO2'), ...CD(6)]},
+  {id:'vo2_5x3c', name:"VO2 5×3 en 45'", tipo:'VO2max', desc:'Cinco series de 3 minutos con la misma recuperación, sin calentamiento largo.', segs:[...WU3(), ...series(5,3,1.15,3,.5,'VO2'), ...CD(3)]},
+  {id:'vo2_3x4', name:'VO2 3×4', tipo:'VO2max', desc:'Tres series de 4 minutos al 112 %.', segs:[...WU3(), ...series(3,4,1.12,4,.5,'VO2'), ...CD(6)]},
+  {id:'vo2_6x2', name:'VO2 6×2', tipo:'VO2max', desc:'Series de 2 minutos muy fuertes con la misma recuperación.', segs:[...WU3(), ...series(6,2,1.18,2,.5,'VO2'), ...CD(6)]},
+  {id:'vo2_4020_45', name:"40/20 2×8", tipo:'VO2max', desc:'40 s fuerte y 20 s suave durante 8 minutos, dos veces.',
+    segs:[...WU3(), ...rep(2,[...rep(8,[Sx(40,1.15,'ON'), Sx(20,.5,'OFF')]), M(4,.5,'Recupera')]), ...CD(6)]},
+  {id:'piramide45', name:'Pirámide 1-2-3-3-2-1', tipo:'VO2max', desc:'Series de 1 a 3 minutos y vuelta, al 108 %, con la misma recuperación.',
+    segs:[...WU3(), ...[1,2,3,3,2,1].flatMap(m => [M(m,1.08,m + "' fuerte"), M(m,.5,'Recupera')]), ...CD(6)]},
+  {id:'an_3030_45', name:'30/30 2×8', tipo:'Anaeróbico', desc:'Cambios de ritmo cortos en dos bloques. El ERG tarda unos segundos en ajustarse: es normal.',
+    segs:[...WU3(), ...rep(8,[Sx(30,1.3,'ON'), Sx(30,.5,'OFF')]), M(5,.55,'Recupera'), ...rep(8,[Sx(30,1.3,'ON'), Sx(30,.5,'OFF')]), ...CD(7)]},
+  {id:'an_1min45', name:'Minutos 6×1', tipo:'Anaeróbico', desc:'Seis minutos al 130 % con 2 de recuperación. Para rematar repechos.', segs:[...WU3(), ...series(6,1,1.3,2,.5,'1 min a tope'), M(8,.65,'Z2'), ...CD(6)]},
+  {id:'an_sprints45', name:'Sprints 6×15 s', tipo:'Anaeróbico', desc:'Seis sprints con recuperación completa. Cambia a modo Pendiente si el ERG no te deja sprintar.',
+    segs:[...WU3(), ...rep(6,[Sx(15,1.6,'Sprint'), Sx(165,.5,'Recupera')]), M(8,.65,'Z2'), ...CD(5)]},
+  {id:'an_ataques45', name:"Ataques en subida 45'", tipo:'Anaeróbico', desc:'Tempo alto de puerto con un ataque de 15 s cada 2 minutos, dos bloques.',
+    segs:[...WU3(), ...rep(2,[...rep(5,[Sx(15,1.5,'Ataque'), Sx(105,.85,'Tempo')]), M(4,.55,'Recupera')]), ...CD(5)]},
+  {id:'fuerza_4x5', name:'Fuerza 4×5 a cadencia baja', tipo:'Fuerza', desc:'Bloques al 85 % a 60-70 rpm. Fuerza para puertos en 45 minutos. Si notas la rodilla, sube cadencia.',
+    segs:[...WU(8), ...series(4,5,.85,3,.55,'Fuerza (60-70 rpm)'), ...CD(5)]},
+  {id:'fuerza_3x8', name:'Fuerza 3×8 en subida', tipo:'Fuerza', desc:'Tres bloques de 8 minutos al 82 % a 55-65 rpm, como en una rampa dura. Si notas las rodillas, sube cadencia.',
+    segs:[...WU(8), ...series(3,8,.82,3,.55,'Fuerza (55-65 rpm)'), ...CD(4)]},
+  {id:'fuerza_arr45', name:"Arrancadas 45'", tipo:'Fuerza', modo:'grade', desc:'Cinco arrancadas de 12 s casi desde parado con desarrollo duro, de pie. Empieza en modo Pendiente: los vatios son una guía.',
+    segs:[...WU3(), ...rep(5,[Sx(12,1.8,'Arrancada'), Sx(168,.55,'Recupera')]), M(10,.7,'Z2'), ...CD(6)]},
+  {id:'marcha_45', name:"Simulación de marcha 45'", tipo:'Tempo', desc:'Una marcha en pequeño: llanos en Z2, dos puertos en sweet spot, bajadas y un final al umbral.',
+    segs:[...WU(6), M(5,.68,'Llano'), M(8,.88,'Puerto 1'), M(4,.55,'Bajada'), M(5,.7,'Llano'), M(8,.92,'Puerto 2'), M(3,.55,'Bajada'), M(4,.97,'Puerto final'), ...CD(2)]},
+  {id:'test20_45', name:"Test de 20 min en 45'", tipo:'Test', test:'20', modo:'grade', desc:'El test de 20 minutos sin el esfuerzo previo de 5 minutos, para que quepa en 45. Tu FTP es el 95 % de la media. Empieza en modo Pendiente.',
+    segs:[...WU(8), ...rep(2,[M(1,1.05,'Activación'), M(1,.5,'Suave')]), M(2,.55,'Suave'), M(20,1.0,'TEST 20 min: a tope'), ...CD(9)]},
   {id:'rampa', name:'Test de rampa', tipo:'Test', test:'rampa', desc:'3 min a 100 W y después +20 W cada minuto hasta que no puedas más. Tu FTP estimado es el 75 % de tu mejor minuto. Cuando no puedas mantener los vatios, pulsa Terminar.',
     segs:[{d:180, w:100, n:'Calentamiento'}, ...Array.from({length:30}, (_, i) => ({d:60, w:120 + 20*i, n:'Escalón ' + (i+1)}))]},
   {id:'test20', name:'Test de 20 minutos', tipo:'Test', test:'20', modo:'grade', desc:'El test clásico: 20 minutos al máximo que puedas sostener. Tu FTP es el 95 % de la media. Empieza en modo Pendiente para que tú controles el esfuerzo; los vatios que salen son solo una guía.',
@@ -738,11 +789,43 @@ const PLANS = [
   {id:'invierno', name:'Invierno en rodillo', nivel:'Medio', semanas:8, desc:'Dos meses de base para la temporada: tempo, fuerza a cadencia baja, sweet spot y fondos que crecen, con cadencia alta en los días suaves.',
     weeks:[{t:'Carga', s:['tempo_2x15','rec_cad','z2_prog','z2_75']}, {t:'Carga', s:['tempo_3x12','rec45','fuerza_4x8','z2_90']}, {t:'Carga', s:['tempo_40','rec_cad','ss_3x10','z2_90']}, {t:'Descarga', s:['z2_acel','rec30','tempo_2x15','z2_60']},
            {t:'Carga', s:['tempo_4x10','rec45','fuerza_5x5','z2_tempo']}, {t:'Carga', s:['ss_4x12','rec_cad','tempo_2x25','z2_120']}, {t:'Carga', s:['ss_3x15','rec45','fuerza_4x8','z2_tempo']}, {t:'Test', s:['ss_2x15','rec30','activacion','rampa']}]},
+  // ---- Añadidos v0.14: planes en 45 minutos
+  {id:'ftp45', name:"Sube tu FTP en 45'", nivel:'Medio-alto', semanas:6, desc:'Sweet spot, umbral y VO2 en sesiones de 45 minutos como mucho. El plan de FTP para cuando no hay más tiempo.',
+    weeks:[{t:'Carga', s:['ss_3x8','rec_cad','um_4x5','z2_45']}, {t:'Carga', s:['ss_2x12','rec45','um_3x7','z2_45prog']}, {t:'Carga', s:['ou_3x6','rec45','um_2x10','z2_tempo45']},
+           {t:'Descarga', s:['ss_4x6','rec30','vo2_4x3','z2_40']}, {t:'Carga', s:['vo2_5x3c','rec45','um_1x20','z2_tempo45']}, {t:'Test', s:['vo2_3x4','rec30','activacion','rampa']}]},
+  {id:'base45', name:"Base en 45'", nivel:'Medio', semanas:6, desc:'Tempo y sweet spot que crecen semana a semana, con fondos de 45 minutos con aceleraciones, cadencia o tempo dentro.',
+    weeks:[{t:'Carga', s:['tempo_3x8','rec_cad','z2_45acel','z2_45']}, {t:'Carga', s:['tempo_2x12','rec45','ss_3x8','z2_45prog']}, {t:'Carga', s:['tempo_30','rec_cad','ss_2x12','z2_tempo45']},
+           {t:'Descarga', s:['z2_40','rec30','tempo_3x8','z2_45cad']}, {t:'Carga', s:['ss_1x25','rec45','tempo_30','z2_tempo45']}, {t:'Test', s:['ss_4x6','rec30','activacion','rampa']}]},
+  {id:'puertos45', name:"Escalador en 45'", nivel:'Medio-alto', semanas:6, desc:'Fuerza a cadencia baja, umbral, ataques y simulaciones de marcha cortas. Para puertos, en 45 minutos.',
+    weeks:[{t:'Carga', s:['fuerza_4x5','rec45','tempo_3x8','z2_45prog']}, {t:'Carga', s:['fuerza_3x8','rec_cad','ss_3x8','z2_tempo45']}, {t:'Carga', s:['um_3x7','rec45','an_ataques45','marcha_45']},
+           {t:'Descarga', s:['ss_4x6','rec30','fuerza_4x5','z2_45']}, {t:'Carga', s:['ou_2x9','rec45','um_1x20','marcha_45']}, {t:'Puesta a punto', s:['um_2x10','rec30','activacion','z2_40']}]},
+  {id:'vo245', name:"VO2 en 45'", nivel:'Alto', semanas:4, desc:'Bloque corto de alta intensidad en sesiones de 45 minutos. Mejor con una buena base detrás.',
+    weeks:[{t:'Carga', s:['vo2_4x3','rec45','an_3030_45','z2_45']}, {t:'Carga', s:['vo2_5x3c','rec45','vo2_3015','z2_45prog']}, {t:'Carga', s:['vo2_3x4','rec45','piramide45','z2_45acel']}, {t:'Descarga', s:['vo2_6x2','rec30','an_sprints45','z2_40']}]},
+  {id:'polar45', name:"Polarizado en 45'", nivel:'Medio-alto', semanas:6, desc:'Casi todo Z2 y una o dos sesiones de VO2 por semana, todo en 45 minutos como mucho.',
+    weeks:[{t:'Carga', s:['vo2_3x4','z2_40','z2_45','z2_45cad']}, {t:'Carga', s:['vo2_4020_45','z2_40','z2_45acel','z2_45']}, {t:'Carga', s:['vo2_5x3c','z2_45','vo2_6x2','z2_45cad']},
+           {t:'Descarga', s:['vo2_4x3','rec30','z2_40','z2_45']}, {t:'Carga', s:['vo2_3015','z2_40','piramide45','z2_45']}, {t:'Test', s:['vo2_4x3','rec30','activacion','rampa']}]},
+  {id:'marcha45p', name:"Prepara una marcha en 45'", nivel:'Medio', semanas:6, desc:'Tempo, sweet spot, fuerza en subida y simulaciones de marcha de 45 minutos, con puesta a punto al final.',
+    weeks:[{t:'Carga', s:['tempo_2x12','rec45','ss_3x8','z2_tempo45']}, {t:'Carga', s:['fuerza_3x8','rec_cad','tempo_30','marcha_45']}, {t:'Carga', s:['ss_2x12','rec45','um_3x7','marcha_45']},
+           {t:'Descarga', s:['tempo_3x8','rec30','z2_45prog','z2_45']}, {t:'Carga', s:['ss_1x25','rec45','an_ataques45','marcha_45']}, {t:'Puesta a punto', s:['ss_4x6','rec30','activacion','z2_40']}]},
+  {id:'mant45', name:"Mantenimiento en 45'", nivel:'Todos', semanas:4, desc:'Una sesión de calidad variada, una suave y un fondo, todo en 45 minutos. Repetible.',
+    weeks:[{t:'Carga', s:['ss_3x8','rec30','vo2_4x3','z2_45']}, {t:'Carga', s:['tempo_2x12','rec45','um_4x5','z2_45acel']}, {t:'Carga', s:['ss_2x12','rec30','an_3030_45','z2_45prog']}, {t:'Descarga', s:['z2_40','rec30','tempo_3x8','z2_45cad']}]},
 ];
 const planById = id => PLANS.find(p => p.id === id);
+// Versión de 45' de cada workout largo (para adaptar cualquier plan)
+const SHORT45 = {z2_60:'z2_45', z2_75:'z2_45prog', z2_90:'z2_tempo45', z2_120:'z2_tempo45', z2_acel:'z2_45acel', z2_prog:'z2_45prog', z2_tempo:'z2_tempo45', rec_60:'rec45',
+  tempo_2x15:'tempo_2x12', tempo_3x12:'tempo_3x8', tempo_2x25:'tempo_30', tempo_4x10:'tempo_2x12', tempo_40:'tempo_30',
+  ss_3x10:'ss_3x8', ss_2x15:'ss_2x12', ss_3x15:'ss_1x25', ss_2x20:'ss_1x25', ss_4x12:'ss_2x12', ss_3x20:'ss_1x25', ss_surges:'ss_surges45',
+  um_4x8:'um_4x5', um_3x10:'um_3x7', um_2x15:'um_2x10', um_2x20:'um_1x20', um_5x6:'um_4x5', um_3x12:'um_2x10', um_1x30:'um_1x20', ou_3x9:'ou_2x9', ou_4x8:'ou_3x6',
+  vo2_5x3:'vo2_5x3c', vo2_6x3:'vo2_5x3c', vo2_4x4:'vo2_3x4', vo2_5x4:'vo2_3x4', vo2_8x2:'vo2_6x2', vo2_4020:'vo2_4020_45', vo2_3x5:'vo2_3x4',
+  an_3030:'an_3030_45', an_sprints:'an_sprints45', an_1min:'an_1min45', an_ataques:'an_ataques45', piramide:'piramide45',
+  fuerza_5x5:'fuerza_4x5', fuerza_4x8:'fuerza_3x8', fuerza_arr:'fuerza_arr45', marcha_sim:'marcha_45', test20:'test20_45'};
+const MAX45 = 46 * 60;
+const shortId = (id, on) => on && SHORT45[id] && wkById(id) && wkDur(wkById(id)) > MAX45 ? SHORT45[id] : id;
+const planMax = p => Math.max(...p.weeks.flatMap(w => w.s.map(i => wkDur(wkById(i)))));
+const planFits45 = p => planMax(p) <= MAX45;
 const PICK = {2:[0,2], 3:[0,2,3], 4:[0,1,2,3]};
-function planWeekTSS(p, n = 3){ return p.weeks.map(w => PICK[n].reduce((a, i) => a + wkTSS(wkById(w.s[i])), 0)); }
-function startPlan(id, days, when){
+function planWeekTSS(p, n = 3, sh = false){ return p.weeks.map(w => PICK[n].reduce((a, i) => a + wkTSS(wkById(shortId(w.s[i], sh))), 0)); }
+function startPlan(id, days, when, sh = false){
   const pl = planById(id); days = days.slice().sort((a, b) => a - b);
   const pick = PICK[days.length];
   const base = weekStart() + (when === 'next' ? 7 * DAY : 0);
@@ -750,10 +833,10 @@ function startPlan(id, days, when){
   pl.weeks.forEach((w, wi) => days.forEach((d, i) => {
     const dt = new Date(base); dt.setDate(dt.getDate() + wi * 7 + d);
     const k = dkey(dt);
-    sessions.push({date:k, wkId:w.s[pick[i]], week:wi + 1, status:k < tk ? 'skip' : 'pend', actId:null});
+    sessions.push({date:k, wkId:shortId(w.s[pick[i]], sh), week:wi + 1, status:k < tk ? 'skip' : 'pend', actId:null});
   }));
-  PLAN = {id, started:now(), days, sessions}; savePlan();
-  closeSheet(); toast('Plan "' + pl.name + '" en marcha'); show('sPlan');
+  PLAN = {id, started:now(), days, sessions, short:sh && !planFits45(pl)}; savePlan();
+  closeSheet(); toast('Plan "' + pl.name + '" en marcha' + (sh && !planFits45(pl) ? " (sesiones de 45')" : '')); show('sPlan');
 }
 function todaySess(){ if (!PLAN) return null; const k = today(); return PLAN.sessions.find(s => s.date === k && s.status !== 'skip') || null; }
 function nextSess(){ if (!PLAN) return null; const k = today(); return PLAN.sessions.find(s => s.date > k && s.status === 'pend') || null; }
@@ -1058,6 +1141,7 @@ function coachContext(focusActId){
   L.push(`HOY: ${DOWL[dow(new Date())]} ${tk}.`);
   L.push(`PERFIL: FTP ${S.ftp} W, peso ${S.peso} kg (${dec(S.ftp / S.peso, 2)} W/kg), FC máx ${S.fcmax}, FC umbral ${S.lthr}. Rodillo de rueda Thinkrider X3 (ERG tarda unos segundos en ajustarse; pendiente máx. realista 8-10 %). Sin sensor de cadencia.`);
   if (S.coachNotes) L.push(`NOTAS DEL CICLISTA PARA EL ENTRENADOR: ${S.coachNotes}`);
+  if (S.plan45 || (PLAN && PLAN.short) || (PLAN && planById(PLAN.id) && planFits45(planById(PLAN.id)))) L.push("TIEMPO DISPONIBLE: casi siempre puede estar 45 minutos como mucho en el rodillo. Propón sesiones de 40-45' salvo que pida más.");
   L.push(`FORMA: CTL ${Math.round(last.ctl)}, ATL ${Math.round(last.atl)}, TSB ${Math.round(last.tsb)}, TSS 7 días ${d7}, TSS 28 días ${d28}.`);
   const feels = ls.slice(-7).filter(d => FEEL[d.k] != null).map(d => `${d.k}: ${FEELS[FEEL[d.k]].t}`);
   if (feels.length) L.push(`FATIGA MATINAL (últimos días): ${feels.join('; ')}.`);
@@ -2586,19 +2670,23 @@ function skipSess(date, wkId){ const s = PLAN.sessions.find(x => x.date === date
 function quitPlan(){ if (!confirm('¿Abandonar el plan? Tus sesiones hechas se quedan guardadas.')) return; PLAN = null; LS.del('ht_plan'); renderPlan(); toast('Plan abandonado'); }
 
 // ================= BIBLIOTECA =================
-let LIB_TAB = 'planes', WK_FILTER = 'Todos';
+let LIB_TAB = 'planes', WK_FILTER = 'Todos', WK_45 = false;
 function libTab(t){ LIB_TAB = t; renderLib(); }
 function renderLib(){
   document.querySelectorAll('#libTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === LIB_TAB));
   if (LIB_TAB === 'planes') renderPlans(); else if (LIB_TAB === 'trayectos') renderRoutes(); else renderWorkouts();
 }
+let PL_FILTER = 'Todos';
 function renderPlans(){
+  const list = PLANS.filter(p => PL_FILTER === 'Todos' || planFits45(p));
   $('libBox').innerHTML = (PLAN ? `<div class="warn">Tienes en marcha ${esc(planById(PLAN.id).name)}. Si empiezas otro, lo sustituye.</div>` : '') +
-    PLANS.map(p => {
+    `<div class="filters">${['Todos', "Hasta 45'"].map(t => `<button class="${t === PL_FILTER ? 'on' : ''}" onclick="PL_FILTER=this.textContent;renderPlans()">${t}</button>`).join('')}</div>` +
+    (PL_FILTER !== 'Todos' ? `<div class="small mut" style="margin:-4px 2px 12px">Cualquier otro plan también se puede hacer en 45': al empezarlo, elige "Hasta 45'" en la duración de las sesiones.</div>` : '') +
+    list.map(p => {
       const wt = planWeekTSS(p, 3), mx = Math.max(...wt);
       return `<div class="plc" onclick="openPlan('${p.id}')">
         <div class="row between"><div class="nm">${p.name}</div>${PLAN && PLAN.id === p.id ? '<span class="tag ok">En marcha</span>' : ''}</div>
-        <div class="meta">${p.semanas} semanas, nivel ${p.nivel.toLowerCase()}</div>
+        <div class="meta">${p.semanas} semanas, nivel ${p.nivel.toLowerCase()}, sesiones de ${planFits45(p) ? "45' como mucho" : 'hasta ' + Math.round(planMax(p) / 60) + "'"}</div>
         <p>${p.desc}</p>
         <div class="pbars">${wt.map((v, i) => `<div title="Semana ${i + 1}" style="height:${Math.max(10, v / mx * 100)}%;background:${p.weeks[i].t === 'Descarga' ? '#3d8bff' : p.weeks[i].t === 'Test' ? '#f2c230' : 'var(--acc)'}"></div>`).join('')}</div>
         <div class="row small mut" style="gap:14px;margin-top:8px"><span><i class="tdot" style="background:var(--acc)"></i> carga</span><span><i class="tdot" style="background:#3d8bff"></i> descarga</span><span><i class="tdot" style="background:#f2c230"></i> test</span></div>
@@ -2606,13 +2694,18 @@ function renderPlans(){
     }).join('');
 }
 let PLAN_DAYS = [1, 3, 5];
+let PLAN_SHORT = !!S.plan45;
+function setPlanShort(id, v){ PLAN_SHORT = v; S.plan45 = v ? 1 : 0; saveS(); openPlan(id); }
 function openPlan(id){
-  const p = planById(id);
+  const p = planById(id), fits = planFits45(p), sh = PLAN_SHORT && !fits;
   const rows = p.weeks.map((w, i) => `<div class="srow" style="cursor:default"><div class="d"><b>${i + 1}</b><span>sem</span></div>
-    <div class="n"><b>${w.t}</b><div class="small mut">${w.s.map(x => wkById(x).name).join(' · ')}</div></div></div>`).join('');
+    <div class="n"><b>${w.t}</b><div class="small mut">${w.s.map(x => wkById(shortId(x, sh)).name).join(' · ')}</div></div></div>`).join('');
   openSheet(`<h2 style="margin-right:40px">${p.name}</h2>
     <div class="tags" style="margin-top:-4px"><span class="tag">${p.semanas} semanas</span><span class="tag">${p.nivel}</span></div>
     <p class="mut">${p.desc}</p>
+    ${fits ? `<div class="small mut" style="margin-bottom:6px">Ninguna sesión pasa de 45 minutos.</div>` : `<h3>Duración de las sesiones</h3>
+    <div class="seg" style="margin-bottom:6px"><button class="${sh ? '' : 'on'}" onclick="setPlanShort('${id}',false)">Como el plan (hasta ${Math.round(planMax(p) / 60)}')</button><button class="${sh ? 'on' : ''}" onclick="setPlanShort('${id}',true)">Hasta 45'</button></div>
+    ${sh ? `<div class="small mut" style="margin-bottom:6px">Cada sesión larga se cambia por su versión de 45' del mismo tipo.</div>` : ''}`}
     <h3>Semana a semana</h3><div class="card" style="padding:6px 10px">${rows}</div>
     <h3>¿Qué días entrenas? (2 a 4)</h3>
     <div class="daypick" id="dayPick"></div>
@@ -2630,13 +2723,13 @@ function toggleDay(i){ PLAN_DAYS = PLAN_DAYS.includes(i) ? PLAN_DAYS.filter(x =>
 function tryStartPlan(id, when){
   if (PLAN_DAYS.length < 2 || PLAN_DAYS.length > 4) return toast('Elige entre 2 y 4 días');
   if (PLAN && !confirm('Ya tienes un plan en marcha. ¿Sustituirlo?')) return;
-  startPlan(id, PLAN_DAYS, when);
+  startPlan(id, PLAN_DAYS, when, PLAN_SHORT);
 }
 function renderWorkouts(){
   const all = allWorkouts();
   const tipos = ['Todos', ...TIPOS.filter(t => all.some(w => w.tipo === t)), ...(CUSTOM.length ? ['Míos'] : [])];
-  const list = all.filter(w => WK_FILTER === 'Todos' || (WK_FILTER === 'Míos' ? w.custom : w.tipo === WK_FILTER));
-  $('libBox').innerHTML = `<div class="filters">${tipos.map(t => `<button class="${t === WK_FILTER ? 'on' : ''}" onclick="WK_FILTER='${t}';renderWorkouts()">${TIPO_C[t] ? `<i class="tdot" style="background:${TIPO_C[t]}"></i>` : ''}${t}</button>`).join('')}</div>
+  const list = all.filter(w => (WK_FILTER === 'Todos' || (WK_FILTER === 'Míos' ? w.custom : w.tipo === WK_FILTER)) && (!WK_45 || (w.test !== 'rampa' && wkDur(w) >= 35 * 60 && wkDur(w) <= MAX45)));
+  $('libBox').innerHTML = `<div class="filters"><button class="${WK_45 ? 'on' : ''}" onclick="WK_45=!WK_45;renderWorkouts()">40-45'</button>${tipos.map(t => `<button class="${t === WK_FILTER ? 'on' : ''}" onclick="WK_FILTER='${t}';renderWorkouts()">${TIPO_C[t] ? `<i class="tdot" style="background:${TIPO_C[t]}"></i>` : ''}${t}</button>`).join('')}</div>
     <div class="row between" style="margin:0 2px 12px"><span class="small mut">${list.length} workouts con tu FTP de ${S.ftp} W</span><div class="row" style="gap:6px"><button class="btn sm" onclick="$('wkFile').click()">Importar</button><button class="btn sm acc" onclick="editWk(null)">${ICON.plus.replace(/22/g, '16')} Crear</button></div></div>
     <input type="file" id="wkFile" accept=".zwo,.erg,.mrc" multiple style="display:none" onchange="importWkFiles(this)">` +
     list.map(w => `<div class="wkc" onclick="openWk('${w.id}')"><div class="viz">${profileSVG(w, '')}</div><div class="body">
