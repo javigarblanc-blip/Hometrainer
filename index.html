@@ -366,6 +366,9 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     </select>
     <label>Pitidos al cambiar de intervalo</label>
     <select id="iSound"><option value="1">Sí, con vibración</option><option value="0">No</option></select>
+    <label>Pantalla siempre encendida</label>
+    <button class="btn ghost block" onclick="testWake()">Probar pantalla encendida (3 min)</button>
+    <div class="small" id="wakeRes" style="margin-top:8px"></div>
     <div class="small mut" style="margin-top:8px">Calibra el X3 con su app antes de las sesiones importantes, tras 10 minutos de calentamiento y siempre con la misma presión de rueda.</div>
   </div>
   <div class="card">
@@ -453,7 +456,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.8.1';
+const VER = '0.8.2';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1224,12 +1227,37 @@ function updateConn(){
 }
 
 // ================= WAKE LOCK + SONIDO =================
-let wl = null, wlOK = true;
+// Pantalla encendida: wake lock del navegador y, de respaldo, un vídeo mudo en bucle (Chrome no apaga la pantalla mientras se reproduce un vídeo visible)
+let wl = null, wlOK = true, wlInfo = {lock:'', video:''}, nsv = null;
+async function lockReq(){
+  if (!('wakeLock' in navigator)){ wlInfo.lock = 'no disponible'; return false; }
+  try{ if (!wl || wl.released) wl = await navigator.wakeLock.request('screen'); wlInfo.lock = 'activo'; return true; }
+  catch(e){ wlInfo.lock = 'rechazado (' + (e.name || 'error') + ')'; return false; }
+}
+async function videoOn(){
+  if (!nsv){
+    nsv = document.createElement('video');
+    nsv.muted = true; nsv.loop = true; nsv.playsInline = true;
+    nsv.setAttribute('muted', ''); nsv.setAttribute('playsinline', ''); nsv.setAttribute('aria-hidden', 'true');
+    nsv.src = nsv.canPlayType('video/webm') ? 'nosleep.webm' : 'nosleep.mp4';
+    nsv.style.cssText = 'position:fixed;left:0;bottom:0;width:96px;height:54px;opacity:.01;pointer-events:none;z-index:1';
+    document.body.appendChild(nsv);
+  }
+  try{ await nsv.play(); wlInfo.video = 'activo'; return true; }
+  catch(e){ wlInfo.video = 'falló (' + (e.name || 'error') + ')'; return false; }
+}
+function videoOff(){ if (nsv){ try{ nsv.pause(); }catch(e){} wlInfo.video = ''; } }
 async function wake(){
-  if (!('wakeLock' in navigator)){ wlOK = false; return; }
-  try{ if (!wl || wl.released){ wl = await navigator.wakeLock.request('screen'); } wlOK = true; }
-  catch(e){ wlOK = false; }
+  const v = videoOn();            // arranca ya, dentro del toque del usuario
+  const a = await lockReq();
+  wlOK = a || await v;
   renderPlayerWarn();
+}
+function sleepOK(){ try{ wl && wl.release(); }catch(e){} wl = null; videoOff(); wlInfo.lock = ''; }
+async function testWake(){
+  await wake();
+  $('wakeRes').innerHTML = `Bloqueo del navegador: <b>${wlInfo.lock || '—'}</b><br>Vídeo de respaldo: <b>${wlInfo.video || '—'}</b><br>${wlOK ? '<span style="color:var(--ok)">✓ La pantalla debería quedarse encendida. Déjala quieta y comprueba que no se apaga.</span>' : '<span style="color:var(--err)">✗ Ningún método funciona. Desactiva el ahorro de batería.</span>'}`;
+  clearTimeout(testWake.t); testWake.t = setTimeout(() => { if (!P.on) sleepOK(); $('wakeRes').innerHTML += '<br><span class="mut">Prueba terminada (3 min).</span>'; }, 180000);
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && P.on) wake(); });
 let AC = null;
@@ -1449,7 +1477,7 @@ function renderPlayerWarn(){
   if (!P.on){ $('pWarn').innerHTML = ''; return; }
   const w = [];
   if (!trainerOn()) w.push('Rodillo desconectado · intentando reconectar…');
-  if (!wlOK) w.push('La pantalla puede apagarse sola. Desactiva el ahorro de batería o alarga el tiempo de pantalla.');
+  if (!wlOK) w.push('La pantalla puede apagarse sola (' + (wlInfo.lock || '') + '). Desactiva el ahorro de batería o alarga el tiempo de pantalla.');
   $('pWarn').innerHTML = w.map(x => `<div class="warn" style="margin:8px 0 0">${x}</div>`).join('');
 }
 setInterval(() => { if (P.on && P.running && BT.cmd) resendCmd(); }, 10000);
@@ -1463,7 +1491,7 @@ function saveLive(){
 function endSession(){
   clearInterval(P.tick); P.on = false;
   $('player').classList.remove('on');
-  try{ wl && wl.release(); }catch(e){}
+  sleepOK();
   if (BT.cmd && BT.cmd.t === 'erg') sendGrade(0);
   LS.del('ht_live');
   renderPlayerWarn();
