@@ -515,7 +515,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.16.0';
+const VER = '0.16.1';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1611,10 +1611,19 @@ function startSession(wk, sessKey, route){
       <button class="btn acc block" onclick="closeSheet();connectTrainer().then(()=>{ if(trainerOn()) startSession(..._pendingStart) })">Conectar rodillo</button>`);
     return;
   }
+  if (S.cadId && S.pmUse !== 0 && !(BT.cadDev && BT.cadDev.gatt.connected) && !window._pmSkip){
+    window._pendingStart = [wk, sessKey, route];
+    openSheet(`<h2>Conecta el medidor</h2><p class="mut">Tu medidor de potencia no está conectado. Sin él se usan los vatios del rodillo, que en un rodillo de rueda pueden salir muy altos y el ERG te pondría menos carga de la que crees.</p>
+      <button class="btn acc block" onclick="closeSheet();connectCad().then(()=>{ if(BT.cadDev && BT.cadDev.gatt.connected) startSession(..._pendingStart) })">Conectar medidor</button>
+      <button class="btn block" style="margin-top:10px" onclick="window._pmSkip=1;closeSheet();startSession(..._pendingStart)">Empezar sin medidor</button>
+      <div class="small mut" style="margin-top:8px">Si empiezas sin él, la sesión no contará para récords ni para estimar el FTP.</div>`);
+    return;
+  }
+  window._pmSkip = 0;
   closeSheet(); audioInit();
   Object.assign(P, {
     on:true, wk, route:route || null, mult:(S.todayMult && S.todayMult.date === today() && wk) ? S.todayMult.mult : 1, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
-    wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
+    wt:0, segI:0, lastSegI:0, pmSec:0, cutAt:0, origTotal:0, rescN:0, rescSeg:{}, resc:null, running:false, auto:true, manual:false, zero:0,
     start:null, rec:newRec(), dist:0, cum:[0], prRef:liveRef(), prSaid:{}, brAt:0, brStart:0, brHalf:0, brKm:0, brRamp:0, lastSent:null, lastChart:0, p3:[],
     w0:wPrime(), wbal:wPrime(), wLow:0, np4:0, npN:0, ghost:route && ROUTE_GHOST ? ghostOf(route.id) : null, gSide:null, brGh:0,
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
@@ -1880,6 +1889,7 @@ function tick(){
   }
   P.p3.push(pw); if (P.p3.length > 3) P.p3.shift();
   pmTrack();
+  if (P.running && pmLive()) P.pmSec = (P.pmSec || 0) + 1;
   ergGuard(pw);
   if (P.route) routeGradeSend(false); else applyTarget(false);
   render();
@@ -2059,6 +2069,9 @@ function endSession(){
   if (P.rec.p.length < 30){ toast('Sesión muy corta: no se guarda'); renderHome(); return; }
   const prevG = P.route ? ghostOf(P.route.id) : null;
   const meta = finalize(P.start, $('pName').textContent, P.wk ? P.wk.id : P.route ? 'route:' + P.route.id : null, P.rec, P.sessKey);
+  meta.psrc = (P.pmSec || 0) > P.rec.p.length / 2 ? 'pm' : 'rodillo';
+  if (meta.psrc === 'rodillo' && S.cadId && S.pmUse !== 0){ meta.noPR = true; meta.prs = []; }
+  saveActs();
   if (P.cutAt || P.rescN){ if (P.cutAt) meta.cut = {at:P.cutAt, plan:P.origTotal}; if (P.rescN) meta.resc = P.rescN; saveActs(); }
   if (P.route){
     const g = ghostFromRec(P.rec, P.route.dist);
@@ -2118,7 +2131,7 @@ function hrBars(hz){
 // FTP estimado con los mejores esfuerzos recientes
 function ftpEstimate(days = 90){
   const since = now() - days * DAY, b = {};
-  ACTS.filter(a => a.date >= since && a.best).forEach(a => [600, 1200, 3600].forEach(d => { const v = a.best[d]; if (v && (!b[d] || v > b[d].w)) b[d] = {w:v, date:a.date}; }));
+  ACTS.filter(a => a.date >= since && a.best && !a.noPR).forEach(a => [600, 1200, 3600].forEach(d => { const v = a.best[d]; if (v && (!b[d] || v > b[d].w)) b[d] = {w:v, date:a.date}; }));
   const c = [];
   if (b[1200]) c.push({w:Math.round(b[1200].w * .95), basis:'95 % de tu mejor 20 min (' + b[1200].w + ' W)', date:b[1200].date});
   if (b[3600]) c.push({w:b[3600].w, basis:'tu mejor hora (' + b[3600].w + ' W)', date:b[3600].date});
@@ -2134,7 +2147,7 @@ function ftpCard(est, fresh){
 }
 function allTimeBest(excludeId){
   const b = {};
-  ACTS.forEach(a => { if (a.id === excludeId || !a.best) return; BEST_D.forEach(d => { const v = a.best[d]; if (v && (!b[d] || v > b[d].w)) b[d] = {w:v, date:a.date, id:a.id}; }); });
+  ACTS.forEach(a => { if (a.id === excludeId || !a.best || a.noPR) return; BEST_D.forEach(d => { const v = a.best[d]; if (v && (!b[d] || v > b[d].w)) b[d] = {w:v, date:a.date, id:a.id}; }); });
   return b;
 }
 function finalize(start, name, wkId, rec, sessKey){
@@ -2177,13 +2190,16 @@ function showAct(id, fresh){
   const rec = LS.get('ht_act_' + id, null);
   const wk = a.wkId ? BASE_WK.find(w => w.id === a.wkId) : null;
   let testBox = '';
-  if (wk && wk.test === 'rampa' && a.best && a.best[60]){ const f = Math.round(a.best[60] * .75); testBox = testCard('Mejor minuto: ' + a.best[60] + ' W', f); }
-  if (wk && wk.test === '20' && a.best && a.best[1200]){ const f = Math.round(a.best[1200] * .95); testBox = testCard('Media de 20 min: ' + a.best[1200] + ' W', f); }
+  if (a.noPR){}
+  else if (wk && wk.test === 'rampa' && a.best && a.best[60]){ const f = Math.round(a.best[60] * .75); testBox = testCard('Mejor minuto: ' + a.best[60] + ' W', f); }
+  if (!a.noPR && wk && wk.test === '20' && a.best && a.best[1200]){ const f = Math.round(a.best[1200] * .95); testBox = testCard('Media de 20 min: ' + a.best[1200] + ' W', f); }
   const bests = [5, 60, 300, 1200, 3600].filter(k => a.best && a.best[k]);
   openSheet(`
     ${fresh ? `<img class="mascot-big" src="${a.ghostRes && a.ghostRes.best && POSE_OK.meta ? 'mascota/meta.webp' : 'mascota/logro.webp'}" alt=""><div class="small" style="color:var(--ok);font-weight:700;margin-bottom:4px">✓ Sesión guardada</div>` : ''}
     <h2 style="margin-right:40px">${esc(a.name)}</h2>
     <div class="small mut" style="margin-top:-6px">${fdate(a.date)}, ${ftime(a.date)}, con FTP de ${a.ftp} W</div>
+    ${a.psrc ? `<div class="small mut" style="margin-top:4px">Vatios ${a.psrc === 'pm' ? 'del medidor de potencia' : 'del rodillo'}.</div>` : ''}
+    ${a.noPR ? `<div class="warn" style="margin:10px 0">Esta sesión no cuenta para récords ni para estimar el FTP${a.psrc === 'rodillo' ? ': se hizo con los vatios del rodillo, que salen altos' : ''}. <a href="#" style="color:inherit;font-weight:700" onclick="event.preventDefault();setNoPR(${a.id},false)">Contarla</a></div>` : ''}
     ${a.cut ? `<div class="small mut" style="margin-top:4px">Acortada: hiciste ${Math.round(a.cut.at / 60)}' de los ${Math.round(a.cut.plan / 60)}' del workout, más la vuelta a la calma.</div>` : ''}
     ${a.resc ? `<div class="small mut" style="margin-top:4px">El ERG se atascó ${a.resc === 1 ? 'una vez' : a.resc + ' veces'} y se quitó la resistencia unos segundos.</div>` : ''}
     ${a.prs && a.prs.length ? (fresh ? prCard(a) : `<div class="tags" style="margin-top:10px">${a.prs.map(d => `<span class="tag acc">🏆 Récord ${BEST_L[d]}: ${a.best[d]} W</span>`).join('')}</div>`) : ''}
@@ -2221,6 +2237,7 @@ function showAct(id, fresh){
       <button class="btn" onclick="downloadTCX(${a.id})">Descargar TCX</button>
     </div>
     <button class="btn block" style="margin-top:10px" onclick="shareCard(${a.id})">📸 Compartir imagen</button>
+    ${a.noPR ? '' : `<button class="btn block" style="margin-top:10px" onclick="setNoPR(${a.id},true)">Vatios erróneos: no contar para récords ni FTP</button>`}
     <button class="btn red block" style="margin-top:10px" onclick="delAct(${a.id})">Borrar sesión</button>
   `);
 }
@@ -2284,6 +2301,15 @@ async function shareCard(id){
   downloadBlob(blob, file.name); toast('Imagen descargada');
 }
 const rpeCol = v => v <= 3 ? '#3ecf8e' : v <= 6 ? '#f5c518' : v <= 8 ? '#ff8a1a' : '#ff4d5e';
+function setNoPR(id, v){
+  const a = ACTS.find(x => x.id === id); if (!a) return;
+  a.noPR = v;
+  if (!v){ const prev = allTimeBest(id); a.prs = BEST_D.filter(d => a.best && a.best[d] && (!prev[d] || a.best[d] > prev[d].w)); }
+  // los récords de las sesiones posteriores se recalculan contra lo que ya cuenta
+  ACTS.slice().sort((x, y) => x.date - y.date).forEach(x => { if (x.id === id || x.noPR || !x.best) return; const prev = {}; ACTS.forEach(y => { if (y.date >= x.date || y.noPR || !y.best) return; BEST_D.forEach(d => { if (y.best[d] && (!prev[d] || y.best[d] > prev[d])) prev[d] = y.best[d]; }); }); x.prs = BEST_D.filter(d => x.best[d] && prev[d] && x.best[d] > prev[d]); });
+  if (v) a.prs = [];
+  saveActs(); toast(v ? 'Sesión fuera de récords y FTP' : 'La sesión vuelve a contar'); showAct(id);
+}
 function testCard(txt, f){
   return `<div class="card" style="margin:12px 0;border-color:#8a6216"><div class="small mut">${txt}</div><div style="font:800 28px var(--hf)">FTP estimado: ${f} W · ${dec(f / S.peso, 2)} W/kg</div>
     <button class="btn acc block" style="margin-top:8px" onclick="setFtp(${f})">Usar ${f} W como mi FTP</button></div>`;
@@ -3066,13 +3092,13 @@ function anaSemanas(){
 }
 function anaLogros(){
   const all = allTimeBest(null);
-  const six = {}; ACTS.filter(a => a.date > now() - 182 * DAY).forEach(a => BEST_D.forEach(d => { const v = a.best && a.best[d]; if (v && (!six[d] || v > six[d].w)) six[d] = {w:v, date:a.date}; }));
+  const six = {}; ACTS.filter(a => a.date > now() - 182 * DAY && !a.noPR).forEach(a => BEST_D.forEach(d => { const v = a.best && a.best[d]; if (v && (!six[d] || v > six[d].w)) six[d] = {w:v, date:a.date}; }));
   if (!Object.keys(all).length){ $('anaBox').innerHTML = '<div class="empty">Aquí aparecerán tus récords de potencia cuando hagas sesiones.</div>'; return; }
   const ds = BEST_D.filter(d => all[d]);
   const curve = lineChart({h:200, yMin:0, yMax:Math.ceil(Math.max(...ds.map(d => all[d].w)) * 1.1 / 50) * 50, xLabels:ds.map((d, i) => ({i, t:BEST_L[d].replace(' min', "'").replace(' s', '"')})),
     series:[{vals:ds.map(d => all[d].w), color:'var(--acc)', w:2.5, dots:true}, {vals:ds.map(d => six[d] ? six[d].w : null), color:'#8b93a3', w:1.5, dash:true}]});
   const est = ftpEstimate();
-  const recent = ACTS.filter(a => a.prs && a.prs.length && a.date > now() - 30 * DAY).slice(0, 6);
+  const recent = ACTS.filter(a => a.prs && a.prs.length && !a.noPR && a.date > now() - 30 * DAY).slice(0, 6);
   $('anaBox').innerHTML = (recent.length ? `<div class="card"><h2>Récords recientes</h2>${recent.map(a => `<div class="pr" onclick="showAct(${a.id})" style="cursor:pointer"><span><b>${esc(a.name)}</b><div class="small mut">${fdate(a.date)}</div></span>
       <span style="text-align:right">${a.prs.map(d => `<span class="tag acc" style="margin:2px">🏆 ${BEST_L[d]} ${a.best[d]} W</span>`).join('')}</span></div>`).join('')}</div>` : '') + `<div class="card"><h2>Curva de potencia</h2>${curve}${legend([['var(--acc)', 'Histórico'], ['#8b93a3', 'Últimos 6 meses']])}</div>
     <div class="card"><h2>Mejores intervalos</h2>${ds.map(d => `<div class="pr"><span><b style="font-size:20px">${BEST_L[d]}</b><div class="small mut">${fdate(all[d].date)}${six[d] && six[d].w !== all[d].w ? ` · 6 meses: ${six[d].w} W` : ''}</div></span>
