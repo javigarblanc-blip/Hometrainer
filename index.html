@@ -512,7 +512,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.15.0';
+const VER = '0.15.1';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1421,14 +1421,15 @@ async function quickConnect(id, setup, name, ms = 8000){
     return true;
   }catch(e){ return false; }
 }
+function btErr(what, e){
+  if (e.name === 'NotFoundError') return; // selector cancelado
+  if (e.name === 'SecurityError') return toast(what + ': vuelve a tocar el botón para abrir el buscador');
+  toast(what + ': ' + e.message);
+}
 async function connectTrainer(){
   if (!btOK()) return toast('Abre la app en Chrome (Android o PC) desde https');
   if (trainerOn()) return toast('El rodillo ya está conectado');
-  if (S.trainerId && navigator.bluetooth.getDevices){
-    setChip('cTrainer', 'wait', 'Buscando…');
-    if (await quickConnect(S.trainerId, setupTrainer, 'Rodillo', 4000)){ toast('Rodillo conectado'); afterReconnect(BT.dev); return; }
-    updateConn();
-  }
+  // El selector se abre en el mismo toque: Chrome no lo deja abrir si antes se espera a otra cosa
   try{
     const dev = await navigator.bluetooth.requestDevice({
       filters:[{namePrefix:'Think'}, {services:[FEC_SVC]}, {services:[0x1826]}],
@@ -1438,7 +1439,8 @@ async function connectTrainer(){
     setChip('cTrainer', 'wait', 'Conectando…');
     await setupTrainer(dev);
     toast('Rodillo conectado');
-  }catch(e){ updateConn(); if (e.name !== 'NotFoundError') toast('Rodillo: ' + e.message); }
+    if (P.on) afterReconnect(dev);
+  }catch(e){ updateConn(); btErr('Rodillo', e); }
 }
 async function setupHR(d){
   const s = await d.gatt.connect();
@@ -1451,13 +1453,12 @@ async function setupHR(d){
 async function connectHR(){
   if (!btOK()) return toast('Abre la app en Chrome desde https');
   if (BT.hrDev && BT.hrDev.gatt.connected) return toast('El pulso ya está conectado');
-  if (S.hrId && navigator.bluetooth.getDevices){ setChip('cHR', 'wait', 'Buscando…'); if (await quickConnect(S.hrId, setupHR, 'Pulsómetro', 4000)){ toast('Pulso conectado'); return; } updateConn(); }
   try{
     const d = await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']}]});
     if (!d._lis){ d._lis = 1; d.addEventListener('gattserverdisconnected', () => onLost(d, setupHR, 'Pulsómetro')); }
     setChip('cHR', 'wait', 'Conectando…');
     await setupHR(d); toast('Pulso conectado');
-  }catch(e){ updateConn(); if (e.name !== 'NotFoundError') toast('Pulso: ' + e.message); }
+  }catch(e){ updateConn(); btErr('Pulso', e); }
 }
 async function setupCad(d){
   const s = await d.gatt.connect();
@@ -1482,7 +1483,7 @@ async function connectCad(){
     d.addEventListener('gattserverdisconnected', () => onLost(d, setupCad, 'Sensor de cadencia'));
     setChip('cCad', 'wait', 'Conectando…');
     await setupCad(d); toast('Cadencia conectada');
-  }catch(e){ updateConn(); if (e.name !== 'NotFoundError') toast('Cadencia: ' + e.message); }
+  }catch(e){ updateConn(); btErr('Cadencia', e); }
 }
 // Reconexión: durante una sesión lo intenta sin límite (la sesión queda en pausa y no se pierde nada); fuera de ella, unos 2 minutos
 async function onLost(dev, setup, name){
@@ -1517,10 +1518,8 @@ function afterReconnect(dev){
   renderPlayerWarn();
 }
 async function reconnectNow(){
-  const d = BT.dev;
-  if (d){ try{ await setupTrainer(d); toast('Rodillo reconectado'); afterReconnect(d); return; }catch(e){} }
+  // El selector tiene que abrirse en el mismo toque; mientras, sigue reintentando solo en segundo plano
   await connectTrainer();
-  if (trainerOn()) afterReconnect(BT.dev);
 }
 function setChip(id, state, text){
   const c = $(id); c.classList.toggle('on', state === 'on'); c.classList.toggle('wait', state === 'wait');
@@ -3179,7 +3178,7 @@ stravaCallback();
 function autoSync(){ if (S.strava && !P.on && now() - (S.lastSync || 0) > 30 * 60e3) stravaSync(true); }
 setTimeout(autoSync, 1500);
 // Al abrir, intenta conectar sin selector el rodillo y el pulso de la última vez (si Chrome lo permite)
-setTimeout(async () => { if (!btOK() || !navigator.bluetooth.getDevices) return; if (S.trainerId && !trainerOn() && await quickConnect(S.trainerId, setupTrainer, 'Rodillo', 15000)) toast('Rodillo conectado'); if (S.hrId && !(BT.hrDev && BT.hrDev.gatt.connected) && await quickConnect(S.hrId, setupHR, 'Pulsómetro', 15000)) toast('Pulso conectado'); }, 1200);
+setTimeout(() => { if (!btOK() || !navigator.bluetooth.getDevices) return; if (S.trainerId && !trainerOn()) quickConnect(S.trainerId, setupTrainer, 'Rodillo', 15000).then(ok => { if (ok) toast('Rodillo conectado'); }); if (S.hrId && !(BT.hrDev && BT.hrDev.gatt.connected)) quickConnect(S.hrId, setupHR, 'Pulsómetro', 15000).then(ok => { if (ok) toast('Pulso conectado'); }); }, 1200);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(autoSync, 800); });
 // Pide al navegador que no borre los datos de la app por falta de espacio
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
