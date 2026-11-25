@@ -335,7 +335,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   <div class="devs">
     <button class="chip" id="cTrainer" onclick="connectTrainer()"><i class="dot"></i><span>Rodillo</span></button>
     <button class="chip" id="cHR" onclick="connectHR()"><i class="dot"></i><span>Pulso</span></button>
-    <button class="chip" id="cCad" onclick="connectCad()"><i class="dot"></i><span>Cadencia</span></button>
+    <button class="chip" id="cCad" onclick="connectCad()"><i class="dot"></i><span>Medidor</span></button>
   </div>
   <div id="heroBox"></div>
   <div class="quick" id="quickBox"></div>
@@ -404,6 +404,9 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
       <option value="cp">Cycling Power (recomendado)</option>
       <option value="fec">FE-C</option>
     </select>
+    <label>Medidor de potencia (pedales, biela)</label>
+    <select id="iPm"><option value="1">Usar sus vatios y ajustar el ERG a ellos</option><option value="0">Solo cadencia: mandan los vatios del rodillo</option></select>
+    <div class="small mut" style="margin-top:4px">Se conecta con el botón Medidor de Inicio. Con sus vatios, el objetivo del ERG se corrige solo para que coincida con lo que marca el medidor.</div>
     <label>Pitidos al cambiar de intervalo</label>
     <select id="iSound"><option value="1">Sí, con vibración</option><option value="0">No</option></select>
     <label>Brinco durante la sesión</label>
@@ -512,7 +515,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.15.1';
+const VER = '0.16.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1300,13 +1303,27 @@ const FEC_SVC = '6e40fec1-b5a3-f393-e0a9-e50e24dcca9e';
 const FEC_RX  = '6e40fec2-b5a3-f393-e0a9-e50e24dcca9e';
 const FEC_TX  = '6e40fec3-b5a3-f393-e0a9-e50e24dcca9e';
 const BT = {dev:null, fecTx:null, hrDev:null, cadDev:null, cmd:null,
-  cpP:0, cpAt:0, fecP:0, fecAt:0, spd:0, spdAt:0, hrV:0, hrAt:0, cadV:0, cadAt:0, cadSeen:false, crank:{}};
+  cpP:0, cpAt:0, fecP:0, fecAt:0, pmP:0, pmAt:0, pmM:{t:0, p:0, n:0}, spd:0, spdAt:0, hrV:0, hrAt:0, cadV:0, cadAt:0, cadSeen:false, crank:{}};
 const btOK = () => 'bluetooth' in navigator && window.isSecureContext;
 const trainerOn = () => !!(BT.dev && BT.dev.gatt.connected && BT.fecTx);
-function curPower(){
+function trainerPower(){
   const t = now(), cp = t - BT.cpAt < 3000, fe = t - BT.fecAt < 3000;
   if (S.src === 'fec') return fe ? BT.fecP : (cp ? BT.cpP : 0);
   return cp ? BT.cpP : (fe ? BT.fecP : 0);
+}
+// Medidor de potencia externo (pedales, biela): si está conectado y mandando datos, sus vatios mandan
+const pmLive = () => S.pmUse !== 0 && BT.cadDev && BT.cadDev.gatt.connected && BT.cadPM && now() - BT.pmAt < 3000;
+function curPower(){ return pmLive() ? BT.pmP : trainerPower(); }
+// Ajuste del ERG al medidor: el rodillo regula con sus propios vatios, así que se le pide target × (rodillo / medidor)
+function pmTrack(){
+  if (!pmLive()) return;
+  const tp = trainerPower(), pp = BT.pmP, m = BT.pmM;
+  if (tp > 40 && pp > 40){ m.t = m.t * .97 + tp; m.p = m.p * .97 + pp; m.n++; }
+}
+function pmRatio(){
+  const m = BT.pmM;
+  if (!pmLive() || m.n < 20 || !m.p) return 1;
+  return Math.max(.75, Math.min(1.33, m.t / m.p));
 }
 const curHR  = () => now() - BT.hrAt  < 5000 ? BT.hrV  : 0;
 const curCad = () => now() - BT.cadAt < 3000 ? BT.cadV : 0;
@@ -1321,6 +1338,7 @@ function crankCad(key, revs, t){
 function parseCP(dv, withPower, key){
   const f = dv.getUint16(0, true);
   if (withPower){ BT.cpP = Math.max(0, dv.getInt16(2, true)); BT.cpAt = now(); }
+  if (key === 'pm'){ BT.pmP = Math.max(0, dv.getInt16(2, true)); BT.pmAt = now(); }
   let o = 4;
   if (f & 0x01) o += 1;
   if (f & 0x04) o += 2;
@@ -1462,28 +1480,33 @@ async function connectHR(){
 }
 async function setupCad(d){
   const s = await d.gatt.connect();
+  let pm = false;
+  // Primero potencia (pedales o biela con medidor); si no, sensor de cadencia
   try{
+    const sv = await s.getPrimaryService('cycling_power');
+    const ch = await sv.getCharacteristic('cycling_power_measurement');
+    ch.addEventListener('characteristicvaluechanged', e => parseCP(e.target.value, false, 'pm'));
+    await ch.startNotifications(); pm = true;
+  }catch(e){
     const sv = await s.getPrimaryService('cycling_speed_and_cadence');
     const ch = await sv.getCharacteristic('csc_measurement');
     ch.addEventListener('characteristicvaluechanged', e => parseCSC(e.target.value));
     await ch.startNotifications();
-  }catch(e){
-    const sv = await s.getPrimaryService('cycling_power');
-    const ch = await sv.getCharacteristic('cycling_power_measurement');
-    ch.addEventListener('characteristicvaluechanged', e => parseCP(e.target.value, false, 'cad'));
-    await ch.startNotifications();
   }
-  BT.cadDev = d; updateConn();
+  if (BT.cadDev !== d) BT.pmM = {t:0, p:0, n:0};
+  BT.cadDev = d; BT.cadPM = pm; if (d.id && S.cadId !== d.id){ S.cadId = d.id; saveS(); }
+  updateConn();
 }
 async function connectCad(){
   if (!btOK()) return toast('Abre la app en Chrome desde https');
-  if (BT.cadDev && BT.cadDev.gatt.connected) return toast('La cadencia ya está conectada');
+  if (BT.cadDev && BT.cadDev.gatt.connected) return toast(BT.cadPM ? 'El medidor ya está conectado' : 'La cadencia ya está conectada');
   try{
-    const d = await navigator.bluetooth.requestDevice({filters:[{services:['cycling_speed_and_cadence']}, {services:['cycling_power']}], optionalServices:['cycling_speed_and_cadence', 'cycling_power']});
-    d.addEventListener('gattserverdisconnected', () => onLost(d, setupCad, 'Sensor de cadencia'));
+    const d = await navigator.bluetooth.requestDevice({filters:[{services:['cycling_power']}, {services:['cycling_speed_and_cadence']}], optionalServices:['cycling_speed_and_cadence', 'cycling_power']});
+    if (BT.dev && d.id && d.id === BT.dev.id) return toast('Ese es el rodillo: elige los pedales, la biela o el sensor');
+    if (!d._lis){ d._lis = 1; d.addEventListener('gattserverdisconnected', () => onLost(d, setupCad, 'Medidor')); }
     setChip('cCad', 'wait', 'Conectando…');
-    await setupCad(d); toast('Cadencia conectada');
-  }catch(e){ updateConn(); btErr('Cadencia', e); }
+    await setupCad(d); toast(BT.cadPM ? 'Medidor de potencia conectado: se usan sus vatios' : 'Cadencia conectada');
+  }catch(e){ updateConn(); btErr('Medidor', e); }
 }
 // Reconexión: durante una sesión lo intenta sin límite (la sesión queda en pausa y no se pierde nada); fuera de ella, unos 2 minutos
 async function onLost(dev, setup, name){
@@ -1528,7 +1551,7 @@ function setChip(id, state, text){
 function updateConn(){
   setChip('cTrainer', trainerOn() ? 'on' : '', trainerOn() ? (BT.dev.name || 'Rodillo') : 'Rodillo');
   const hr = BT.hrDev && BT.hrDev.gatt.connected; setChip('cHR', hr ? 'on' : '', hr ? (BT.hrDev.name || 'Pulso') : 'Pulso');
-  const cd = BT.cadDev && BT.cadDev.gatt.connected; setChip('cCad', cd ? 'on' : '', cd ? (BT.cadDev.name || 'Cadencia') : 'Cadencia');
+  const cd = BT.cadDev && BT.cadDev.gatt.connected; setChip('cCad', cd ? 'on' : '', cd ? (BT.cadDev.name || (BT.cadPM ? 'Medidor' : 'Cadencia')) : 'Medidor');
 }
 
 // ================= WAKE LOCK + SONIDO =================
@@ -1756,6 +1779,7 @@ const FIELDS = {
   np:   {n:'Potencia normalizada', f:() => [P.npN ? Math.round(Math.pow(P.np4 / P.npN, .25)) : '--', 'NP']},
   tss:  {n:'TSS acumulado', f:() => { const n = P.rec.p.length, np = P.npN ? Math.pow(P.np4 / P.npN, .25) : 0; return [n ? Math.round(n / 3600 * Math.pow(np / S.ftp, 2) * 100) : 0, 'TSS']; }},
   kj:   {n:'Trabajo (kJ)', f:() => [Math.round(P.rec.p.reduce((a, b) => a + b, 0) / 1000), 'kJ']},
+  tpow: {n:'Vatios del rodillo', f:() => [Math.round(trainerPower()) || 0, pmLive() ? 'W rodillo ×' + dec(pmRatio(), 2) : 'W rodillo']},
   left: {n:'Lo que queda', f:() => P.route ? [kmTxt(Math.max(0, P.route.dist - P.rDist)), 'quedan'] : P.wk ? [P.wk.test === 'rampa' ? '--' : clock(P.total - P.wt), 'restante'] : ['--', 'restante']},
   spd:  {n:'Velocidad', f:() => [dec(P.route ? P.vSpd * 3.6 : curSpd()), 'km/h']},
   dist: {n:'Distancia', f:() => [dec((P.route ? P.rDist : P.dist) / 1000, 1), 'km']},
@@ -1793,10 +1817,10 @@ function applyTarget(force){
   if (P.mode !== 'erg') return;
   if (P.resc && !force) return;
   P.resc = null;
-  const w = target();
-  if (force || w !== P.lastSent){
+  const w = target(), ws = Math.round(w * pmRatio());
+  if (force || w !== P.lastSent || Math.abs(ws - (P.lastWs || 0)) >= 3){
     if (P.lastSent == null || Math.abs(w - P.lastSent) > Math.max(10, P.lastSent * .08)) P.sentAt = now();
-    P.lastSent = w; sendERG(w);
+    P.lastSent = w; P.lastWs = ws; sendERG(ws);
   }
 }
 // Espiral del ERG: si la potencia se hunde (cadencia baja), el rodillo frena cada vez más.
@@ -1855,6 +1879,7 @@ function tick(){
     if (r.p.length % 30 === 0) saveLive();
   }
   P.p3.push(pw); if (P.p3.length > 3) P.p3.shift();
+  pmTrack();
   ergGuard(pw);
   if (P.route) routeGradeSend(false); else applyTarget(false);
   render();
@@ -3076,7 +3101,7 @@ function renderCfg(){
       <button class="btn sm ghost" style="margin-top:8px" onclick="if(confirm('¿Poner el contador a cero?')){S.aiUsage=null;S.aiTotal=null;saveS();renderCfg();}">Poner a cero</button>`;
   }
   $('iModel').innerHTML = COACH_MODELS.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); $('iModel').value = S.coachModel; $('iKey').value = S.apiKey; $('iNotes').value = S.coachNotes;
-  $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iBrinco').value = String(S.brinco == null ? 1 : +S.brinco); $('iErgG').value = String(S.ergGuard === 0 ? 0 : 1); $('iWeek').value = String(S.weekAuto == null ? 1 : +S.weekAuto); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
+  $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iBrinco').value = String(S.brinco == null ? 1 : +S.brinco); $('iErgG').value = String(S.ergGuard === 0 ? 0 : 1); $('iPm').value = String(S.pmUse === 0 ? 0 : 1); $('iWeek').value = String(S.weekAuto == null ? 1 : +S.weekAuto); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
   $('iZbg').value = String(S.zoneBg === 0 ? 0 : 1); $('iFs').value = String(S.fullscreen === 0 ? 0 : 1); $('iWp').value = wPrime();
   $('cbDom').textContent = location.hostname || '(tu dominio)';
   $('stravaState').innerHTML = S.strava ? `<span style="color:var(--ok)">● Conectado${S.strava.who ? ' como ' + esc(S.strava.who) : ''}</span>${S.lastSync ? ' · sincronizado ' + fdate(S.lastSync) : ''}` : 'No conectado';
@@ -3092,13 +3117,13 @@ function readCfg(){
   const oldPeso = S.peso, oldFtp = S.ftp;
   S.ftp = Math.round(n('iFtp', S.ftp)); S.peso = n('iPeso', S.peso); S.fcmax = Math.round(n('iFc', S.fcmax)); S.lthr = Math.round(n('iLthr', S.lthr));
   S.apiKey = $('iKey').value.trim(); S.coachModel = $('iModel').value; S.coachNotes = $('iNotes').value.trim();
-  S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.brinco = +$('iBrinco').value; S.ergGuard = +$('iErgG').value; S.weekAuto = +$('iWeek').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
+  S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.brinco = +$('iBrinco').value; S.ergGuard = +$('iErgG').value; S.pmUse = +$('iPm').value; S.weekAuto = +$('iWeek').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
   S.zoneBg = +$('iZbg').value; S.fullscreen = +$('iFs').value; S.wprime = Math.round(Math.max(3000, Math.min(60000, n('iWp', wPrime()))));
   if (S.ftp !== oldFtp) S.ftpHist.push({date:now(), ftp:S.ftp});
   saveS();
   if (S.peso !== oldPeso && trainerOn()) sendUserCfg();
 }
-['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iBrinco', 'iWeek', 'iSid', 'iSsec', 'iZbg', 'iFs', 'iWp'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
+['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iBrinco', 'iErgG', 'iPm', 'iWeek', 'iSid', 'iSsec', 'iZbg', 'iFs', 'iWp'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
 async function exportData(share){
   const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, routes:ROUTES, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
   const name = 'umbral-copia-' + today() + '.json', blob = new Blob([JSON.stringify(data)], {type:'application/json'});
@@ -3178,7 +3203,7 @@ stravaCallback();
 function autoSync(){ if (S.strava && !P.on && now() - (S.lastSync || 0) > 30 * 60e3) stravaSync(true); }
 setTimeout(autoSync, 1500);
 // Al abrir, intenta conectar sin selector el rodillo y el pulso de la última vez (si Chrome lo permite)
-setTimeout(() => { if (!btOK() || !navigator.bluetooth.getDevices) return; if (S.trainerId && !trainerOn()) quickConnect(S.trainerId, setupTrainer, 'Rodillo', 15000).then(ok => { if (ok) toast('Rodillo conectado'); }); if (S.hrId && !(BT.hrDev && BT.hrDev.gatt.connected)) quickConnect(S.hrId, setupHR, 'Pulsómetro', 15000).then(ok => { if (ok) toast('Pulso conectado'); }); }, 1200);
+setTimeout(() => { if (!btOK() || !navigator.bluetooth.getDevices) return; if (S.trainerId && !trainerOn()) quickConnect(S.trainerId, setupTrainer, 'Rodillo', 15000).then(ok => { if (ok) toast('Rodillo conectado'); }); if (S.hrId && !(BT.hrDev && BT.hrDev.gatt.connected)) quickConnect(S.hrId, setupHR, 'Pulsómetro', 15000).then(ok => { if (ok) toast('Pulso conectado'); }); if (S.cadId && !(BT.cadDev && BT.cadDev.gatt.connected)) quickConnect(S.cadId, setupCad, 'Medidor', 15000).then(ok => { if (ok) toast(BT.cadPM ? 'Medidor conectado' : 'Cadencia conectada'); }); }, 1200);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(autoSync, 800); });
 // Pide al navegador que no borre los datos de la app por falta de espacio
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
