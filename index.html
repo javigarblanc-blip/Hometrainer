@@ -415,6 +415,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     <select id="iErgG"><option value="1">Sí: si me hundo, quita la resistencia unos segundos</option><option value="0">No</option></select>
     <label>Pantalla siempre encendida</label>
     <button class="btn ghost block" onclick="testWake()">Probar pantalla encendida (3 min)</button>
+    <button class="btn ghost block" style="margin-top:8px" onclick="openTrainerTest()">Probar la resistencia del rodillo</button>
     <div class="small" id="wakeRes" style="margin-top:8px"></div>
     <label>Fondo de la sesión según la zona</label>
     <select id="iZbg"><option value="1">Sí, que se tiña del color de la zona</option><option value="0">No</option></select>
@@ -515,7 +516,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.17.1';
+const VER = '0.18.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1032,6 +1033,7 @@ function renderRoutes(){
   $('libBox').innerHTML = `<div class="grid2" style="margin-bottom:6px">
       <button class="btn" onclick="$('gpxFile').click()">${ICON.plus.replace(/22/g, '16')} Importar GPX</button>
       <button class="btn" onclick="stravaRoutesSheet()">Desde Strava</button></div>
+    <button class="btn ghost block" style="margin:6px 0" onclick="openTrainerTest()">Probar la resistencia del rodillo</button>
     <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" style="display:none" onchange="importGPX(this)">
     <div class="small mut" style="margin:6px 2px 4px">Exporta el GPX de una ruta de Strava, Wikiloc o Komoot, o usa una salida tuya de Strava. El rodillo reproduce sus pendientes.</div>
     ${ROUTES.length ? `<div class="wkhead"><b>Tus trayectos</b><span>${ROUTES.length}</span></div>${ROUTES.slice().reverse().map(card).join('')}` : ''}
@@ -1073,7 +1075,72 @@ function openRoute(id){
     <div class="seg" id="diffSeg" style="margin-bottom:6px">${[.5, .75, 1].map(v => `<button class="${ROUTE_DIFF === v ? 'on' : ''}" onclick="ROUTE_DIFF=${v};document.querySelectorAll('#diffSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===${v}))" data-v="${v}">${v * 100} %</button>`).join('')}</div>
     <div class="small mut">Al 50 % una rampa del 10 % se nota como un 5 %. La velocidad y el tiempo se calculan siempre con la pendiente real. Un rodillo de rueda como el X3 no llega a simular rampas muy duras: por encima del 8-10 % notarás el tope.</div>
     <button class="btn acc block lg" style="margin-top:14px" onclick="startSession(null,null,routeById('${r.id}'))">${ICON.play} Empezar trayecto</button>
+    <button class="btn ghost block" style="margin-top:8px" onclick="openTrainerTest()">Probar antes la resistencia del rodillo</button>
     ${r.src !== 'tipo' ? `<button class="btn red block" style="margin-top:10px" onclick="delRoute('${r.id}')">Borrar trayecto</button>` : ''}`);
+}
+// ================= Prueba de resistencia del rodillo (v0.18) =================
+// Pendiente o vatios a mano, sin grabar, para comprobar que el rodillo responde bien.
+// Compara los vatios del rodillo con los que harían falta en la carretera a esa velocidad y pendiente.
+const TT = {on:false, mode:'grade', g:0, w:150, iv:null};
+function physW(kmh, g){
+  const v = kmh / 3.6, m = (S.peso || 75) + 9, th = Math.atan(g / 100);
+  return Math.max(0, (v * m * 9.81 * (.005 * Math.cos(th) + Math.sin(th)) + .5 * 1.2 * .32 * v * v * v) / .97);
+}
+function ttSend(){ if (!trainerOn()) return; if (TT.mode === 'grade') sendGrade(TT.g); else sendERG(TT.w); }
+function ttSet(k, v){
+  if (k === 'mode') TT.mode = v;
+  if (k === 'g') TT.g = Math.max(-5, Math.min(15, Math.round(v * 2) / 2));
+  if (k === 'w') TT.w = Math.max(50, Math.min(600, Math.round(v / 5) * 5));
+  ttSend(); ttRender(true);
+}
+function openTrainerTest(){
+  if (P.on) return toast('Termina antes la sesión');
+  TT.on = true; TT.hist = [];
+  openSheet('<div id="ttBox"></div>');
+  ttRender(true); ttSend();
+  clearInterval(TT.iv);
+  TT.iv = setInterval(() => {
+    if (!$('sheet').classList.contains('on') || !$('ttBox')){ ttClose(); return; }
+    ttRender(false);
+  }, 700);
+}
+function ttClose(){
+  clearInterval(TT.iv); TT.iv = null;
+  if (TT.on && trainerOn() && !P.on) sendGrade(0);
+  TT.on = false;
+}
+function ttRender(full){
+  const box = $('ttBox'); if (!box) return;
+  const on = trainerOn(), spd = curSpd(), tw = trainerPower(), pm = pmLive() ? BT.pmP : 0, hr = curHR ? curHR() : 0, cad = curCad();
+  const exp = TT.mode === 'grade' && spd > 3 ? physW(spd, TT.g) : 0;
+  // media de los últimos ~5 s para que no baile
+  if (on && spd > 3) { TT.hist.push({tw, exp, pm}); if (TT.hist.length > 7) TT.hist.shift(); } else TT.hist = [];
+  const avg = k => TT.hist.length ? TT.hist.reduce((a, x) => a + x[k], 0) / TT.hist.length : 0;
+  const aTw = avg('tw'), aExp = avg('exp'), aPm = avg('pm'), ref = aPm || aTw;
+  let verdict = '';
+  if (!on) verdict = `<div class="warn">Conecta el rodillo para empezar.</div><button class="btn acc block" style="margin-top:8px" onclick="connectTrainer().then(()=>{ttSend();ttRender(true)})">Conectar rodillo</button>`;
+  else if (TT.mode === 'erg') verdict = `<div class="small mut">En vatios el rodillo debería quedarse cerca de ${TT.w} W pedalees a la cadencia que pedalees (tarda unos segundos en ajustarse).${aTw ? ` Ahora marca ${Math.round(aTw)} W (${aTw >= TT.w * .93 && aTw <= TT.w * 1.07 ? 'bien' : 'aún ajustando o fuera del objetivo'}).` : ''}${aPm ? ` Tu medidor marca ${Math.round(aPm)} W.` : ''}</div>`;
+  else if (TT.hist.length < 4) verdict = `<div class="small mut">Pedalea a ritmo constante unos segundos para comparar.</div>`;
+  else {
+    const d = (ref - aExp) / Math.max(30, aExp), pc = Math.round(d * 100);
+    const ok = Math.abs(d) <= .15, col = ok ? 'var(--ok)' : Math.abs(d) <= .3 ? '#f2c230' : 'var(--red)';
+    verdict = `<div class="card" style="margin:0;border-color:${col}"><b style="color:${col};font-size:17px">${ok ? 'Coherente' : d > 0 ? 'Marca más de lo esperado' : 'Marca menos de lo esperado'}${ok ? '' : ` (${pc > 0 ? '+' : ''}${pc} %)`}</b>
+      <div class="small mut" style="margin-top:4px">En carretera, al ${dec(TT.g)} % y a ${dec(spd)} km/h, harían falta unos <b style="color:var(--txt)">${Math.round(aExp)} W</b>. ${aPm ? 'Tu medidor' : 'El rodillo'} marca <b style="color:var(--txt)">${Math.round(ref)} W</b>.</div>
+      <div class="small mut" style="margin-top:4px">${ok ? 'La resistencia y los vatios cuadran.' : d > 0 ? 'Si notas poca resistencia para esos vatios, el rodillo mide de más (revisa el apriete del rodillo contra la rueda y la presión del neumático).' : 'Si se te hace más duro de lo que dicen los vatios, el rodillo mide de menos o frena de más (apriete o presión).'}</div></div>`;
+  }
+  const big = (v, u, l) => `<div style="flex:1;min-width:0;text-align:center"><div style="font:800 36px/1 var(--num);white-space:nowrap">${v}<span class="mut" style="font:600 13px var(--body)"> ${u}</span></div><div class="small mut">${l}</div></div>`;
+  const live = `<div class="card" style="display:flex;gap:6px;margin:12px 0">${big(on && tw ? Math.round(tw) : '--', 'W', 'rodillo')}${pmLive() ? big(BT.pmP || '--', 'W', 'medidor') : ''}${big(on && spd ? dec(spd) : '--', 'km/h', 'rueda')}${cad ? big(Math.round(cad), 'rpm', 'cadencia') : ''}${hr ? big(hr, 'ppm', 'pulso') : ''}</div>`;
+  if (!full){ const l = $('ttLive'), v = $('ttVer'); if (l) l.innerHTML = live; if (v) v.innerHTML = verdict; return; }
+  const ctl = TT.mode === 'grade'
+    ? `<div style="display:flex;align-items:center;gap:10px;margin:6px 0 10px"><button class="btn lg" style="width:64px" onclick="ttSet('g',TT.g-.5)">−</button><div style="flex:1;text-align:center;font:800 56px/1 var(--num)">${dec(TT.g)}<span style="font-size:22px"> %</span></div><button class="btn lg" style="width:64px" onclick="ttSet('g',TT.g+.5)">+</button></div>
+       <div class="row wrap" style="gap:6px">${[0, 2, 4, 6, 8, 10].map(g => `<button class="btn sm ${TT.g === g ? 'acc' : ''}" onclick="ttSet('g',${g})">${g} %</button>`).join('')}</div>`
+    : `<div style="display:flex;align-items:center;gap:10px;margin:6px 0 10px"><button class="btn lg" style="width:64px" onclick="ttSet('w',TT.w-10)">−</button><div style="flex:1;text-align:center;font:800 56px/1 var(--num);color:var(--acc)">${TT.w}<span style="font-size:22px"> W</span></div><button class="btn lg" style="width:64px" onclick="ttSet('w',TT.w+10)">+</button></div>
+       <div class="row wrap" style="gap:6px">${[100, 150, 200, 250].map(w => `<button class="btn sm ${TT.w === w ? 'acc' : ''}" onclick="ttSet('w',${w})">${w} W</button>`).join('')}</div>`;
+  box.innerHTML = `<h2>prueba del rodillo</h2><div class="small mut" style="margin-top:-6px">No se graba nada. Cambia la pendiente o los vatios y mira si la resistencia y los datos cuadran.</div>
+    <div class="seg" style="margin-top:12px">${[['grade', 'Pendiente'], ['erg', 'Vatios (ERG)']].map(([k, t]) => `<button class="${TT.mode === k ? 'on' : ''}" onclick="ttSet('mode','${k}')">${t}</button>`).join('')}</div>
+    ${ctl}<div id="ttLive">${live}</div><div id="ttVer">${verdict}</div>
+    <div class="small mut" style="margin-top:10px">La comparación usa tu peso de Ajustes (${S.peso} kg) más 9 kg de bici. Al cerrar, la pendiente vuelve a 0 %.</div>
+    <button class="btn block" style="margin-top:12px" onclick="closeSheet();ttClose()">Cerrar</button>`;
 }
 function delRoute(id){ if (!confirm('¿Borrar este trayecto?')) return; ROUTES = ROUTES.filter(r => r.id !== id); saveRoutes(); closeSheet(); renderRoutes(); }
 async function stravaRoutesSheet(){
