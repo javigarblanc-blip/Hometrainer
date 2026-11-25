@@ -516,7 +516,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.18.2';
+const VER = '0.19.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -2233,6 +2233,7 @@ function finalize(start, name, wkId, rec, sessKey){
   const id = start || now();
   const meters = rec.s.reduce((a, v) => a + v / 10 / 3.6, 0);
   const meta = Object.assign({id, date:id, name, wkId, dist:Math.round(meters / 10) / 100, ftp:S.ftp, strava:null, rpe:null, note:''}, calcStats(rec, S.ftp));
+  if (wkId && String(wkId).startsWith('route:')){ const r = routeById(String(wkId).slice(6)); let g = 0; if (r && rec.rd && rec.rd.length){ const md = Math.max(...rec.rd); for (let i = 1; i < r.d.length && r.d[i] <= md; i++) if (r.e[i] > r.e[i - 1]) g += r.e[i] - r.e[i - 1]; } meta.gain = Math.round(g); }
   const prev = allTimeBest(id);
   meta.prs = BEST_D.filter(d => meta.best[d] && (!prev[d] || meta.best[d] > prev[d].w) && ACTS.length > 0);
   meta.prPrev = {}; meta.prs.forEach(d => { if (prev[d]) meta.prPrev[d] = prev[d].w; });
@@ -2280,6 +2281,7 @@ function showAct(id, fresh){
     ${a.cut ? `<div class="small mut" style="margin-top:4px">Acortada: hiciste ${Math.round(a.cut.at / 60)}' de los ${Math.round(a.cut.plan / 60)}' del workout, más la vuelta a la calma.</div>` : ''}
     ${a.resc ? `<div class="small mut" style="margin-top:4px">El ERG se atascó ${a.resc === 1 ? 'una vez' : a.resc + ' veces'} y se quitó la resistencia unos segundos.</div>` : ''}
     ${a.prs && a.prs.length ? (fresh ? prCard(a) : `<div class="tags" style="margin-top:10px">${a.prs.map(d => `<span class="tag acc">🏆 Récord ${BEST_L[d]}: ${a.best[d]} W</span>`).join('')}</div>`) : ''}
+    ${fresh ? newBadgesCard(checkBadges()) : ''}
     ${fresh && !testBox && (() => { const e = ftpEstimate(); return e && e.w >= S.ftp * 1.03 ? ftpCard(e, true) : ''; })() || ''}
     ${testBox}
     ${a.ghostRes ? `<div class="card" style="margin:12px 0;${a.ghostRes.best ? 'border:1px solid var(--acc)' : ''}"><b style="font-size:17px">${a.ghostRes.best ? (a.ghostRes.prev ? '⏱️ ¡Nueva mejor vez! ' + clock(a.ghostRes.dur) : '⏱️ Primera vez completado: ' + clock(a.ghostRes.dur)) : '⏱️ ' + clock(a.ghostRes.dur) + ' en este trayecto'}</b>
@@ -2548,9 +2550,9 @@ async function stravaSync(silent){
   try{
     if (!silent) toast('Sincronizando Strava…');
     const tk = await stravaToken();
-    const after = Math.floor((now() - 180 * DAY) / 1000);
+    const after = Math.floor(Math.min(now() - 180 * DAY, new Date(new Date().getFullYear(), 0, 1).getTime()) / 1000);
     let all = [];
-    for (let page = 1; page <= 6; page++){
+    for (let page = 1; page <= 10; page++){
       const r = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=100&page=${page}`, {headers:{Authorization:'Bearer ' + tk}});
       if (!r.ok) throw new Error(r.status === 401 ? 'vuelve a pulsar Conectar Strava para dar permiso de lectura' : 'error ' + r.status);
       const j = await r.json(); all = all.concat(j); if (j.length < 100) break;
@@ -2559,7 +2561,7 @@ async function stravaSync(silent){
     const hid = new Set((S.extHide || []).map(String));
     EXT = all.filter(a => !mine.has(String(a.id)) && !hid.has(String(a.id)) && !String(a.external_id || '').startsWith('ht_')).map(a => {
       const e = estTSS(a);
-      return {id:a.id, date:new Date(a.start_date).getTime(), name:a.name, sport:a.sport_type || a.type, dur:a.moving_time, dist:a.distance, hr:a.average_heartrate || null, np:a.weighted_average_watts || null, tss:e.tss, how:e.how};
+      return {id:a.id, date:new Date(a.start_date).getTime(), name:a.name, sport:a.sport_type || a.type, dur:a.moving_time, dist:a.distance, elev:Math.round(a.total_elevation_gain || 0), kj:Math.round(a.kilojoules || 0), hr:a.average_heartrate || null, np:a.weighted_average_watts || null, tss:e.tss, how:e.how};
     });
     LS.set('ht_ext', EXT); S.lastSync = now(); saveS();
     if (!silent) toast(EXT.length + ' actividades de Strava sincronizadas');
@@ -3211,16 +3213,152 @@ function anaSemanas(){
         ${ch != null ? `<div class="small mut" style="margin-top:6px">Frente a la semana anterior: <b style="color:${Math.abs(ch) > 30 ? 'var(--warnc)' : 'var(--txt)'}">${ch > 0 ? '+' : ''}${Math.round(ch)} %</b></div>` : ''}</div>`;
     }).join('');
 }
+// ================= LOGROS DIVERTIDOS (v0.19) =================
+// Kilómetros, desnivel, energía y horas del año comparados con cosas reales, e insignias que se desbloquean.
+let FUN_ALL = true;   // true: toda la bici (Umbral + salidas de Strava); false: solo rodillo con Umbral
+const nf = (v, d = 0) => Number(v).toLocaleString('es-ES', {minimumFractionDigits:d, maximumFractionDigits:d});
+const isBikeExt = e => /Ride/.test(e.sport || '') && !/EBike/.test(e.sport || '');
+// desnivel de una sesión de trayecto (lo que subiste del recorrido hasta donde llegaste)
+function actGain(a){
+  if (a.gain != null) return a.gain;
+  let g = 0;
+  if (a.wkId && String(a.wkId).startsWith('route:')){
+    const r = routeById(String(a.wkId).slice(6)), rec = LS.get('ht_act_' + a.id, null);
+    if (r && rec && rec.rd && rec.rd.length){
+      const maxd = Math.max(...rec.rd);
+      for (let i = 1; i < r.d.length && r.d[i] <= maxd; i++) if (r.e[i] > r.e[i - 1]) g += r.e[i] - r.e[i - 1];
+    }
+  }
+  a.gain = Math.round(g); saveActs();
+  return a.gain;
+}
+function yearItems(all, year){
+  const y0 = new Date(year, 0, 1).getTime(), y1 = new Date(year + 1, 0, 1).getTime();
+  const own = ACTS.filter(a => a.date >= y0 && a.date < y1).map(a => ({src:'u', date:a.date, km:a.dist || 0, gain:actGain(a), kj:a.kj || 0, sec:a.dur || 0, a}));
+  const ext = all ? EXT.filter(e => e.date >= y0 && e.date < y1 && isBikeExt(e)).map(e => ({src:'s', date:e.date, km:(e.dist || 0) / 1000, gain:e.elev || 0, kj:e.kj || 0, sec:e.dur || 0, e})) : [];
+  return own.concat(ext);
+}
+const KM_M = [[50, 'ir de Salamanca a Ledesma y volver'], [100, 'Salamanca–Ávila'], [120, 'Salamanca–Valladolid'], [212, 'Salamanca–Madrid'], [400, 'Salamanca–Santiago de Compostela'], [500, 'Salamanca–Lisboa'],
+  [780, 'el Camino de Santiago francés, de Roncesvalles a Santiago'], [1000, 'la Península de punta a punta, de Tarifa a Estaca de Bares'], [1650, 'Salamanca–París'], [3300, 'una Vuelta a España entera'],
+  [6000, 'cruzar el Atlántico de Lisboa a Nueva York'], [40075, 'la vuelta al mundo por el ecuador'], [384400, 'ir a la Luna']];
+const UP_M = [[100, 'un edificio de 30 plantas'], [330, 'la Torre Eiffel'], [828, 'el Burj Khalifa, el edificio más alto del mundo'], [1723, 'la Peña de Francia desde el nivel del mar'],
+  [3479, 'el Mulhacén, techo de la Península'], [3715, 'el Teide desde el mar'], [4806, 'el Mont Blanc'], [5895, 'el Kilimanjaro'], [8849, 'el Everest desde el nivel del mar'],
+  [11000, 'la altura de crucero de un avión'], [100000, 'el espacio (la línea de Kármán)']];
+function milestone(v, list, unit){
+  let done = null, next = null;
+  for (const m of list){ if (v >= m[0]) done = m; else { next = m; break; } }
+  let txt = '';
+  if (done){ const k = v / done[0]; txt = k >= 2 ? `Como hacer <b>${done[1]}</b> ${nf(k, k < 10 ? 1 : 0)} veces` : `Ya has hecho lo mismo que <b>${done[1]}</b> (${nf(done[0])} ${unit})`; }
+  else txt = 'Cada pedalada cuenta: ya has empezado';
+  const prev = done ? done[0] : 0;
+  const bar = next ? `<div class="small mut" style="margin-top:8px">Próximo: ${next[1]} · te faltan ${nf(next[0] - v)} ${unit}</div>
+    <div style="height:6px;border-radius:3px;background:var(--s2);margin-top:4px;overflow:hidden"><div style="height:100%;width:${Math.min(100, (v - prev) / (next[0] - prev) * 100).toFixed(1)}%;background:var(--acc)"></div></div>` : '';
+  return `<div class="small" style="margin-top:4px">${txt}</div>${bar}`;
+}
+function funBlock(ico, big, unit, label, extra){
+  return `<div style="padding:14px 0;border-top:1px solid var(--line)"><div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:22px">${ico}</span>
+    <b style="font:800 34px/1 var(--num)">${big}</b><span class="mut" style="font-weight:600">${unit}</span><span class="small mut" style="margin-left:auto">${label}</span></div>${extra}</div>`;
+}
+function funCard(){
+  const year = new Date().getFullYear(), it = yearItems(FUN_ALL, year);
+  const km = it.reduce((a, x) => a + x.km, 0), up = it.reduce((a, x) => a + x.gain, 0), kj = it.reduce((a, x) => a + x.kj, 0), sec = it.reduce((a, x) => a + x.sec, 0);
+  const hasExt = EXT.some(isBikeExt);
+  const seg = `<div class="seg" style="margin:8px 0 2px">${[[true, 'Toda la bici'], [false, 'Solo rodillo']].map(([v, t]) => `<button class="${FUN_ALL === v ? 'on' : ''}" onclick="FUN_ALL=${v};anaLogros()">${t}</button>`).join('')}</div>`;
+  const chips = arr => `<div class="row wrap" style="gap:6px;margin-top:6px">${arr.filter(x => x[1] >= 1).map(([e, n, t]) => `<span class="tag" style="font-size:13px">${e} <b style="color:var(--txt)">${nf(n, n < 10 ? 1 : 0)}</b> ${t}</span>`).join('')}</div>`;
+  const min = sec / 60;
+  return `<div class="card"><h2>tu ${year} en bici</h2>
+    <div class="small mut" style="margin-top:-4px">${it.length} ${it.length === 1 ? 'salida' : 'salidas'}${FUN_ALL && hasExt ? ' (Umbral + Strava)' : ' en Umbral'}</div>
+    ${hasExt ? seg : ''}
+    ${funBlock('🚴', nf(km), 'km', 'distancia', milestone(km, KM_M, 'km'))}
+    ${funBlock('⛰️', nf(up), 'm', 'desnivel', milestone(up, UP_M, 'm') + (!FUN_ALL || !hasExt ? '<div class="small mut" style="margin-top:4px">En rodillo solo suma el desnivel de los trayectos.</div>' : ''))}
+    ${funBlock('🔥', nf(kj), 'kcal', 'aprox.', chips([['🍺', kj / 90, 'cañas'], ['🥐', kj / 230, 'cruasanes'], ['🥓', kj / 250, 'raciones de jamón'], ['🍳', kj / 1500, 'tortillas de patatas enteras'], ['🍕', kj / 2000, 'pizzas familiares']]) +
+      `<div class="small mut" style="margin-top:6px">Con esa energía mecánica habrías cargado el móvil ${nf(kj / 54)} veces o hervido ${nf(kj / 335)} litros de agua. (En bici, 1 kJ de trabajo ≈ 1 kcal gastada.)</div>`)}
+    ${funBlock('⏱️', nf(sec / 3600, 1).replace(',0', ''), 'h', 'pedaleando', chips([['⚽', min / 90, 'partidos de fútbol'], ['🎬', min / 120, 'películas'], ['📺', min / 45, 'capítulos de serie']]))}
+  </div>`;
+}
+// ---- Insignias
+function weekStreak(){
+  // semanas seguidas (hasta la actual o la anterior) con al menos 2 salidas en bici
+  const wk = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); };
+  const cnt = {}; ACTS.forEach(a => { const k = wk(a.date); cnt[k] = (cnt[k] || 0) + 1; }); EXT.filter(isBikeExt).forEach(e => { const k = wk(e.date); cnt[k] = (cnt[k] || 0) + 1; });
+  let k = wk(now()); if ((cnt[k] || 0) < 2) k -= 7 * DAY;
+  let n = 0; while ((cnt[k] || 0) >= 2){ n++; k -= 7 * DAY; }
+  return n;
+}
+function badgeStats(){
+  const y = yearItems(true, new Date().getFullYear());
+  const hr = a => new Date(a.date).getHours();
+  return {
+    n:ACTS.length, km:y.reduce((a, x) => a + x.km, 0), up:y.reduce((a, x) => a + x.gain, 0), kj:y.reduce((a, x) => a + x.kj, 0),
+    streak:weekStreak(), early:ACTS.filter(a => hr(a) < 8).length, late:ACTS.filter(a => hr(a) >= 22).length,
+    test:ACTS.filter(a => /^(rampa|test20|test20_45)$/.test(a.wkId || '')).length, pr:ACTS.filter(a => a.prs && a.prs.length && !a.noPR).length,
+    route:ACTS.filter(a => a.wkId && String(a.wkId).startsWith('route:') && a.ghostRes).length, ghost:ACTS.filter(a => a.ghostRes && a.ghostRes.best && a.ghostRes.prev).length,
+    s45:ACTS.filter(a => a.dur >= 38 * 60 && a.dur <= 47 * 60).length, big:ACTS.filter(a => a.tss >= 100).length,
+    plan:PLAN ? PLAN.sessions.filter(s => s.status === 'done').length : 0, planAll:PLAN ? PLAN.sessions.length : 0
+  };
+}
+const BADGES = [
+  ['s1', '🐸', 'Primer brinco', 'Tu primera sesión en Umbral', s => [s.n, 1]],
+  ['s10', '🔟', 'Diez de diez', '10 sesiones en Umbral', s => [s.n, 10]],
+  ['s25', '🥉', 'Constancia', '25 sesiones en Umbral', s => [s.n, 25]],
+  ['s50', '🥈', 'Medio centenar', '50 sesiones en Umbral', s => [s.n, 50]],
+  ['s100', '🥇', 'Centenario', '100 sesiones en Umbral', s => [s.n, 100]],
+  ['k212', '🚉', 'A Madrid a pedales', '212 km en el año: Salamanca–Madrid', s => [s.km, 212]],
+  ['k780', '🐚', 'Peregrino', '780 km en el año: el Camino francés', s => [s.km, 780]],
+  ['k1000', '🗺️', 'Mil kilómetros', '1.000 km en el año', s => [s.km, 1000]],
+  ['k3300', '🇪🇸', 'Tu propia Vuelta', '3.300 km en el año: una Vuelta a España', s => [s.km, 3300]],
+  ['u1723', '⛪', 'Peña de Francia', '1.723 m de desnivel en el año', s => [s.up, 1723]],
+  ['u4806', '🏔️', 'Mont Blanc', '4.806 m de desnivel en el año', s => [s.up, 4806]],
+  ['u8849', '🧗', 'Everesting', '8.849 m de desnivel en el año', s => [s.up, 8849]],
+  ['e1500', '🍳', 'Tortilla quemada', '1.500 kcal en el año: una tortilla entera', s => [s.kj, 1500]],
+  ['e20000', '🍕', 'Fiesta de pizzas', '20.000 kcal en el año: diez pizzas familiares', s => [s.kj, 20000]],
+  ['st3', '🔥', 'En racha', '3 semanas seguidas con 2 o más salidas', s => [s.streak, 3]],
+  ['st8', '🌋', 'Imparable', '8 semanas seguidas con 2 o más salidas', s => [s.streak, 8]],
+  ['early', '🌅', 'Madrugador', 'Una sesión antes de las 8:00', s => [s.early, 1]],
+  ['late', '🌙', 'Rana nocturna', 'Una sesión después de las 22:00', s => [s.late, 1]],
+  ['test', '📏', 'Me mido', 'Hacer un test de FTP', s => [s.test, 1]],
+  ['pr', '🏆', 'Récord', 'Batir un récord de potencia', s => [s.pr, 1]],
+  ['route', '🏁', 'Hasta la meta', 'Completar un trayecto', s => [s.route, 1]],
+  ['ghost', '👻', 'Cazafantasmas', 'Ganar a tu fantasma en un trayecto', s => [s.ghost, 1]],
+  ['s45', '⏱️', 'Exprés', '10 sesiones de 40-45 minutos', s => [s.s45, 10]],
+  ['big', '💥', 'Sesión gorda', 'Una sesión de 100 TSS o más', s => [s.big, 1]],
+  ['plan', '📅', 'Plan cumplido', 'Hacer todas las sesiones de un plan', s => [s.planAll && s.plan >= s.planAll ? 1 : 0, 1]]
+];
+// Marca las insignias conseguidas y devuelve las nuevas. La primera vez las marca todas sin avisar.
+function checkBadges(){
+  const s = badgeStats(), first = !S.badges, got = S.badges || {}, fresh = [];
+  BADGES.forEach(([id, , , , f]) => { const [v, t] = f(s); if (v >= t && !got[id]){ got[id] = now(); if (!first) fresh.push(id); } });
+  S.badges = got; saveS();
+  return fresh;
+}
+function badgeCard(){
+  checkBadges();
+  const s = badgeStats(), got = S.badges || {};
+  const n = BADGES.filter(b => got[b[0]]).length;
+  return `<div class="card"><h2>insignias</h2><div class="small mut" style="margin-top:-4px">${n} de ${BADGES.length} conseguidas. Las de kilómetros, desnivel y calorías son del año.</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">${BADGES.map(([id, e, t, d, f]) => {
+      const [v, tg] = f(s), ok = !!got[id];
+      return `<div onclick="toast(${JSON.stringify(d + (ok ? ' · conseguida el ' + fdm(got[id]) : ' · llevas ' + nf(Math.min(v, tg)) + ' de ' + nf(tg))).replace(/"/g, '&quot;')})" style="text-align:center;padding:10px 4px;border-radius:12px;background:var(--s2);cursor:pointer;${ok ? '' : 'opacity:.45;filter:grayscale(1)'}">
+        <div style="font-size:28px">${e}</div><div style="font-weight:700;font-size:12px;line-height:1.2;margin-top:4px">${t}</div>
+        ${ok ? '' : `<div style="height:4px;border-radius:2px;background:var(--line);margin:6px 8px 0;overflow:hidden"><div style="height:100%;width:${Math.min(100, v / tg * 100).toFixed(0)}%;background:var(--acc)"></div></div>`}</div>`; }).join('')}</div></div>`;
+}
+function newBadgesCard(ids){
+  if (!ids || !ids.length) return '';
+  const bs = ids.map(id => BADGES.find(b => b[0] === id)).filter(Boolean);
+  return `<div class="card" style="margin:12px 0;border-color:var(--acc)"><b style="font-size:17px">🏅 ${bs.length === 1 ? '¡Insignia nueva!' : '¡' + bs.length + ' insignias nuevas!'}</b>
+    ${bs.map(([, e, t, d]) => `<div style="display:flex;gap:10px;align-items:center;margin-top:8px"><span style="font-size:30px">${e}</span><span><b>${t}</b><div class="small mut">${d}</div></span></div>`).join('')}</div>`;
+}
 function anaLogros(){
+  const top = funCard() + badgeCard();
   const all = allTimeBest(null);
   const six = {}; ACTS.filter(a => a.date > now() - 182 * DAY && !a.noPR).forEach(a => BEST_D.forEach(d => { const v = a.best && a.best[d]; if (v && (!six[d] || v > six[d].w)) six[d] = {w:v, date:a.date}; }));
-  if (!Object.keys(all).length){ $('anaBox').innerHTML = '<div class="empty">Aquí aparecerán tus récords de potencia cuando hagas sesiones.</div>'; return; }
+  if (!Object.keys(all).length){ $('anaBox').innerHTML = top + '<div class="empty">Aquí aparecerán tus récords de potencia cuando hagas sesiones.</div>'; return; }
   const ds = BEST_D.filter(d => all[d]);
   const curve = lineChart({h:200, yMin:0, yMax:Math.ceil(Math.max(...ds.map(d => all[d].w)) * 1.1 / 50) * 50, xLabels:ds.map((d, i) => ({i, t:BEST_L[d].replace(' min', "'").replace(' s', '"')})),
     series:[{vals:ds.map(d => all[d].w), color:'var(--acc)', w:2.5, dots:true}, {vals:ds.map(d => six[d] ? six[d].w : null), color:'#8b93a3', w:1.5, dash:true}]});
   const est = ftpEstimate();
   const recent = ACTS.filter(a => a.prs && a.prs.length && !a.noPR && a.date > now() - 30 * DAY).slice(0, 6);
-  $('anaBox').innerHTML = (recent.length ? `<div class="card"><h2>Récords recientes</h2>${recent.map(a => `<div class="pr" onclick="showAct(${a.id})" style="cursor:pointer"><span><b>${esc(a.name)}</b><div class="small mut">${fdate(a.date)}</div></span>
+  $('anaBox').innerHTML = top + (recent.length ? `<div class="card"><h2>Récords recientes</h2>${recent.map(a => `<div class="pr" onclick="showAct(${a.id})" style="cursor:pointer"><span><b>${esc(a.name)}</b><div class="small mut">${fdate(a.date)}</div></span>
       <span style="text-align:right">${a.prs.map(d => `<span class="tag acc" style="margin:2px">🏆 ${BEST_L[d]} ${a.best[d]} W</span>`).join('')}</span></div>`).join('')}</div>` : '') + `<div class="card"><h2>Curva de potencia</h2>${curve}${legend([['var(--acc)', 'Histórico'], ['#8b93a3', 'Últimos 6 meses']])}</div>
     <div class="card"><h2>Mejores intervalos</h2>${ds.map(d => `<div class="pr"><span><b style="font-size:20px">${BEST_L[d]}</b><div class="small mut">${fdate(all[d].date)}${six[d] && six[d].w !== all[d].w ? ` · 6 meses: ${six[d].w} W` : ''}</div></span>
       <span style="text-align:right"><b>${all[d].w}</b> <span class="mut">W</span><div class="small mut">${dec(all[d].w / S.peso, 2)} W/kg</div></span></div>`).join('')}</div>
