@@ -515,7 +515,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.16.2';
+const VER = '0.17.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -2301,11 +2301,16 @@ function setFtp(v){
   S.ftp = v; S.ftpHist.push({date:now(), ftp:v}); saveS();
   toast('FTP actualizado a ' + v + ' W'); closeSheet(); renderHome();
 }
+function delActs(ids){
+  if (!ids.length) return;
+  const set = new Set(ids);
+  ACTS = ACTS.filter(a => !set.has(a.id)); saveActs(); ids.forEach(id => LS.del('ht_act_' + id));
+  Object.keys(GHOSTS).forEach(k => { if (GHOSTS[k] && set.has(GHOSTS[k].actId)) delete GHOSTS[k]; }); saveGhosts();
+  if (PLAN){ PLAN.sessions.forEach(s => { if (set.has(s.actId)){ s.status = 'pend'; s.actId = null; } }); savePlan(); }
+}
 function delAct(id){
   if (!confirm('¿Borrar esta sesión? No se puede deshacer.')) return;
-  ACTS = ACTS.filter(a => a.id !== id); saveActs(); LS.del('ht_act_' + id);
-  Object.keys(GHOSTS).forEach(k => { if (GHOSTS[k] && GHOSTS[k].actId === id) delete GHOSTS[k]; }); saveGhosts();
-  if (PLAN){ PLAN.sessions.forEach(s => { if (s.actId === id){ s.status = 'pend'; s.actId = null; } }); savePlan(); }
+  delActs([id]);
   closeSheet(); renderAna(); renderHome(); toast('Sesión borrada');
 }
 
@@ -2445,7 +2450,8 @@ async function stravaSync(silent){
       const j = await r.json(); all = all.concat(j); if (j.length < 100) break;
     }
     const mine = new Set(ACTS.filter(a => a.strava).map(a => String(a.strava)));
-    EXT = all.filter(a => !mine.has(String(a.id)) && !String(a.external_id || '').startsWith('ht_')).map(a => {
+    const hid = new Set((S.extHide || []).map(String));
+    EXT = all.filter(a => !mine.has(String(a.id)) && !hid.has(String(a.id)) && !String(a.external_id || '').startsWith('ht_')).map(a => {
       const e = estTSS(a);
       return {id:a.id, date:new Date(a.start_date).getTime(), name:a.name, sport:a.sport_type || a.type, dur:a.moving_time, dist:a.distance, hr:a.average_heartrate || null, np:a.weighted_average_watts || null, tss:e.tss, how:e.how};
     });
@@ -2994,26 +3000,61 @@ function delWk(id){
 let ANA_TAB = 'actividad', CARGA_D = 90;
 function anaTab(t){ ANA_TAB = t; renderAna(); }
 function renderAna(){
+  if (ANA_TAB !== 'actividad') SEL = null;
   document.querySelectorAll('#anaTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === ANA_TAB));
   if (S.strava && !P.on && now() - (S.lastSync || 0) > 30 * 60e3) stravaSync(true);
   ({actividad:anaActs, forma:anaForma, carga:anaCarga, semanas:anaSemanas, logros:anaLogros})[ANA_TAB]();
 }
 const SPORT = s => /Run/.test(s) ? 'Carrera' : /Ride/.test(s) ? 'Bici' : /Walk|Hike/.test(s) ? 'Andar' : /Swim/.test(s) ? 'Natación' : /Weight|Workout|Crossfit/.test(s) ? 'Gimnasio' : s;
+let SEL = null; // modo seleccionar: Set de claves 'ht:id' / 'ext:id'
+function selToggle(k){ if (SEL.has(k)) SEL.delete(k); else SEL.add(k); anaActs(); }
+function selMode(on){ SEL = on ? new Set() : null; anaActs(); }
+function selDelete(){
+  if (!SEL || !SEL.size) return;
+  const own = [...SEL].filter(k => k.startsWith('ht:')).map(k => +k.slice(3)), ext = [...SEL].filter(k => k.startsWith('ext:')).map(k => k.slice(4));
+  const msg = (own.length ? own.length + (own.length === 1 ? ' sesión de Umbral se borrará' : ' sesiones de Umbral se borrarán') + ' (no se puede deshacer)' : '') +
+    (own.length && ext.length ? ' y ' : '') + (ext.length ? ext.length + (ext.length === 1 ? ' actividad de Strava se quitará' : ' actividades de Strava se quitarán') + ' de Umbral (en Strava siguen)' : '') + '. ¿Seguir?';
+  if (!confirm(msg.charAt(0).toUpperCase() + msg.slice(1))) return;
+  delActs(own); hideExt(ext);
+  SEL = null; renderAna(); renderHome(); toast('Hecho: ' + (own.length + ext.length) + ' quitadas');
+}
+function hideExt(ids){
+  if (!ids.length) return;
+  S.extHide = [...new Set([...(S.extHide || []), ...ids.map(String)])]; saveS();
+  EXT = EXT.filter(e => !S.extHide.includes(String(e.id))); LS.set('ht_ext', EXT);
+}
+function showExt(id){
+  const e = EXT.find(x => String(x.id) === String(id)); if (!e) return;
+  openSheet(`<h2>${esc(e.name)}</h2><div class="small mut" style="margin-top:-6px">${fdate(e.date)}, ${ftime(e.date)} · De Strava</div>
+    <div class="kv" style="margin-top:14px"><div><span>Tipo</span><b>${SPORT(e.sport)}</b></div><div><span>Tiempo</span><b>${dur(e.dur)}</b></div><div><span>TSS</span><b>${e.tss}</b></div>
+      ${e.dist ? `<div><span>Distancia</span><b>${dec(e.dist / 1000)} km</b></div>` : ''}${e.hr ? `<div><span>FC media</span><b>${Math.round(e.hr)}</b></div>` : ''}${e.np ? `<div><span>NP</span><b>${Math.round(e.np)} W</b></div>` : ''}</div>
+    <div class="small mut" style="margin-top:8px">TSS calculado por ${e.how}. Cuenta en la carga y la forma.</div>
+    <a class="btn block" style="margin-top:16px;text-align:center;text-decoration:none;color:#fc6a2c" href="https://www.strava.com/activities/${e.id}" target="_blank" rel="noopener">Ver en Strava</a>
+    <button class="btn red block" style="margin-top:10px" onclick="if(confirm('¿Quitar esta actividad de Umbral? En Strava sigue.')){hideExt(['${e.id}']);closeSheet();renderAna();renderHome();toast('Quitada de Umbral')}">Quitar de Umbral</button>
+    <div class="small mut" style="margin-top:6px">Deja de contar en la carga. Para borrarla del todo, bórrala en Strava.</div>`);
+}
 function anaActs(){
   const items = ACTS.map(a => ({k:'ht', date:a.date, a})).concat(EXT.map(e => ({k:'ext', date:e.date, e}))).sort((x, y) => y.date - x.date).slice(0, 100);
   if (!items.length){ $('anaBox').innerHTML = '<div class="empty">Aquí aparecerán tus sesiones.<br><button class="btn acc" style="margin-top:14px" onclick="show(\'sLib\');libTab(\'workouts\')">Elegir un workout</button></div>'; return; }
   // agrupado por mes
   let html = S.strava ? '' : `<div class="small mut" style="margin:0 2px 12px">Conecta Strava en Ajustes para ver aquí también tus salidas y carreras, y que cuenten en la carga.</div>`;
+  html += SEL ? `<div class="row" style="justify-content:space-between;align-items:center;margin:0 2px 10px"><b>${SEL.size ? SEL.size + (SEL.size === 1 ? ' elegida' : ' elegidas') : 'Toca las que quieras quitar'}</b><button class="btn sm" onclick="selMode(false)">Cancelar</button></div>`
+              : `<div class="row" style="justify-content:flex-end;margin:0 2px 6px"><button class="btn sm" onclick="selMode(true)">Seleccionar</button></div>`;
   let curM = '';
   const rows = [];
+  const chk = k => SEL ? `<div style="width:26px;height:26px;flex:none;border-radius:50%;border:2px solid ${SEL.has(k) ? 'var(--acc)' : 'var(--line)'};background:${SEL.has(k) ? 'var(--acc)' : 'transparent'};display:grid;place-items:center;color:#111;font-weight:800;margin-right:2px">${SEL.has(k) ? '✓' : ''}</div>` : '';
   items.forEach(x => {
     const m = new Date(x.date).toLocaleDateString('es-ES', {month:'long', year:'numeric'});
     if (m !== curM){ if (rows.length){ html += `<div class="group">${rows.join('')}</div>`; rows.length = 0; } curM = m; html += `<div class="wkhead"><b>${m.charAt(0).toUpperCase() + m.slice(1)}</b></div>`; }
-    rows.push(x.k === 'ht' ? actRow(x.a) : `<a class="li" href="https://www.strava.com/activities/${x.e.id}" target="_blank" rel="noopener"><div class="zs" style="background:var(--strava);opacity:.7"></div>
+    const k = x.k === 'ht' ? 'ht:' + x.a.id : 'ext:' + x.e.id;
+    let row = x.k === 'ht' ? actRow(x.a) : `<div class="li" onclick="showExt('${x.e.id}')"><div class="zs" style="background:var(--strava);opacity:.7"></div>
       <div class="main"><b>${esc(x.e.name)}</b><div class="meta">${fdate(x.e.date)}, ${SPORT(x.e.sport).toLowerCase()}${x.e.dist ? ', ' + dec(x.e.dist / 1000) + ' km' : ''}</div></div>
-      <div class="side"><b>${x.e.tss}</b><span>TSS, ${dur(x.e.dur)}</span></div></a>`);
+      <div class="side"><b>${x.e.tss}</b><span>TSS, ${dur(x.e.dur)}</span></div></div>`;
+    if (SEL) row = row.replace(/^<div class="li" onclick="[^"]*">/, `<div class="li" onclick="selToggle('${k}')">${chk(k)}`);
+    rows.push(row);
   });
   if (rows.length) html += `<div class="group">${rows.join('')}</div>`;
+  if (SEL && SEL.size) html += `<div style="position:sticky;bottom:calc(84px + env(safe-area-inset-bottom));margin-top:12px"><button class="btn red block lg" onclick="selDelete()">Quitar ${SEL.size} ${SEL.size === 1 ? 'actividad' : 'actividades'}</button></div>`;
   $('anaBox').innerHTML = html;
 }
 function anaForma(){
