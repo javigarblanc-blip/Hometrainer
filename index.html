@@ -516,7 +516,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.18.0';
+const VER = '0.18.1';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1272,21 +1272,46 @@ async function coachAsk(userText, focusActId){
 // Llamada a la API. inChat: el último mensaje de CHAT ya es la pregunta y no va en el historial.
 async function coachApi(userText, focusActId, inChat){
   {
-    const history = (inChat ? CHAT.slice(-8, -1) : CHAT.slice(-7)).map(m => ({role:m.role, content:m.role === 'user' ? m.text : JSON.stringify({texto:m.text, acciones:m.actions || []})}));
+    const history = (inChat ? CHAT.slice(-8, -1) : CHAT.slice(-7)).filter(m => m.text && !m.err).map(m => ({role:m.role, content:m.role === 'user' ? m.text : JSON.stringify({texto:m.text, acciones:m.actions || []})}));
     const msgs = history.concat([{role:'user', content:`DATOS ACTUALES DE LA APP:\n${coachContext(focusActId)}\n\nMENSAJE DEL CICLISTA: ${userText}`}]);
     while (msgs.length && msgs[0].role !== 'user') msgs.shift();
     const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST',
       headers:{'content-type':'application/json', 'x-api-key':S.apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:S.coachModel || 'claude-sonnet-5-5', max_tokens:1500,
+      body:JSON.stringify({model:S.coachModel || 'claude-sonnet-5-5', max_tokens:3000,
         system:[{type:'text', text:COACH_SYS + '\n\n' + aiLibraryBlock(), cache_control:{type:'ephemeral'}}], messages:msgs})});
     const j = await r.json();
     if (!r.ok) throw new Error((j.error && j.error.message) || ('error ' + r.status));
     const cost = j.usage ? aiTrack(S.coachModel || 'claude-sonnet-5-5', j.usage) : 0;
     const raw = (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
-    let obj = null; const m = raw.match(/\{[\s\S]*\}/);
-    try{ obj = JSON.parse(m ? m[0] : raw); }catch(e){ obj = {texto:raw, acciones:[]}; }
-    return {msg:{role:'assistant', text:String(obj.texto || ''), actions:validActions(obj.acciones), at:now(), cost, tok:j.usage ? (j.usage.input_tokens || 0) + (j.usage.cache_creation_input_tokens || 0) + (j.usage.cache_read_input_tokens || 0) + (j.usage.output_tokens || 0) : 0, cached:j.usage ? j.usage.cache_read_input_tokens || 0 : 0}};
+    const obj = parseCoachReply(raw);
+    let text = obj.texto;
+    if (!text) throw new Error('Brinco ha devuelto una respuesta vacía (' + (j.stop_reason === 'max_tokens' ? 'se cortó por larga' : 'motivo: ' + (j.stop_reason || 'desconocido')) + '). Vuelve a intentarlo');
+    if (j.stop_reason === 'max_tokens') text += '\n\n_(La respuesta se cortó por larga.)_';
+    return {msg:{role:'assistant', text, actions:validActions(obj.acciones), at:now(), cost, tok:j.usage ? (j.usage.input_tokens || 0) + (j.usage.cache_creation_input_tokens || 0) + (j.usage.cache_read_input_tokens || 0) + (j.usage.output_tokens || 0) : 0, cached:j.usage ? j.usage.cache_read_input_tokens || 0 : 0}};
   }
+}
+// Saca {texto, acciones} de la respuesta aunque venga con ```json, con texto alrededor, cortada o con otra clave
+function parseCoachReply(raw){
+  raw = String(raw || '').trim();
+  const s = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const pickText = o => { if (!o || typeof o !== 'object') return '';
+    for (const k of ['texto', 'text', 'respuesta', 'mensaje', 'analisis', 'análisis']) if (typeof o[k] === 'string' && o[k].trim()) return o[k];
+    const v = Object.values(o).find(x => typeof x === 'string' && x.trim().length > 20); return v || ''; };
+  const tries = [s];
+  const a = s.indexOf('{');
+  if (a >= 0){ // primer objeto equilibrado
+    let d = 0, inS = false, esc = false;
+    for (let i = a; i < s.length; i++){ const c = s[i];
+      if (inS){ if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inS = false; continue; }
+      if (c === '"') inS = true; else if (c === '{') d++; else if (c === '}' && --d === 0){ tries.push(s.slice(a, i + 1)); break; } }
+    tries.push(s.slice(a, s.lastIndexOf('}') + 1));
+  }
+  for (const t of tries){ try{ const o = JSON.parse(t); const tx = pickText(o); if (tx) return {texto:tx, acciones:Array.isArray(o.acciones) ? o.acciones : []}; }catch(e){} }
+  // JSON cortado: rescatar el campo texto
+  const m = s.match(/"texto"\s*:\s*"((?:\\.|[^"\\])*)/);
+  if (m){ let tx = m[1]; try{ tx = JSON.parse('"' + tx.replace(/\\$/, '') + '"'); }catch(e){ tx = tx.replace(/\\n/g, '\n').replace(/\\"/g, '"'); } if (tx.trim()) return {texto:tx, acciones:[]}; }
+  // sin JSON: texto tal cual
+  return {texto:a < 0 ? s : s.replace(/^[\s\S]*?\{[\s\S]*\}\s*/, '').trim() || '', acciones:[]};
 }
 function validActions(arr){
   if (!Array.isArray(arr)) return [];
