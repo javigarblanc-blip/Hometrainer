@@ -516,7 +516,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.18.1';
+const VER = '0.18.2';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1381,7 +1381,7 @@ function renderCoach(scroll){
   }
   box.innerHTML = (CHAT.length ? '' : `<div class="empty" style="padding:24px 10px"><img class="mascot-big" src="mascota/entrenador.webp" alt="">Soy Brinco, tu entrenador. Pregúntame lo que quieras sobre tu entrenamiento. Veo tu forma, tu plan, tus sesiones y lo que haces en Strava.</div>`) +
     CHAT.map((m, mi) => m.role === 'user' ? `<div class="bub me">${esc(m.text)}</div>`
-      : `<div class="bub ai ${m.err ? 'err' : ''}">${mdLite(m.text)}${(m.actions || []).map((a, ai) => actionCard(a, mi, ai)).join('')}${m.cost != null && m.tok ? `<div class="small" style="color:var(--dim);margin-top:8px">${m.tok.toLocaleString('es-ES')} tokens${m.cached ? ' (' + m.cached.toLocaleString('es-ES') + ' de caché)' : ''}, ${usd(m.cost)}</div>` : ''}</div>`).join('') +
+      : `<div class="bub ai ${m.err ? 'err' : ''}">${m.text ? mdLite(m.text) : '<span class="mut">(Respuesta vacía. Vuelve a preguntar.)</span>'}${(m.actions || []).map((a, ai) => actionCard(a, mi, ai)).join('')}${m.cost != null && m.tok ? `<div class="small" style="color:var(--dim);margin-top:8px">${m.tok.toLocaleString('es-ES')} tokens${m.cached ? ' (' + m.cached.toLocaleString('es-ES') + ' de caché)' : ''}, ${usd(m.cost)}</div>` : ''}</div>`).join('') +
     (coachBusy ? '<div class="bub ai"><span class="typing"><i></i><i></i><i></i></span></div>' : '');
   $('coachUsage').textContent = aiUsageTxt();
   $('coachChips').innerHTML = COACH_CHIPS.map((c, i) => `<button onclick="coachChip(${i})" ${coachBusy ? 'disabled' : ''}>${c[0]}</button>`).join('');
