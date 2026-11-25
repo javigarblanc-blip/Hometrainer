@@ -408,6 +408,8 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     <select id="iSound"><option value="1">Sí, con vibración</option><option value="0">No</option></select>
     <label>Brinco durante la sesión</label>
     <select id="iBrinco"><option value="1">Sí, que me anime</option><option value="0">No</option></select>
+    <label>Protección contra el atasco del ERG</label>
+    <select id="iErgG"><option value="1">Sí: si me hundo, quita la resistencia unos segundos</option><option value="0">No</option></select>
     <label>Pantalla siempre encendida</label>
     <button class="btn ghost block" onclick="testWake()">Probar pantalla encendida (3 min)</button>
     <div class="small" id="wakeRes" style="margin-top:8px"></div>
@@ -510,7 +512,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.14.0';
+const VER = '0.15.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -939,13 +941,19 @@ function kmProfileSVG(r){
   g += `<text x="${L}" y="12" fill="var(--mut)" font-size="10">${Math.round(emax)} m</text><text x="${W - Rr}" y="12" fill="var(--mut)" font-size="10" text-anchor="end">% medio por ${unit / 1000} km</text>`;
   return `<svg class="lc" viewBox="0 0 ${W} ${H}">${g}</svg>`;
 }
-// Trayectos variados de 30, 45 y 50 minutos (a un 75 % de un FTP de 200 W): subidas, llanos y bajadas
+// Trayectos variados de 30, 40, 45 y 50 minutos (a un 75 % de un FTP de 200 W): subidas, llanos y bajadas
 function genRoute(id, name, tramos, seed, base){ const rt = genClimb(id, 'x', tramos, seed, base); rt.name = name; return rt; }
 const VAR_ROUTES = [
   genRoute('v30_ondulado', 'Ondulado · 30\'', [[1.3,1],[0.9,4],[0.9,-3],[1.7,0.5],[0.7,6],[0.9,-4],[1.7,1],[1,3.5],[1.3,-2.5],[1.3,0.5]], 61, 500),
   genRoute('v30_subida', 'Sube y baja · 30\'', [[1.5,1],[2.2,5.5],[0.4,2],[1.1,6.5],[2.2,-5],[1.5,0.5]], 67, 700),
   genRoute('v45_sierra', 'Sierra · 45\'', [[1.4,1],[1.8,4.5],[1.1,7],[1.4,-4],[1.1,1],[1.4,6],[1.8,-5.5],[2.2,0.5],[0.7,3],[1.4,-2]], 71, 800),
   genRoute('v45_repechos', 'Llano con repechos · 45\'', [[3.1,0.5],[0.6,7],[1,-3],[3.1,0],[0.8,8],[1,-4],[3.1,0.5],[0.5,9],[1,-5],[3.1,0]], 73, 300),
+  // ---- Añadidos v0.15: más trayectos de 40-45'
+  genRoute('v45_rompe', 'Rompepiernas · 45\'', [[1.5,1],[0.8,6],[0.8,-5],[1,1],[0.6,8],[0.9,-5],[1.2,0.5],[1,5],[0.7,-3],[0.5,9],[1,-6],[1.5,1],[0.8,7],[1,-5],[1,0.5]], 103, 450),
+  genRoute('v45_larga', 'Subida larga · 45\'', [[2.3,0.5],[1.5,3.5],[1.5,4.5],[1.2,3],[1.5,5],[1.2,4],[0.8,5.5],[0.8,2]], 107, 500),
+  genRoute('v45_final', 'Llano y final en alto · 45\'', [[3.4,0.3],[1.9,1.5],[2.6,0],[1,5],[1,7],[1,8],[1,6.5]], 109, 350),
+  genRoute('v40_repechos', 'Tres repechos · 40\'', [[2,0.5],[0.7,8],[0.9,-4],[2.6,0.5],[0.6,10],[0.9,-5],[2.6,0],[0.9,7.5],[1.1,-3],[1.6,0.5]], 113, 400),
+  genRoute('v45_media', 'Media montaña · 45\'', [[1.2,1],[2.1,5.5],[2.1,-5],[1.2,0.5],[1.6,6.5],[0.8,3],[0.8,7],[2.5,-5.5],[0.8,0.5]], 127, 750),
   genRoute('v50_valle', 'Vuelta por el valle · 50\'', [[2.3,0.5],[1.6,3],[2.3,5],[2.3,-4.5],[3.1,0.5],[1.2,6.5],[1.6,-5],[2.3,1],[0.8,-1]], 79, 600),
   genRoute('v50_dospuertos', 'Dos puertos · 50\'', [[1.4,1],[2.8,6],[2.8,-6],[1.4,0.5],[2.5,7],[2.5,-6.5],[1.4,0.5]], 83, 650),
 ];
@@ -1504,6 +1512,7 @@ function afterReconnect(dev){
   if (P.route){ P.gSent = null; routeGradeSend(true); }
   else if (P.mode === 'grade') sendGrade(P.grade);
   else { P.lastSent = null; applyTarget(true); }
+  P.resc = null;
   if (P.rec && P.rec.p.length){ brSay('¡Rodillo de vuelta! Seguimos donde lo dejamos.'); beep(990, 200); }
   renderPlayerWarn();
 }
@@ -1627,6 +1636,8 @@ const BR = {
   half:['Mitad del entreno. Vas muy bien.', 'Ecuador superado. Sigue así.'],
   ramp:['Rampa dura: {g} %. Siéntate y gira con calma.', '¡Repecho del {g} %! Esto es lo mío.'],
   lastkm:['¡Último kilómetro! A coronar.', 'Queda un kilómetro. ¡Brinca hasta arriba!'],
+  spiral:['Te estabas atascando: te quito la resistencia unos segundos. ¡Sube la cadencia!', 'Croac, que te frenas. Gira rápido unos segundos y vuelvo a los vatios.'],
+  spiral2:['Si no llegas a los vatios, baja un 5 % con el botón −. Mejor terminar la serie un poco más suave.'],
   drink:['Llevas un buen rato. Bebe un trago.', 'Recuerda hidratarte, que en el rodillo se suda el doble.']
 };
 const brPick = (k, v = {}) => { const a = BR[k]; return a[Math.floor(Math.random() * a.length)].replace(/\{(\w)\}/g, (_, x) => v[x] != null ? v[x] : ''); };
@@ -1781,8 +1792,33 @@ function target(){
 }
 function applyTarget(force){
   if (P.mode !== 'erg') return;
+  if (P.resc && !force) return;
+  P.resc = null;
   const w = target();
-  if (force || w !== P.lastSent){ P.lastSent = w; sendERG(w); }
+  if (force || w !== P.lastSent){
+    if (P.lastSent == null || Math.abs(w - P.lastSent) > Math.max(10, P.lastSent * .08)) P.sentAt = now();
+    P.lastSent = w; sendERG(w);
+  }
+}
+// Espiral del ERG: si la potencia se hunde (cadencia baja), el rodillo frena cada vez más.
+// Se quita la resistencia unos segundos (pendiente 0 %) y se vuelve a los vatios.
+const RESC_S = 8;
+function ergGuard(pw){
+  if (P.resc){
+    if (now() >= P.resc.until){ P.resc = null; P.rescEnd = now(); P.lastSent = null; applyTarget(true); P.sentAt = now(); renderCtl(); }
+    return;
+  }
+  if (S.ergGuard === 0 || P.mode !== 'erg' || !P.running || P.route || (P.wk && P.wk.test === 'rampa')){ P.lowN = 0; return; }
+  const tgt = target();
+  if (tgt < S.ftp * .5 || now() - (P.sentAt || 0) < 10000 || now() - (P.rescEnd || 0) < 15000){ P.lowN = 0; return; }
+  P.lowN = pw < tgt * .65 ? (P.lowN || 0) + 1 : 0;
+  if (P.lowN >= 4){
+    P.lowN = 0; P.resc = {at:now(), until:now() + RESC_S * 1000, tgt};
+    sendGrade(0); beep(520, 250); buzz([120, 60, 120]);
+    const k = P.wk ? 's' + P.segI : 'f'; P.rescSeg = P.rescSeg || {}; P.rescSeg[k] = (P.rescSeg[k] || 0) + 1;
+    brSay(brPick(P.rescSeg[k] === 2 && P.wk ? 'spiral2' : 'spiral'));
+    P.rescN = (P.rescN || 0) + 1;
+  }
 }
 function tick(){
   if (!P.on) return;
@@ -1810,7 +1846,7 @@ function tick(){
     brTick();
     { const n = P.rec.p.length; if (n >= 30){ const a30 = (P.cum[n] - P.cum[n - 30]) / 30; P.np4 += a30 ** 4; P.npN++; } }
     if (P.route && P.rDist >= P.route.dist){ beep(660, 500); toast('¡Trayecto completado!'); return endSession(); }
-    if (P.wk && P.wt >= P.total){ beep(660, 500); toast(P.wk.test ? 'Fin del test' : '¡Entreno completado!'); return endSession(); }
+    if (P.wk && P.wt >= P.total){ beep(660, 500); toast(P.wk.test ? 'Fin del test' : P.cutAt ? 'Sesión acortada guardada' : '¡Entreno completado!'); return endSession(); }
     if (P.wk){
       curSeg();
       const left = P.starts[P.segI] + P.wk.segs[P.segI].d - P.wt;
@@ -1820,6 +1856,7 @@ function tick(){
     if (r.p.length % 30 === 0) saveLive();
   }
   P.p3.push(pw); if (P.p3.length > 3) P.p3.shift();
+  ergGuard(pw);
   if (P.route) routeGradeSend(false); else applyTarget(false);
   render();
 }
@@ -1836,6 +1873,7 @@ function render(){
   $('pTime').textContent = clock(P.rec.p.length);
   let st = '';
   if (P.manual) st = 'En pausa';
+  else if (P.resc) st = 'Resistencia quitada: sube la cadencia (' + Math.max(0, Math.ceil((P.resc.until - now()) / 1000)) + ' s)';
   else if (!trainerOn()) st = 'Esperando al rodillo';
   else if (!P.running) st = P.rec.p.length ? 'Pausa automática. Pedalea para seguir' : 'Empieza a pedalear';
   else if (P.route && P.diff !== 1) st = 'Dificultad al ' + Math.round(P.diff * 100) + ' %';
@@ -1931,6 +1969,7 @@ function adj(dir){
 }
 function toggleMode(){
   if (P.route) return;
+  P.resc = null;
   P.mode = P.mode === 'erg' ? 'grade' : 'erg';
   if (P.mode === 'grade') sendGrade(P.grade); else applyTarget(true);
   wake(); renderCtl(); render();
@@ -1951,7 +1990,37 @@ function renderPlayerWarn(){
 setInterval(() => { if (P.on && P.running && BT.cmd) resendCmd(); }, 10000);
 function askEnd(){
   if (!P.rec.p.length){ if (confirm('No has empezado a rodar. ¿Salir?')) endSession(); return; }
-  if (confirm('¿Terminar la sesión?')) endSession();
+  const coolLeft = P.wk && P.wk.segs.slice(P.segI).every(s => segInt(s) < .62);
+  const canCut = P.wk && P.wk.test !== 'rampa' && !P.cutAt && P.total - P.wt > 4 * 60 && !coolLeft;
+  const inPlan = PLAN && P.wk && PLAN.sessions.some(x => x.wkId === P.wk.id && x.status !== 'done' && (x.date === P.sessKey || x.date === today()));
+  const short = P.rec.p.length < 30;
+  openSheet(`<h2>¿Acabar ya?</h2>
+    <p class="mut">Llevas ${clock(P.rec.p.length)}${P.wk && P.wk.test !== 'rampa' ? ' de ' + clock(P.total) : ''}. ${short ? 'Es muy poco: no se guardará.' : 'Lo hecho se guarda' + (inPlan ? ' y cuenta como hecha en tu plan.' : '.')}</p>
+    ${canCut ? `<button class="btn acc block" onclick="cutNow()">Acabar con 3' de vuelta a la calma</button><div class="small mut" style="margin:6px 2px 0">Se salta lo que queda y bajas pulsaciones girando suave antes de guardar.</div>` : ''}
+    <button class="btn ${canCut ? '' : 'acc '}block" style="margin-top:12px" onclick="closeSheet();endSession()">Terminar ahora${short ? '' : ' y guardar'}</button>
+    <button class="btn ghost block" style="margin-top:8px" onclick="closeSheet()">Seguir pedaleando</button>`);
+}
+function cutNow(){
+  closeSheet();
+  if (!P.wk || !P.on) return;
+  const cur = P.wk.segs[P.segI], el = P.wt - P.starts[P.segI];
+  const segs = P.wk.segs.slice(0, P.segI);
+  if (el >= 5){
+    const s = Object.assign({}, cur, {d:el});
+    if (cur.p0 != null) s.p1 = cur.p0 + (cur.p1 - cur.p0) * el / cur.d;
+    segs.push(s);
+  }
+  const cd = R(3, .55, .4, 'Vuelta a la calma'); cd.d = 180;
+  segs.push(cd);
+  P.cutAt = P.wt; P.origTotal = P.total;
+  P.wk = Object.assign({}, P.wk, {segs});
+  P.starts = segs.reduce((a, s, i) => (a.push(i ? a[i-1] + segs[i-1].d : 0), a), []);
+  P.total = P.starts[segs.length - 1] + cd.d;
+  P.segI = 0; curSeg(); P.lastSegI = P.segI;
+  $('pSub').textContent = 'Acortado: 3\' de vuelta a la calma y a casa';
+  P.resc = null; P.lastSent = null; applyTarget(true);
+  beep(1180, 350); brSay(brPick('cool'), 'bebe');
+  render(); drawPlayerChart();
 }
 function saveLive(){
   LS.set('ht_live', {start:P.start, name:$('pName').textContent, wkId:P.wk ? P.wk.id : P.route ? 'route:' + P.route.id : null, sessKey:P.sessKey, rec:P.rec, ftp:S.ftp});
@@ -1966,6 +2035,7 @@ function endSession(){
   if (P.rec.p.length < 30){ toast('Sesión muy corta: no se guarda'); renderHome(); return; }
   const prevG = P.route ? ghostOf(P.route.id) : null;
   const meta = finalize(P.start, $('pName').textContent, P.wk ? P.wk.id : P.route ? 'route:' + P.route.id : null, P.rec, P.sessKey);
+  if (P.cutAt || P.rescN){ if (P.cutAt) meta.cut = {at:P.cutAt, plan:P.origTotal}; if (P.rescN) meta.resc = P.rescN; saveActs(); }
   if (P.route){
     const g = ghostFromRec(P.rec, P.route.dist);
     if (g){
@@ -2090,6 +2160,8 @@ function showAct(id, fresh){
     ${fresh ? `<img class="mascot-big" src="${a.ghostRes && a.ghostRes.best && POSE_OK.meta ? 'mascota/meta.webp' : 'mascota/logro.webp'}" alt=""><div class="small" style="color:var(--ok);font-weight:700;margin-bottom:4px">✓ Sesión guardada</div>` : ''}
     <h2 style="margin-right:40px">${esc(a.name)}</h2>
     <div class="small mut" style="margin-top:-6px">${fdate(a.date)}, ${ftime(a.date)}, con FTP de ${a.ftp} W</div>
+    ${a.cut ? `<div class="small mut" style="margin-top:4px">Acortada: hiciste ${Math.round(a.cut.at / 60)}' de los ${Math.round(a.cut.plan / 60)}' del workout, más la vuelta a la calma.</div>` : ''}
+    ${a.resc ? `<div class="small mut" style="margin-top:4px">El ERG se atascó ${a.resc === 1 ? 'una vez' : a.resc + ' veces'} y se quitó la resistencia unos segundos.</div>` : ''}
     ${a.prs && a.prs.length ? (fresh ? prCard(a) : `<div class="tags" style="margin-top:10px">${a.prs.map(d => `<span class="tag acc">🏆 Récord ${BEST_L[d]}: ${a.best[d]} W</span>`).join('')}</div>`) : ''}
     ${fresh && !testBox && (() => { const e = ftpEstimate(); return e && e.w >= S.ftp * 1.03 ? ftpCard(e, true) : ''; })() || ''}
     ${testBox}
@@ -3005,7 +3077,7 @@ function renderCfg(){
       <button class="btn sm ghost" style="margin-top:8px" onclick="if(confirm('¿Poner el contador a cero?')){S.aiUsage=null;S.aiTotal=null;saveS();renderCfg();}">Poner a cero</button>`;
   }
   $('iModel').innerHTML = COACH_MODELS.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); $('iModel').value = S.coachModel; $('iKey').value = S.apiKey; $('iNotes').value = S.coachNotes;
-  $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iBrinco').value = String(S.brinco == null ? 1 : +S.brinco); $('iWeek').value = String(S.weekAuto == null ? 1 : +S.weekAuto); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
+  $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iBrinco').value = String(S.brinco == null ? 1 : +S.brinco); $('iErgG').value = String(S.ergGuard === 0 ? 0 : 1); $('iWeek').value = String(S.weekAuto == null ? 1 : +S.weekAuto); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
   $('iZbg').value = String(S.zoneBg === 0 ? 0 : 1); $('iFs').value = String(S.fullscreen === 0 ? 0 : 1); $('iWp').value = wPrime();
   $('cbDom').textContent = location.hostname || '(tu dominio)';
   $('stravaState').innerHTML = S.strava ? `<span style="color:var(--ok)">● Conectado${S.strava.who ? ' como ' + esc(S.strava.who) : ''}</span>${S.lastSync ? ' · sincronizado ' + fdate(S.lastSync) : ''}` : 'No conectado';
@@ -3021,7 +3093,7 @@ function readCfg(){
   const oldPeso = S.peso, oldFtp = S.ftp;
   S.ftp = Math.round(n('iFtp', S.ftp)); S.peso = n('iPeso', S.peso); S.fcmax = Math.round(n('iFc', S.fcmax)); S.lthr = Math.round(n('iLthr', S.lthr));
   S.apiKey = $('iKey').value.trim(); S.coachModel = $('iModel').value; S.coachNotes = $('iNotes').value.trim();
-  S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.brinco = +$('iBrinco').value; S.weekAuto = +$('iWeek').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
+  S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.brinco = +$('iBrinco').value; S.ergGuard = +$('iErgG').value; S.weekAuto = +$('iWeek').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
   S.zoneBg = +$('iZbg').value; S.fullscreen = +$('iFs').value; S.wprime = Math.round(Math.max(3000, Math.min(60000, n('iWp', wPrime()))));
   if (S.ftp !== oldFtp) S.ftpHist.push({date:now(), ftp:S.ftp});
   saveS();
