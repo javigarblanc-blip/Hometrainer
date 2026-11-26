@@ -555,7 +555,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.27.0';
+const VER = '0.28.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -921,8 +921,39 @@ const PLANS = [
            {t:'Descarga', s:['tempo_3x8','rec30','z2_45prog','z2_45']}, {t:'Carga', s:['ss_1x25','rec45','an_ataques45','marcha_45']}, {t:'Puesta a punto', s:['ss_4x6','rec30','activacion','z2_40']}]},
   {id:'mant45', name:"Mantenimiento en 45'", nivel:'Todos', semanas:4, desc:'Una sesión de calidad variada, una suave y un fondo, todo en 45 minutos. Repetible.',
     weeks:[{t:'Carga', s:['ss_3x8','rec30','vo2_4x3','z2_45']}, {t:'Carga', s:['tempo_2x12','rec45','um_4x5','z2_45acel']}, {t:'Carga', s:['ss_2x12','rec30','an_3030_45','z2_45prog']}, {t:'Descarga', s:['z2_40','rec30','tempo_3x8','z2_45cad']}]},
+  // ---- v0.28: para bajar peso sin perder forma
+  {id:'afina', name:'Plan afinamiento', nivel:'Todos', semanas:8, desc:'Para bajar peso sin perder fuerza: fondos en Z2 que crecen (queman mucho y cansan poco), un sweet spot a la semana para no perder FTP y series cortas que siguen gastando después. Te marca un objetivo de kcal por semana y sigue tu peso y tus W/kg. El peso baja sobre todo con lo que comes: el rodillo ayuda a gastar más y a no perder músculo.',
+    weeks:[{t:'Arranque', s:['z2_45acel','rec45','ss_3x10','z2_60']}, {t:'Carga', s:['vo2_express','z2_45','ss_2x15','z2_75']}, {t:'Carga', s:['vo2_3015','z2_45cad','ss_3x15','z2_90']},
+           {t:'Descarga', s:['z2_45','rec30','tempo_3x12','z2_60']}, {t:'Carga', s:['vo2_4020_45','z2_45','ss_4x12','z2_90']}, {t:'Carga', s:['vo2_express','z2_45acel','ss_2x20','z2_tempo']},
+           {t:'Carga', s:['vo2_3015','z2_45cad','ss_3x20','z2_120']}, {t:'Test', s:['ss_2x15','rec30','activacion','rampa']}]},
 ];
 const planById = id => PLANS.find(p => p.id === id);
+// kJ de un workout (1 kJ de trabajo en la bici ≈ 1 kcal gastada, por un rendimiento del cuerpo de ~24 %)
+function wkKJ(wk){ if (!wk) return 0; if (wk.test === 'rampa') return 180; let j = 0; wk.segs.forEach(sg => { for (let t = 0; t < sg.d; t += 10) j += segW(sg, t) * Math.min(10, sg.d - t); }); return Math.round(j / 1000); }
+function logPeso(v){ v = Math.round(parseFloat(String(v).replace(',', '.')) * 10) / 10; if (!(v > 30 && v < 250)) return toast('Pon tu peso en kg'); const old = S.peso; S.peso = v; S.pesoHist = (S.pesoHist || []).filter(h => dkey(h.date) !== today()); S.pesoHist.push({date:now(), kg:v}); saveS(); if (old !== v && trainerOn()) sendUserCfg(); renderPlan(); toast('Peso apuntado'); }
+function afinaCard(curW){
+  const ws = PLAN.sessions.filter(x => x.week === curW), w0 = ws.length ? weekStart(kdate(ws[0].date)) : weekStart();
+  const goal = ws.filter(x => x.status !== 'skip').reduce((a, x) => a + wkKJ(wkById(x.wkId)), 0);
+  const done = ACTS.filter(a => a.date >= w0 && a.date < w0 + 7 * DAY).reduce((a, x) => a + (x.kj || 0), 0);
+  const H = (S.pesoHist || []).slice(-20), first = H[0], start = PLAN.started;
+  const p0 = (S.pesoHist || []).filter(h => h.date <= start + DAY).slice(-1)[0] || first;
+  const fh = d => { const x = S.ftpHist.filter(h => h.date <= d); return x.length ? x[x.length - 1].ftp : S.ftp; };
+  const wkg0 = p0 ? fh(p0.date) / p0.kg : null, wkg = S.ftp / S.peso;
+  const chart = H.length >= 2 ? lineChart({h:140, dp:1, yMin:Math.floor(Math.min(...H.map(h => h.kg)) - 1), yMax:Math.ceil(Math.max(...H.map(h => h.kg)) + 1), xLabels:H.map((h, i) => ({i, t:i === 0 || i === H.length - 1 ? fdm(new Date(h.date)) : ''})), series:[{vals:H.map(h => h.kg), color:'var(--acc)', w:2.5, dots:true}]}) : '';
+  return `<div class="card"><h2>afinamiento</h2>
+    <div class="small mut" style="margin:-4px 0 8px">Semana ${curW}: gasto en el rodillo</div>
+    <div style="display:flex;align-items:baseline;gap:8px"><b style="font:700 34px/1 var(--num)">${done.toLocaleString('es-ES')}</b><span class="mut">de ${goal.toLocaleString('es-ES')} kcal</span></div>
+    <div class="ibar" style="height:10px;border-radius:5px;background:var(--s2);margin:8px 0 4px;overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, goal ? done / goal * 100 : 0).toFixed(0)}%;background:var(--ok)"></i></div>
+    <div class="small mut">Es lo que gastas pedaleando (1 kJ de trabajo ≈ 1 kcal). Para bajar unos 0,5 kg a la semana hace falta un déficit de unas 500 kcal al día sumando comida y ejercicio: no compenses lo del rodillo comiendo de más.</div>
+    <h3 style="margin-top:14px">Peso y W/kg</h3>
+    <div class="kv" style="margin:6px 0">
+      <div><span>Peso</span><b>${dec(S.peso, 1)} kg</b></div>
+      <div><span>Cambio</span><b>${p0 ? (S.peso - p0.kg > 0 ? '+' : S.peso < p0.kg ? '−' : '') + dec(Math.abs(S.peso - p0.kg), 1) + ' kg' : '--'}</b></div>
+      <div><span>W/kg</span><b style="color:var(--ok)">${dec(wkg, 2)}</b>${wkg0 ? `<span class="small mut">al empezar ${dec(wkg0, 2)}</span>` : ''}</div></div>
+    ${chart}
+    <div class="row" style="gap:8px;margin-top:8px"><input type="number" id="afPeso" inputmode="decimal" step="0.1" placeholder="Peso de hoy (kg)" style="flex:1"><button class="btn sm acc" onclick="logPeso($('afPeso').value)">Apuntar</button></div>
+    <div class="small mut" style="margin-top:6px">Pésate siempre igual, mejor por la mañana. Con menos kilos y el mismo FTP subes más rápido: es lo que mide el W/kg.</div></div>`;
+}
 // Versión de 45' de cada workout largo (para adaptar cualquier plan)
 const SHORT45 = {z2_60:'z2_45', z2_75:'z2_45prog', z2_90:'z2_tempo45', z2_120:'z2_tempo45', z2_acel:'z2_45acel', z2_prog:'z2_45prog', z2_tempo:'z2_tempo45', rec_60:'rec45',
   tempo_2x15:'tempo_2x12', tempo_3x12:'tempo_3x8', tempo_2x25:'tempo_30', tempo_4x10:'tempo_2x12', tempo_40:'tempo_30',
@@ -948,6 +979,7 @@ function startPlan(id, days, when, sh = false){
     sessions.push({date:k, wkId:shortId(w.s[pick[i]], sh), week:wi + 1, status:k < tk ? 'skip' : 'pend', actId:null});
   }));
   PLAN = {id, started:now(), days, sessions, short:sh && !planFits45(pl)}; savePlan();
+  if (id === 'afina' && !(S.pesoHist || []).some(h => dkey(h.date) === today())){ S.pesoHist = (S.pesoHist || []).concat({date:now(), kg:S.peso}); saveS(); }
   closeSheet(); toast('Plan "' + pl.name + '" en marcha' + (sh && !planFits45(pl) ? " (sesiones de 45')" : '')); show('sPlan');
 }
 function todaySess(){ if (!PLAN) return null; const k = today(); return PLAN.sessions.find(s => s.date === k && s.status !== 'skip') || null; }
@@ -2620,7 +2652,7 @@ function showAct(id, fresh){
       <div><span>Máx</span><b>${a.maxP} W</b></div>
       <div><span>FC media</span><b>${a.avgHr || '--'}</b></div>
       <div><span>FC máx</span><b>${a.maxHr || '--'}</b></div>
-      <div><span>Trabajo</span><b>${a.kj} kJ</b></div>
+      <div><span>Trabajo</span><b>${a.kj} kJ</b><span class="small mut">≈ ${a.kj} kcal</span></div>
       ${a.avgC ? `<div><span>Cadencia</span><b>${a.avgC}</b></div>` : ''}
       <div><span>W/kg (NP)</span><b>${dec(a.np / S.peso, 2)}</b></div>
       <div><span>Distancia</span><b>${dec(a.dist)} km</b></div>
@@ -3294,6 +3326,7 @@ function renderPlan(){
         <div style="position:absolute;bottom:0;left:0;right:0;height:${x.done / mx * 100}%;background:var(--acc);border-radius:4px 4px 2px 2px"></div></div>`).join('')}</div>
     <div class="gscale" style="margin-top:6px">${wk.map(x => `<span style="flex:1;text-align:center">${x.w}</span>`).join('')}</div>
     ${finished ? `<button class="btn acc block lg" style="margin-top:14px" onclick="show('sLib');libTab('planes')">Elegir el siguiente plan</button>` : ''}</div></div>`;
+  if (PLAN.id === 'afina') html += afinaCard(curW);
   for (let w = 1; w <= pl.weeks.length; w++){
     const ss = PLAN.sessions.filter(s => s.week === w);
     if (!ss.length) continue;
@@ -4046,6 +4079,7 @@ function readCfg(){
   S.name = $('iName').value.trim(); S.src = $('iSrc').value; S.sound = +$('iSound').value; S.brinco = +$('iBrinco').value; S.ergGuard = +$('iErgG').value; S.pmUse = +$('iPm').value; S.weekAuto = +$('iWeek').value; S.sid = $('iSid').value.trim(); S.ssec = $('iSsec').value.trim();
   S.zoneBg = +$('iZbg').value; S.fullscreen = +$('iFs').value; S.wprime = Math.round(Math.max(3000, Math.min(60000, n('iWp', wPrime()))));
   if (S.ftp !== oldFtp) S.ftpHist.push({date:now(), ftp:S.ftp});
+  if (S.peso !== oldPeso){ S.pesoHist = (S.pesoHist || []).filter(h => dkey(h.date) !== today()); S.pesoHist.push({date:now(), kg:S.peso}); }
   saveS();
   if (S.peso !== oldPeso && trainerOn()) sendUserCfg();
 }
