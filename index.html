@@ -243,15 +243,20 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .ptop .tt{text-align:right;flex:none}
 .ptop .tt b{font:700 24px/1 var(--num);font-variant-numeric:tabular-nums;display:block}
 .ptop .tt span{font-size:11px;color:var(--mut)}
-.pprog{height:3px;background:var(--s2);border-radius:2px;overflow:hidden;margin:10px 0 0}
+.pprog{height:6px;background:var(--s2);border-radius:2px;overflow:hidden;margin:10px 0 0}
 .pprog i{display:block;height:100%;background:var(--mut);width:0}
-.pint{background:var(--s1);border-radius:16px;padding:12px 14px 0;margin:12px 0 0;overflow:hidden;transition:box-shadow .3s}
+.pint{background:var(--s1);border-radius:16px;padding:12px 14px 0;margin:12px 0 0;overflow:hidden;transition:box-shadow .3s;position:relative;--ic:var(--acc);--ip:0%}
+.pint::before{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--ip);background:var(--ic);opacity:.13;transition:width 1s linear,background .4s;pointer-events:none}
+.pint>*{position:relative}
 .pint.flash{box-shadow:inset 0 0 0 2px var(--acc)}
 .pint .top2{display:flex;justify-content:space-between;align-items:flex-end}
 .pint .lab{font-size:13px;color:var(--mut);font-weight:500}
 .pint .t{font:700 50px/1 var(--num);font-variant-numeric:tabular-nums;margin-top:2px}
-.pint .ibar{height:4px;background:var(--s2);margin:12px -14px 0}
-.pint .ibar i{display:block;height:100%;background:var(--acc);width:0;transition:width 1s linear}
+.pint .ibar{height:10px;background:var(--s2);margin:12px -14px 0}
+.pint .ibar i{display:block;height:100%;background:var(--ic);width:0;transition:width 1s linear,background .4s}
+.pint.end .ibar i{animation:ibp .5s ease-in-out infinite alternate}
+@keyframes ibp{from{opacity:1}to{opacity:.35}}
+.pctl .half{grid-column:span 2;flex-direction:row;padding:10px 4px}
 .ptile{text-align:center;padding:10px 0 4px;position:relative}
 .ptile .zl{display:inline-flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:var(--mut)}
 .pw{font:700 clamp(110px,34vw,230px)/.88 var(--num);font-variant-numeric:tabular-nums;transition:color .3s;margin-top:2px;letter-spacing:-.02em}
@@ -276,6 +281,9 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .scene{position:relative;border-radius:14px;overflow:hidden;background:var(--s1)}
 .scene svg{display:block;width:100%;height:150px}
 .scene .mk{position:absolute;transform:translate(-50%,-100%);width:34px;height:34px;border-radius:50%;border:3px solid var(--acc);background:var(--s1) center/cover;box-shadow:0 3px 8px rgba(0,0,0,.35);transition:left 1s linear,top 1s linear;z-index:2}
+.emptyc{display:flex;gap:14px;align-items:flex-start}
+.emptyc img{width:84px;height:84px;object-fit:contain;flex:none}
+.scene .chm{position:absolute;transform:translate(-50%,-100%);font-size:20px;line-height:1;z-index:1;transition:left 1s linear,top 1s linear;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
 .scene .mk.gh{border-color:var(--mut);border-style:dashed;opacity:.6;filter:grayscale(1);z-index:1}
 .scene .lbl{position:absolute;bottom:4px;font:700 11px var(--body);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);transform:translateX(-50%)}
 .scene .gap{position:absolute;left:8px;top:6px;font:700 13px var(--body);padding:3px 8px;border-radius:8px;background:var(--s1);opacity:.92}
@@ -340,7 +348,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   <div id="heroBox"></div>
   <div class="quick" id="quickBox"></div>
   <div class="card coachcard" id="coachCard" style="margin-top:10px" onclick="openCoach()"></div>
-  <div id="weekCard"></div>
+  <div id="weekRep"></div>
   <div id="backupCard"></div>
   <div class="sec"><h2>Forma</h2><button class="link" onclick="show('sAna');anaTab('forma')">Ver análisis</button></div>
   <div class="card" id="formCard"></div>
@@ -516,7 +524,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.19.0';
+const VER = '0.20.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -961,7 +969,61 @@ const VAR_ROUTES = [
   genRoute('v50_valle', 'Vuelta por el valle · 50\'', [[2.3,0.5],[1.6,3],[2.3,5],[2.3,-4.5],[3.1,0.5],[1.2,6.5],[1.6,-5],[2.3,1],[0.8,-1]], 79, 600),
   genRoute('v50_dospuertos', 'Dos puertos · 50\'', [[1.4,1],[2.8,6],[2.8,-6],[1.4,0.5],[2.5,7],[2.5,-6.5],[1.4,0.5]], 83, 650),
 ];
-const allRoutes = () => ROUTES.concat(VAR_ROUTES, GEN_ROUTES);
+// Puertos reales de la zona (v0.20): perfil aproximado por tramos con su longitud, desnivel y rampas publicados.
+// Cada puerto tiene su versión entera y un final de unos 40-45' para los días de poco tiempo.
+function realClimb(id, name, tramos, seed, base, info){ const rt = genClimb(id, 'x', tramos, seed, base); rt.name = name; rt.src = 'real'; rt.info = info; return rt; }
+function climbTail(tramos, km){ const out = []; let left = km; for (let i = tramos.length - 1; i >= 0 && left > .05; i--){ const [k, g] = tramos[i], use = Math.min(k, left); out.unshift([Math.round(use * 10) / 10, g]); left -= use; } return out; }
+const tramosGain = tr => tr.reduce((a, [k, g]) => a + k * 10 * g, 0);
+const REAL_DEF = [
+  // id, nombre, tramos [km, %], semilla, altitud de salida, km del final (negativo: los primeros km, donde está lo duro), texto
+  ['r_pfrancia', 'Peña de Francia (El Cabaco)', [[1,2.5],[2,4.5],[2,5.5],[1,2],[2,5.5],[1,4],[1,8],[1,9],[.8,11],[.7,8.5],[.5,7]], 131, 950, 6,
+    'Desde El Cabaco, unos 13 km y 750 m hasta el santuario (1.723 m). Los últimos 4 km, por encima del 8 % con rampas del 11-12 %.'],
+  ['r_covatilla', 'La Covatilla (Béjar)', [[2,4],[3,6],[2,3],[3,3],[2,7],[2,8],[2,7.5],[1.5,9],[1.5,7.5],[.9,6]], 137, 820, 6,
+    'Desde Béjar por Candelario y La Hoya: unos 20 km al 5,8 % hasta la estación de esquí (1.966 m). Final de Vuelta.'],
+  ['r_penanegra', 'Peña Negra (Piedrahíta)', [[1,4],[2,5.5],[2,6.5],[2,6],[1.5,7],[2,6.5],[2,5.5],[1.5,6],[.7,4]], 139, 1050, 7,
+    'Desde Piedrahíta, 14,7 km al 5,8 % hasta 1.909 m. Subida regular, sin rampas muy duras.'],
+  ['r_honduras', 'Puerto de Honduras (Cabezuela)', [[1,4],[2,6.5],[2,7.5],[2,7],[1,8.5],[2,6.5],[2,6],[1.5,2.5],[1,4],[1.4,2.5],[1,3.5]], 149, 505, -6,
+    'Desde Cabezuela del Valle (Jerte), unos 17 km y 930 m hasta 1.433 m. Lo duro está en los primeros 12 km.']
+];
+const REAL_ROUTES = [];
+REAL_DEF.forEach(([id, name, tr, seed, base, fin, info]) => {
+  REAL_ROUTES.push(realClimb(id, name, tr, seed, base, info));
+  const head = fin < 0, km = Math.abs(fin);
+  const part = head ? climbTail(tr.slice().reverse(), km).reverse() : climbTail(tr, km), b0 = head ? base : Math.round(base + tramosGain(tr) - tramosGain(part));
+  REAL_ROUTES.push(realClimb(id + '_f', name.replace(/ \(.*\)/, '') + (head ? ': primeros ' : ': últimos ') + km + ' km', part, seed + 1, b0, (head ? 'La parte dura del puerto' : 'Final del puerto') + ', para los días de 40-45 minutos. ' + info));
+});
+const allRoutes = () => ROUTES.concat(REAL_ROUTES, VAR_ROUTES, GEN_ROUTES);
+// ===== Retos por medallas (v0.20): tiempos calculados con tu FTP de hoy, así que se endurecen cuando mejoras =====
+const CHAL = [{k:'bronce', n:'Bronce', e:'🥉', f:.70}, {k:'plata', n:'Plata', e:'🥈', f:.80}, {k:'oro', n:'Oro', e:'🥇', f:.90}];
+const chalByK = k => CHAL.find(c => c.k === k);
+function chalTimes(r, ftp = S.ftp){ const o = {}; CHAL.forEach(c => { o[c.k] = Math.round(routeETA(r, ftp * c.f)); }); return o; }
+function medalFor(r, secs, ftp){ if (!secs) return null; const t = chalTimes(r, ftp); let m = null; CHAL.forEach(c => { if (secs <= t[c.k]) m = c; }); return m; }
+function medalNow(r){ const g = ghostOf(r.id); return g ? medalFor(r, g.dur) : null; }
+// ritmo del reto: segundo en que pasarías por cada 100 m a esos vatios (mismo formato que el fantasma)
+function chalPace(r, watts){
+  const t = [0]; let acc = 0, k = 1;
+  for (let i = 1; i < r.d.length; i++){ acc += (r.d[i] - r.d[i - 1]) / Math.max(.8, eqSpeed(watts, r.g[i])); while (k * 100 <= r.d[i]){ t.push(Math.round(acc)); k++; } }
+  return {t, dur:Math.round(acc)};
+}
+function chalGap(){ const c = P.chal; if (!c || P.rDist < 50) return null; return {s:Math.round(P.rec.p.length - ghostTime(c, P.rDist))}; }
+let ROUTE_CHAL = null; // null = la siguiente medalla que no tienes
+function chalDefault(r){ const m = medalNow(r), i = m ? CHAL.indexOf(m) : -1; return CHAL[Math.min(CHAL.length - 1, i + 1)].k; }
+function chalCard(r){
+  const t = chalTimes(r), g = ghostOf(r.id), m = g ? medalFor(r, g.dur) : null, sel = ROUTE_CHAL || chalDefault(r);
+  const hist = ACTS.filter(a => a.wkId === 'route:' + r.id && a.chal && a.chal.got).map(a => ({c:chalByK(a.chal.got), ftp:a.chal.ftp}));
+  const bestHist = hist.length ? hist.reduce((b, x) => CHAL.indexOf(x.c) > CHAL.indexOf(b.c) ? x : b) : null;
+  const next = CHAL.find(c => !m || CHAL.indexOf(c) > CHAL.indexOf(m));
+  let msg = '';
+  if (bestHist && (!m || CHAL.indexOf(bestHist.c) > CHAL.indexOf(m)) && bestHist.ftp < S.ftp) msg = `¡Tu FTP ha subido! Ganaste el ${bestHist.c.e} ${bestHist.c.n.toLowerCase()} con ${bestHist.ftp} W y ahora pide ${clock(t[bestHist.c.k])}. Vuelve a por él.`;
+  else if (g && next) msg = `Tu mejor vez (${clock(g.dur)}) ${m ? 'vale ' + m.e + ' ' + m.n.toLowerCase() : 'aún no llega al bronce'}. Para ${next.e} ${next.n.toLowerCase()} te faltan ${clock(g.dur - t[next.k])}.`;
+  else if (g) msg = `¡Tienes el oro con tu FTP de hoy! Si tu FTP sube, el reto también.`;
+  else msg = 'Complétalo para ganar tu primera medalla.';
+  return `<div class="card" style="margin:12px 0"><b>Retos</b><div class="small mut" style="margin-top:2px">Tiempos con tu FTP de hoy (${S.ftp} W) y tu peso: subir al ${CHAL.map(c => Math.round(c.f * 100) + ' %').join(', ')} del FTP. Cuando mejoras, se endurecen.</div>
+    <div class="seg" id="chSeg" style="margin:10px 0 0">${CHAL.map(c => `<button data-v="${c.k}" class="${sel === c.k ? 'on' : ''}" onclick="ROUTE_CHAL='${c.k}';document.querySelectorAll('#chSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v==='${c.k}'))" style="${m && CHAL.indexOf(c) <= CHAL.indexOf(m) ? 'box-shadow:inset 0 0 0 2px var(--ok)' : ''}">${c.e} ${clock(t[c.k])}</button>`).join('')}
+      <button data-v="no" class="${sel === 'no' ? 'on' : ''}" onclick="ROUTE_CHAL='no';document.querySelectorAll('#chSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v==='no'))">Sin reto</button></div>
+    <div class="small" style="margin-top:8px">${msg}</div>
+    <div class="small mut" style="margin-top:4px">En la sesión verás si vas por delante o por detrás del ritmo de la medalla que elijas (marcada en la escena).</div></div>`;
+}
 const routeById = id => allRoutes().find(r => r.id === id);
 const gcol = g => g < -1 ? '#3d8bff' : g < 3 ? '#2bc48a' : g < 6 ? '#f2c230' : g < 9 ? '#ff8a2a' : g < 12 ? '#ff4d5e' : '#b0306a';
 function routeSVG(r, cls = '', pos = null, H = 100){
@@ -1003,13 +1065,13 @@ function routeScene(r, pos, gpos){
   let lbl = '', step = span > 2000 ? 1000 : 500;
   for (let k = Math.ceil(x0 / step) * step; k <= x0 + span; k += step) if (X(k) > 20 && X(k) < W - 20) lbl += `<div class="lbl" style="left:${(X(k) / W * 100).toFixed(2)}%">${dec(k / 1000, step < 1000 ? 1 : 0)} km</div>`;
   const mk = (x, cls) => `<div class="mk${cls}" style="left:${(X(x) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, x)) / H * 100).toFixed(2)}%;background-image:url(mascota/avatar.webp)"></div>`;
-  const gp = gpos != null ? ghostGap() : null;
+  const gp = gpos != null ? ghostGap() : null, cg = P.on && P.chal ? chalGap() : null, cpos = P.on && P.chal ? ghostDist(P.chal, P.rec.p.length) : null, cc = P.chal ? chalByK(P.chal.k) : null;
   return `<div class="scene"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${skyDefs('skyP')}
       <rect width="${W}" height="${H}" fill="url(#skyP)"/><circle cx="${W * .8}" cy="${H * .22}" r="11" style="fill:var(--sun)" opacity=".55"/>
       <path d="${m1}" style="fill:var(--mnt1)"/><path d="${m2}" style="fill:var(--mnt2)"/>
       ${ground}<path d="${road}" fill="none" style="stroke:var(--txt)" stroke-width="1.4" opacity=".55" vector-effect="non-scaling-stroke"/>${done}</svg>
-    ${lbl}${gpos != null && gpos >= x0 && gpos <= x0 + span ? mk(gpos, ' gh') : ''}${mk(pos, '')}
-    ${gp ? `<div class="gap" style="color:${gp.s <= 0 ? 'var(--ok)' : 'var(--err)'}">Fantasma: ${gp.s <= 0 ? 'vas ' + clock(-gp.s) + ' por delante' : 'vas ' + clock(gp.s) + ' por detrás'}</div>` : ''}</div>`;
+    ${lbl}${cpos != null && cpos >= x0 && cpos <= x0 + span ? `<div class="chm" style="left:${(X(cpos) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, cpos)) / H * 100).toFixed(2)}%">${cc.e}</div>` : ''}${gpos != null && gpos >= x0 && gpos <= x0 + span ? mk(gpos, ' gh') : ''}${mk(pos, '')}
+    ${gp || cg ? `<div class="gap">${gp ? `<span style="color:${gp.s <= 0 ? 'var(--ok)' : 'var(--err)'}">Fantasma: ${gp.s <= 0 ? 'vas ' + clock(-gp.s) + ' por delante' : 'vas ' + clock(gp.s) + ' por detrás'}</span>` : ''}${gp && cg ? '<br>' : ''}${cg ? `<span style="color:${cg.s <= 0 ? 'var(--ok)' : 'var(--err)'}">${cc.e} ${cg.s <= 0 ? clock(-cg.s) + ' por delante' : clock(cg.s) + ' por detrás'}</span>` : ''}</div>` : ''}</div>`;
 }
 function routeIdx(r, x){ return Math.max(0, Math.min(r.d.length - 1, Math.round(x / STEP))); }
 const routeGrade = (r, x) => r.g[routeIdx(r, x)];
@@ -1028,8 +1090,9 @@ const kmTxt = m => dec(m / 1000, m < 10000 ? 1 : 0) + ' km';
 let ROUTE_DIFF = 1;
 function renderRoutes(){
   const card = r => `<div class="wkc" onclick="openRoute('${r.id}')"><div class="viz">${routeSVG(r)}</div><div class="body">
-      <div style="min-width:0"><span class="nm">${esc(r.name)}</span><div class="meta">${kmTxt(r.dist)}, +${r.gain} m, media ${dec(r.avgG)} %</div></div>
+      <div style="min-width:0"><span class="nm">${(m => m ? m.e + ' ' : '')(medalNow(r))}${esc(r.name)}</span><div class="meta">${kmTxt(r.dist)}, +${r.gain} m, media ${dec(r.avgG)} %</div></div>
       <div class="side"><b>${dur(routeETA(r, S.ftp * .75))}</b><span>a ${Math.round(S.ftp * .75)} W</span></div></div></div>`;
+  ROUTE_CHAL = null;
   $('libBox').innerHTML = `<div class="grid2" style="margin-bottom:6px">
       <button class="btn" onclick="$('gpxFile').click()">${ICON.plus.replace(/22/g, '16')} Importar GPX</button>
       <button class="btn" onclick="stravaRoutesSheet()">Desde Strava</button></div>
@@ -1037,6 +1100,7 @@ function renderRoutes(){
     <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" style="display:none" onchange="importGPX(this)">
     <div class="small mut" style="margin:6px 2px 4px">Exporta el GPX de una ruta de Strava, Wikiloc o Komoot, o usa una salida tuya de Strava. El rodillo reproduce sus pendientes.</div>
     ${ROUTES.length ? `<div class="wkhead"><b>Tus trayectos</b><span>${ROUTES.length}</span></div>${ROUTES.slice().reverse().map(card).join('')}` : ''}
+    <div class="wkhead"><b>Puertos de la zona</b><span>enteros y sus finales de 40-45'</span></div>${REAL_ROUTES.map(card).join('')}
     <div class="wkhead"><b>Trayectos variados</b><span>subidas, llanos y bajadas</span></div>${VAR_ROUTES.map(card).join('')}
     <div class="wkhead"><b>Puertos tipo</b><span>perfiles de ejemplo</span></div>${GEN_ROUTES.map(card).join('')}`;
 }
@@ -1052,11 +1116,12 @@ function importGPX(inp){
 }
 function openRoute(id){
   const r = routeById(id); if (!r) return;
+  ROUTE_CHAL = null;
   const climbs = []; // tramo más duro de 1 km
   let best = {g:-99, at:0}; const w = Math.round(1000 / STEP);
   for (let i = 0; i + w < r.d.length; i += 4){ const g = (r.e[i + w] - r.e[i]) / (r.d[i + w] - r.d[i]) * 100; if (g > best.g) best = {g, at:r.d[i]}; }
   openSheet(`<h2>${esc(r.name)}</h2>
-    <div class="small mut" style="margin-top:2px">${r.src === 'tipo' ? 'Perfil de ejemplo' : r.src === 'strava' ? 'Desde una salida de Strava' : 'Importado de GPX'}</div>
+    <div class="small mut" style="margin-top:2px">${r.src === 'tipo' ? 'Perfil de ejemplo' : r.src === 'real' ? 'Puerto real · perfil aproximado' : r.src === 'strava' ? 'Desde una salida de Strava' : 'Importado de GPX'}</div>
     <div style="margin-top:14px;background:var(--viz);border-radius:12px;padding:6px 4px 2px">${kmProfileSVG(r)}</div>
     <div class="row small mut" style="gap:12px;margin-top:8px;flex-wrap:wrap">${[[-3, '<0 %'], [2, '0-3'], [4, '3-6'], [7, '6-9'], [10, '9-12'], [13, '>12 %']].map(([g, t]) => `<span><i class="tdot" style="background:${gcol(g)}"></i> ${t}</span>`).join('')}</div>
     <div class="kv">
@@ -1067,6 +1132,8 @@ function openRoute(id){
       <div><span>Km más duro</span><b>${dec(best.g)} %</b></div>
       <div><span>Tiempo a ${Math.round(S.ftp * .75)} W</span><b>${dur(routeETA(r, S.ftp * .75))}</b></div>
     </div>
+    ${r.info ? `<div class="small mut" style="margin-top:10px">${esc(r.info)} El perfil está hecho por tramos con esos datos, no con un GPX: las rampas reales pueden variar un poco.</div>` : ''}
+    ${chalCard(r)}
     ${(() => { const g = ghostOf(r.id); return g ? `<div class="card" style="margin:12px 0;display:flex;gap:12px;align-items:center"><div style="width:44px;height:44px;border-radius:50%;border:3px dashed var(--mut);background:url(mascota/avatar.webp) center/cover;filter:grayscale(1);opacity:.7;flex:none"></div>
       <div style="flex:1;min-width:0"><b>Tu mejor vez: ${clock(g.dur)}</b><div class="small mut">${fdate(g.date)}. Tu fantasma sale contigo y verás si vas por delante o por detrás.</div>
       <div class="seg" id="ghSeg" style="margin:8px 0 0">${[[1, 'Con fantasma'], [0, 'Sin fantasma']].map(([v, t]) => `<button data-v="${v}" class="${+ROUTE_GHOST === v ? 'on' : ''}" onclick="ROUTE_GHOST=${!!v};document.querySelectorAll('#ghSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===${v}))">${t}</button>`).join('')}</div></div></div>`
@@ -1076,7 +1143,7 @@ function openRoute(id){
     <div class="small mut">Al 50 % una rampa del 10 % se nota como un 5 %. La velocidad y el tiempo se calculan siempre con la pendiente real. Un rodillo de rueda como el X3 no llega a simular rampas muy duras: por encima del 8-10 % notarás el tope.</div>
     <button class="btn acc block lg" style="margin-top:14px" onclick="startSession(null,null,routeById('${r.id}'))">${ICON.play} Empezar trayecto</button>
     <button class="btn ghost block" style="margin-top:8px" onclick="openTrainerTest()">Probar antes la resistencia del rodillo</button>
-    ${r.src !== 'tipo' ? `<button class="btn red block" style="margin-top:10px" onclick="delRoute('${r.id}')">Borrar trayecto</button>` : ''}`);
+    ${r.src !== 'tipo' && r.src !== 'real' ? `<button class="btn red block" style="margin-top:10px" onclick="delRoute('${r.id}')">Borrar trayecto</button>` : ''}`);
 }
 // ================= Prueba de resistencia del rodillo (v0.18) =================
 // Pendiente o vatios a mano, sin grabar, para comprobar que el rodillo responde bien.
@@ -1232,7 +1299,7 @@ function coachContext(focusActId){
   } else L.push('PLAN ACTIVO: ninguno.');
   L.push('ACTIVIDADES ÚLTIMOS 21 DÍAS:');
   const since = now() - 21 * DAY;
-  ACTS.filter(a => a.date >= since).forEach(a => L.push(`- ${dkey(a.date)} rodillo "${a.name}" ${dur(a.dur)} TSS ${a.tss} NP ${a.np} W IF ${dec(a.ifv, 2)}${a.avgHr ? ' FC media ' + a.avgHr + ' máx ' + a.maxHr : ''}${a.rpe ? ' RPE ' + a.rpe + '/10' : ''}${a.note ? ' nota: "' + a.note + '"' : ''}`));
+  ACTS.filter(a => a.date >= since).forEach(a => L.push(`- ${dkey(a.date)} rodillo "${a.name}" ${dur(a.dur)} TSS ${a.tss} NP ${a.np} W IF ${dec(a.ifv, 2)}${a.avgHr ? ' FC media ' + a.avgHr + ' máx ' + a.maxHr : ''}${a.rpe ? ' RPE ' + a.rpe + '/10' : ''}${actDec(a) ? ' deriva del pulso ' + dec(actDec(a).pct) + ' %' : ''}${a.note ? ' nota: "' + a.note + '"' : ''}`));
   EXT.filter(e => e.date >= since).forEach(e => L.push(`- ${dkey(e.date)} Strava ${SPORT(e.sport)} "${e.name}" ${dur(e.dur)}${e.dist ? ' ' + dec(e.dist / 1000) + ' km' : ''} TSS≈${e.tss} (${e.how})${e.hr ? ' FC media ' + Math.round(e.hr) : ''}`));
   const best = allTimeBest(null); const bl = [5, 60, 300, 1200].filter(d => best[d]).map(d => `${BEST_L[d]} ${best[d].w} W`);
   if (bl.length) L.push(`MEJORES POTENCIAS: ${bl.join(', ')}.`);
@@ -1708,7 +1775,8 @@ function startSession(wk, sessKey, route){
     on:true, wk, route:route || null, mult:(S.todayMult && S.todayMult.date === today() && wk) ? S.todayMult.mult : 1, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
     wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
     start:null, rec:newRec(), dist:0, cum:[0], prRef:liveRef(), prSaid:{}, brAt:0, brStart:0, brHalf:0, brKm:0, brRamp:0, lastSent:null, lastChart:0, p3:[],
-    w0:wPrime(), wbal:wPrime(), wLow:0, np4:0, npN:0, ghost:route && ROUTE_GHOST ? ghostOf(route.id) : null, gSide:null, brGh:0,
+    w0:wPrime(), wbal:wPrime(), wLow:0, cutAt:0, origTotal:0, rescN:0, resc:null, edits:0, np4:0, npN:0, ghost:route && ROUTE_GHOST ? ghostOf(route.id) : null, gSide:null, brGh:0,
+    chal:(() => { if (!route) return null; const k = ROUTE_CHAL || chalDefault(route); const c = chalByK(k); return c ? Object.assign(chalPace(route, S.ftp * c.f), {k, ftp:S.ftp}) : null; })(), cSide:null, brCh:0,
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
     total: wk ? wkDur(wk) : 0
   });
@@ -1732,6 +1800,7 @@ function renderRoute(){
   $('pIntT').innerHTML = `<span style="color:${gcol(g)}">${dec(g)}<small>%</small></span>`;
   $('pTgtLab').textContent = 'Quedan'; $('pTgt').innerHTML = kmTxt(left).replace(' km', '<small>km</small>');
   const pc = P.rDist / r.dist * 100; $('pIntProg').style.width = pc + '%'; $('pProg').style.width = pc + '%';
+  { const b = $('pIntBox'); b.style.setProperty('--ip', pc.toFixed(1) + '%'); b.style.setProperty('--ic', gcol(g)); b.classList.remove('end'); }
   const ahead = Math.min(500, left), gA = ahead > 50 ? (routeEle(r, P.rDist + ahead) - routeEle(r, P.rDist)) / ahead * 100 : 0;
   $('pNext').textContent = ahead > 50 ? `Próximos ${Math.round(ahead)} m: media del ${dec(gA)} %` : 'Últimos metros';
 }
@@ -1744,6 +1813,8 @@ const BR = {
   wlow:['Te queda poca reserva (W\'). Aguanta el ritmo, no lo subas.', 'Depósito casi vacío. Constante y respira, que ya queda poco.'],
   gpass:['¡Has adelantado a tu fantasma! Vas por delante de tu mejor vez.', '¡Croac! Le has pasado a tu mejor vez. Mantén.'],
   glost:['Tu fantasma te pasa. ¡Aprieta un poco!', 'Tu mejor vez va por delante. ¡A por ella!'],
+  cpass:['¡Vas a ritmo de {m}! Mantén estos vatios.', '¡Croac! Vas por delante del ritmo de {m}.'],
+  clost:['Te quedas por detrás del ritmo de {m}. Sube un poco los vatios.', 'El {m} se escapa: aprieta un pelín, que se puede.'],
   easy:['Recupera: suelta piernas y bebe un trago.', 'Respira. Aprovecha para beber y relajar los hombros.', 'Recuperación. Baja pulsaciones, que viene más.'],
   last:['¡Último bloque duro! Vacía el depósito.', '¡El último! Aquí se gana la forma.', 'Último esfuerzo, ¡a por él!'],
   cool:['Vuelta a la calma. ¡Buen trabajo!', 'Ya está lo duro. Gira suave y estira después.'],
@@ -1799,7 +1870,7 @@ function brTick(){
     if (!P.brKm && P.route.dist > 3000 && P.route.dist - P.rDist <= 1000){ P.brKm = 1; brSay(brPick('lastkm'), 'puerto'); }
     const g = routeGrade(P.route, P.rDist) * P.diff;
     if (g >= 8 && now() - P.brRamp > 180000 && now() - P.brAt > 20000){ P.brRamp = now(); brSay(brPick('ramp', {g:Math.round(g)}), 'puerto'); }
-    brGhost();
+    brGhost(); brChal();
   }
   if (!P.wk && P.wt > 0 && P.wt % 1200 === 0) brSay(brPick('drink'), 'bebe');
   if (P.wbal != null && P.wk && P.wbal / P.w0 < .2 && !P.wLow && now() - P.brAt > 15000){ P.wLow = 1; brSay(brPick('wlow')); }
@@ -1847,6 +1918,15 @@ function brGhost(){
   }
   if (ahead) P.gSide = 'a'; else if (behind) P.gSide = 'b';
 }
+function brChal(){
+  const gp = chalGap(); if (!gp || P.rDist < 300) return;
+  const c = chalByK(P.chal.k), m = c.e + ' ' + c.n.toLowerCase(), ahead = gp.s < -3, behind = gp.s > 3;
+  if (P.cSide != null && now() - P.brCh > 120000 && now() - P.brAt > 20000){
+    if (ahead && P.cSide === 'b'){ P.brCh = now(); brSay(brPick('cpass', {m})); buzz([60, 40, 60]); }
+    else if (behind && P.cSide === 'a'){ P.brCh = now(); brSay(brPick('clost', {m})); }
+  }
+  if (ahead) P.cSide = 'a'; else if (behind) P.cSide = 'b';
+}
 const gapTxt = s => (s > 0 ? '+' : s < 0 ? '−' : '') + clock(Math.abs(s));
 
 // ================= W' (reserva anaeróbica, modelo de Skiba con CP = FTP) =================
@@ -1876,7 +1956,8 @@ const FIELDS = {
   spd:  {n:'Velocidad', f:() => [dec(P.route ? P.vSpd * 3.6 : curSpd()), 'km/h']},
   dist: {n:'Distancia', f:() => [dec((P.route ? P.rDist : P.dist) / 1000, 1), 'km']},
   gain: {n:'Desnivel subido', f:() => ['+' + Math.round(P.gain || 0), 'desnivel (m)']},
-  ghost:{n:'Fantasma (mejor vez)', f:() => { const gp = ghostGap(); if (!P.ghost) return ['+' + Math.round(P.gain || 0), 'desnivel (m)']; if (!gp) return ['0:00', 'vs mejor vez']; return [gapTxt(gp.s), gp.s <= 0 ? 'por delante' : 'por detrás', gp.s <= 0 ? 'var(--ok)' : 'var(--err)']; }},
+  chal: {n:'Reto (medalla)', f:() => { if (!P.chal) return ['--', 'sin reto']; const gp = chalGap(), c = chalByK(P.chal.k); if (!gp) return ['0:00', 'vs ' + c.e]; return [gapTxt(gp.s), c.e + (gp.s <= 0 ? ' por delante' : ' por detrás'), gp.s <= 0 ? 'var(--ok)' : 'var(--err)']; }},
+  ghost:{n:'Fantasma (mejor vez)', f:() => { const gp = ghostGap(); if (!P.ghost) return P.chal ? FIELDS.chal.f() : ['+' + Math.round(P.gain || 0), 'desnivel (m)']; if (!gp) return ['0:00', 'vs mejor vez']; return [gapTxt(gp.s), gp.s <= 0 ? 'por delante' : 'por detrás', gp.s <= 0 ? 'var(--ok)' : 'var(--err)']; }},
   time: {n:'Tiempo total', f:() => [clock(P.rec.p.length), 'tiempo']}
 };
 const FIELD_DEF = {wk:['hr', 'wbal', 'left', 'np', 'tss', 'kj'], route:['hr', 'spd', 'ghost', 'left', 'gain', 'wbal'], free:['hr', 'avg', 'kj', 'np', 'tss', 'wbal']};
@@ -1890,7 +1971,7 @@ function renderStats(){
 function pickField(i){
   const c = fctx(), cur = curFields();
   openSheet(`<h2>Dato ${i + 1}</h2><div class="small mut" style="margin:-4px 0 12px">Elige qué ves en este hueco. Se guarda para ${c === 'route' ? 'los trayectos' : c === 'wk' ? 'los workouts' : 'rodar libre'}.</div>
-    <div class="grid2">${Object.entries(FIELDS).filter(([k]) => c === 'route' || !['ghost', 'gain'].includes(k)).map(([k, f]) => `<button class="btn${cur[i] === k ? ' acc' : ''}" style="justify-content:flex-start;text-align:left" onclick="setField(${i},'${k}')">${f.n}</button>`).join('')}</div>
+    <div class="grid2">${Object.entries(FIELDS).filter(([k]) => c === 'route' || !['ghost', 'gain', 'chal'].includes(k)).map(([k, f]) => `<button class="btn${cur[i] === k ? ' acc' : ''}" style="justify-content:flex-start;text-align:left" onclick="setField(${i},'${k}')">${f.n}</button>`).join('')}</div>
     <h3 style="margin-top:16px">Cuántos datos</h3>
     <div class="seg">${[3, 6].map(n => `<button class="${(+S.nFields === 6 ? 6 : 3) === n ? 'on' : ''}" onclick="S.nFields=${n};saveS();closeSheet();renderStats()">${n} datos</button>`).join('')}</div>`);
 }
@@ -1954,7 +2035,7 @@ function tick(){
       vs = P.vSpd * 3.6; r.rd.push(Math.round(P.rDist));
     }
     r.t.push(Math.round((now() - P.start) / 1000));
-    r.p.push(Math.round(pw)); r.hr.push(curHR()); r.c.push(Math.round(curCad())); r.s.push(Math.round(vs * 10)); r.wt.push(P.wt);
+    r.p.push(Math.round(pw)); r.hr.push(curHR()); r.c.push(Math.round(curCad())); r.s.push(Math.round(vs * 10)); r.wt.push(P.wt); if (P.wk){ curSeg(); (r.si = r.si || []).push(P.segI); }
     P.dist += vs / 3.6;
     P.wt++;
     P.wbal = Math.min(P.w0, wStep(P.wbal, pw, S.ftp, P.w0));
@@ -2006,6 +2087,7 @@ function render(){
     $('pTgtLab').textContent = P.mode === 'erg' ? 'Objetivo' : 'Guía';
     $('pTgt').textContent = tgt + ' W';
     $('pIntProg').style.width = (el / seg.d * 100) + '%';
+    { const b = $('pIntBox'); b.style.setProperty('--ip', (el / seg.d * 100).toFixed(1) + '%'); b.style.setProperty('--ic', ZH[zone(segInt(seg) * P.mult)] || 'var(--acc)'); b.classList.toggle('end', left <= 10 && P.running); }
     $('pProg').style.width = (P.wt / P.total * 100) + '%';
     const nx = P.wk.segs[P.segI + 1];
     const nw = nx ? segW(nx, 0, P.mult) + (nx.p0 != null ? '-' + segW(nx, nx.d, P.mult) : '') : '';
@@ -2016,7 +2098,7 @@ function render(){
     $('pIntT').textContent = dec(P.dist / 1000) + ' km';
     $('pTgtLab').textContent = P.mode === 'erg' ? 'Vatios' : 'Pendiente';
     $('pTgt').textContent = P.mode === 'erg' ? P.ergW + ' W' : dec(P.grade) + ' %';
-    $('pIntProg').style.width = '0'; $('pProg').style.width = '0';
+    $('pIntProg').style.width = '0'; $('pProg').style.width = '0'; $('pIntBox').style.setProperty('--ip', '0%'); $('pIntBox').classList.remove('end');
     nxEl.textContent = '';
   }
   nxEl.classList.toggle('soon', soon);
@@ -2063,6 +2145,7 @@ function renderCtl(){
   const [lm, lp] = P.mode === 'grade' ? ['−0,5 %', '+0,5 %'] : P.wk ? ['−5 %', '+5 %'] : ['−10 W', '+10 W'];
   b.push(`<button class="btn" onclick="adj(-1)">${ICON.minus}${lm}</button>`, `<button class="btn" onclick="adj(1)">${ICON.plus}${lp}</button>`);
   if (!P.wk) b.push(`<button class="btn" onclick="adj(0)">${ICON.reset}${P.mode === 'erg' ? 'Reset' : 'Llano'}</button>`);
+  if (P.wk && P.wk.test !== 'rampa') b.push(`<button class="btn half" onclick="segLen(-1)">${ICON.minus}1' este bloque</button>`, `<button class="btn half" onclick="segLen(1)">${ICON.plus}1' este bloque</button>`);
   b.push(`<button class="btn full" onclick="toggleMode()"><span>Modo <b style="color:var(--acc)">${P.mode === 'erg' ? 'ERG' : 'pendiente'}</b><span class="mut">: ${P.mode === 'erg' ? 'el rodillo fija los vatios' : 'tú controlas el esfuerzo'}. Toca para cambiar</span></span></button>`);
   $('pCtl').innerHTML = b.join('');
 }
@@ -2075,6 +2158,22 @@ function skipSeg(){
   if (!P.wk) return;
   if (P.segI >= P.wk.segs.length - 1){ if (confirm('Es el último intervalo. ¿Terminar el entreno?')) endSession(); return; }
   P.wt = P.starts[P.segI + 1]; curSeg(); P.lastSegI = P.segI; applyTarget(true); render(); drawPlayerChart();
+}
+// alarga o acorta el bloque actual 1 minuto (sin bajar de 10 s por delante)
+function segLen(dir){
+  if (!P.wk || P.wk.test === 'rampa') return;
+  curSeg();
+  const seg = P.wk.segs[P.segI], el = P.wt - P.starts[P.segI];
+  const nd = dir > 0 ? seg.d + 60 : Math.max(el + 10, seg.d - 60);
+  if (nd === seg.d) return toast('Este bloque ya está terminando');
+  const segs = P.wk.segs.slice(); segs[P.segI] = Object.assign({}, seg, {d:nd});
+  P.edits = (P.edits || 0) + nd - seg.d;
+  P.wk = Object.assign({}, P.wk, {segs});
+  P.starts = segs.reduce((a, s, i) => (a.push(i ? a[i-1] + segs[i-1].d : 0), a), []);
+  P.total = wkDur(P.wk);
+  beep(dir > 0 ? 990 : 740, 120); buzz(60);
+  toast((dir > 0 ? 'Bloque alargado' : 'Bloque acortado') + ': quedan ' + clock(nd - el));
+  wake(); render(); drawPlayerChart();
 }
 function adj(dir){
   if (P.route){ P.diff = dir === 0 ? 1 : Math.max(.25, Math.min(1.5, Math.round((P.diff + dir * .25) * 100) / 100)); P.gSent = null; routeGradeSend(true); renderCtl(); render(); return; }
@@ -2151,12 +2250,13 @@ function endSession(){
   if (P.rec.p.length < 30){ toast('Sesión muy corta: no se guarda'); renderHome(); return; }
   const prevG = P.route ? ghostOf(P.route.id) : null;
   const meta = finalize(P.start, $('pName').textContent, P.wk ? P.wk.id : P.route ? 'route:' + P.route.id : null, P.rec, P.sessKey);
-  if (P.cutAt || P.rescN){ if (P.cutAt) meta.cut = {at:P.cutAt, plan:P.origTotal}; if (P.rescN) meta.resc = P.rescN; saveActs(); }
+  if (P.cutAt || P.rescN || P.edits){ if (P.cutAt) meta.cut = {at:P.cutAt, plan:P.origTotal}; if (P.rescN) meta.resc = P.rescN; if (P.edits) meta.edits = P.edits; saveActs(); }
   if (P.route){
     const g = ghostFromRec(P.rec, P.route.dist);
     if (g){
       const prev = prevG, best = !prev || g.dur < prev.dur;
       meta.ghostRes = {best, dur:g.dur, prev:prev ? prev.dur : null, prevDate:prev ? prev.date : null};
+      { const t = chalTimes(P.route), got = medalFor(P.route, g.dur); meta.chal = {got:got ? got.k : null, target:P.chal ? P.chal.k : null, times:t, ftp:S.ftp, dur:g.dur}; }
       if (best){ GHOSTS[P.route.id] = Object.assign(g, {date:meta.date, actId:meta.id}); saveGhosts(); }
       saveActs();
     }
@@ -2235,6 +2335,7 @@ function finalize(start, name, wkId, rec, sessKey){
   const meta = Object.assign({id, date:id, name, wkId, dist:Math.round(meters / 10) / 100, ftp:S.ftp, strava:null, rpe:null, note:''}, calcStats(rec, S.ftp));
   if (wkId && String(wkId).startsWith('route:')){ const r = routeById(String(wkId).slice(6)); let g = 0; if (r && rec.rd && rec.rd.length){ const md = Math.max(...rec.rd); for (let i = 1; i < r.d.length && r.d[i] <= md; i++) if (r.e[i] > r.e[i - 1]) g += r.e[i] - r.e[i - 1]; } meta.gain = Math.round(g); }
   const prev = allTimeBest(id);
+  { const dc = decoupling(rec, S.ftp); meta.dec = dc ? {pct:dc.pct, ef:dc.ef} : 0; }
   meta.prs = BEST_D.filter(d => meta.best[d] && (!prev[d] || meta.best[d] > prev[d].w) && ACTS.length > 0);
   meta.prPrev = {}; meta.prs.forEach(d => { if (prev[d]) meta.prPrev[d] = prev[d].w; });
   LS.set('ht_act_' + id, rec);
@@ -2279,6 +2380,7 @@ function showAct(id, fresh){
     <div class="small mut" style="margin-top:-6px">${fdate(a.date)}, ${ftime(a.date)}, con FTP de ${a.ftp} W</div>
     ${a.noPR ? `<div class="warn" style="margin:10px 0">Esta sesión no cuenta para récords ni para estimar el FTP. <a href="#" style="color:inherit;font-weight:700" onclick="event.preventDefault();setNoPR(${a.id},false)">Volver a contarla</a></div>` : ''}
     ${a.cut ? `<div class="small mut" style="margin-top:4px">Acortada: hiciste ${Math.round(a.cut.at / 60)}' de los ${Math.round(a.cut.plan / 60)}' del workout, más la vuelta a la calma.</div>` : ''}
+    ${a.edits ? `<div class="small mut" style="margin-top:4px">Cambiaste la duración de los bloques: ${a.edits > 0 ? '+' : '−'}${clock(Math.abs(a.edits))} en total.</div>` : ''}
     ${a.resc ? `<div class="small mut" style="margin-top:4px">El ERG se atascó ${a.resc === 1 ? 'una vez' : a.resc + ' veces'} y se quitó la resistencia unos segundos.</div>` : ''}
     ${a.prs && a.prs.length ? (fresh ? prCard(a) : `<div class="tags" style="margin-top:10px">${a.prs.map(d => `<span class="tag acc">🏆 Récord ${BEST_L[d]}: ${a.best[d]} W</span>`).join('')}</div>`) : ''}
     ${fresh ? newBadgesCard(checkBadges()) : ''}
@@ -2286,6 +2388,9 @@ function showAct(id, fresh){
     ${testBox}
     ${a.ghostRes ? `<div class="card" style="margin:12px 0;${a.ghostRes.best ? 'border:1px solid var(--acc)' : ''}"><b style="font-size:17px">${a.ghostRes.best ? (a.ghostRes.prev ? '⏱️ ¡Nueva mejor vez! ' + clock(a.ghostRes.dur) : '⏱️ Primera vez completado: ' + clock(a.ghostRes.dur)) : '⏱️ ' + clock(a.ghostRes.dur) + ' en este trayecto'}</b>
       <div class="small mut">${a.ghostRes.prev ? (a.ghostRes.best ? clock(a.ghostRes.prev - a.ghostRes.dur) + ' menos que tu anterior mejor vez (' + clock(a.ghostRes.prev) + ').' : 'Tu mejor vez sigue siendo ' + clock(a.ghostRes.prev) + ' (' + clock(a.ghostRes.dur - a.ghostRes.prev) + ' más).') : 'La próxima vez correrás contra este tiempo.'}</div></div>` : ''}
+    ${a.chal ? (() => { const c = a.chal, got = c.got ? chalByK(c.got) : null, nx = CHAL.find(x => !got || CHAL.indexOf(x) > CHAL.indexOf(got));
+      return `<div class="card" style="margin:12px 0;${got ? 'border:1px solid var(--acc)' : ''}"><b style="font-size:17px">${got ? got.e + ' ¡Medalla de ' + got.n.toLowerCase() + '!' : 'Sin medalla esta vez'}</b>
+        <div class="small mut">${got ? 'Con tu FTP de ' + c.ftp + ' W. ' : ''}${nx ? 'Para ' + nx.e + ' ' + nx.n.toLowerCase() + ' hacía falta ' + clock(c.times[nx.k]) + ' (te faltaron ' + clock(c.dur - c.times[nx.k]) + ').' : 'Es la máxima. Cuando suba tu FTP, el oro pedirá más.'}</div></div>`; })() : ''}
     <div class="kv">
       <div><span>Tiempo</span><b>${clock(a.dur)}</b></div>
       <div><span>TSS</span><b>${a.tss}</b></div>
@@ -2302,6 +2407,7 @@ function showAct(id, fresh){
       ${a.wMin != null ? `<div><span>W' mínimo</span><b style="color:${wcol(a.wMin)}">${Math.round(a.wMin * 100)} %</b></div>` : ''}
     </div>
     ${rec ? actChart(rec) : ''}
+    ${decCard(a)}
     ${a.zt ? `<h3 style="margin-top:16px">Tiempo en zonas de potencia</h3>${zoneBars(a.zt)}` : ''}
     ${(() => { const hz = a.hz || (rec ? hrZones(rec.hr) : null); return hz ? `<h3 style="margin-top:16px">Tiempo en zonas de pulso</h3>${hrBars(hz)}` : ''; })()}
     ${bests.length ? `<h3 style="margin-top:16px">Mejores potencias</h3>
@@ -2423,25 +2529,46 @@ function delAct(id){
 }
 
 // ================= TCX =================
+// Vueltas: una por bloque del workout (rec.si); en sesiones antiguas, con los bloques del workout y rec.wt
+function tcxLaps(a, rec){
+  const n = rec.p.length; let si = rec.si && rec.si.length === n ? rec.si : null;
+  if (!si && a.wkId && rec.wt && rec.wt.length === n && !String(a.wkId).startsWith('route:') && !a.cut){
+    const wk = wkById(a.wkId);
+    if (wk){ const st = wk.segs.reduce((x, sg, i) => (x.push(i ? x[i-1] + wk.segs[i-1].d : 0), x), []);
+      si = rec.wt.map(t => { let k = 0; while (k < st.length - 1 && t >= st[k + 1]) k++; return k; }); }
+  }
+  if (!si) return [[0, n]];
+  const laps = []; let s0 = 0;
+  for (let i = 1; i <= n; i++) if (i === n || si[i] !== si[i - 1]){ laps.push([s0, i]); s0 = i; }
+  // une vueltas de menos de 5 s con la anterior (saltos o cambios rápidos)
+  return laps.reduce((acc, l) => { if (acc.length && l[1] - l[0] < 5){ acc[acc.length - 1][1] = l[1]; } else acc.push(l); return acc; }, []);
+}
 function buildTCX(a, rec){
   const iso = t => new Date(a.date + t * 1000).toISOString();
   const rt = a.wkId && String(a.wkId).startsWith('route:') && rec.rd && rec.rd.length ? routeById(a.wkId.slice(6)) : null;
-  let d = 0, pts = '';
+  let d = 0; const tp = [], dd = [];
   for (let i = 0; i < rec.p.length; i++){
-    const ms = rec.s[i] / 10 / 3.6; d += ms;
+    const ms = rec.s[i] / 10 / 3.6; d += ms; dd.push(d);
     let geo = '';
     if (rt){ const k = routeIdx(rt, rec.rd[i]); if (rt.la) geo += `<Position><LatitudeDegrees>${rt.la[k]}</LatitudeDegrees><LongitudeDegrees>${rt.lo[k]}</LongitudeDegrees></Position>`; geo += `<AltitudeMeters>${rt.e[k]}</AltitudeMeters>`; }
-    pts += `<Trackpoint><Time>${iso(rec.t[i])}</Time>${geo}<DistanceMeters>${d.toFixed(1)}</DistanceMeters>` +
+    tp.push(`<Trackpoint><Time>${iso(rec.t[i])}</Time>${geo}<DistanceMeters>${d.toFixed(1)}</DistanceMeters>` +
       (rec.hr[i] > 0 ? `<HeartRateBpm><Value>${rec.hr[i]}</Value></HeartRateBpm>` : '') +
       (rec.c[i] > 0 ? `<Cadence>${rec.c[i]}</Cadence>` : '') +
-      `<Extensions><ns3:TPX><ns3:Speed>${ms.toFixed(2)}</ns3:Speed><ns3:Watts>${rec.p[i]}</ns3:Watts></ns3:TPX></Extensions></Trackpoint>\n`;
+      `<Extensions><ns3:TPX><ns3:Speed>${ms.toFixed(2)}</ns3:Speed><ns3:Watts>${rec.p[i]}</ns3:Watts></ns3:TPX></Extensions></Trackpoint>\n`);
   }
+  const laps = tcxLaps(a, rec).map(([i0, i1]) => {
+    const hr = rec.hr.slice(i0, i1).filter(x => x > 0), p = rec.p.slice(i0, i1);
+    const secs = i1 - i0, dist = dd[i1 - 1] - (i0 ? dd[i0 - 1] : 0), kj = Math.round(p.reduce((x, y) => x + y, 0) / 1000);
+    const hrx = hr.length ? `<AverageHeartRateBpm><Value>${Math.round(hr.reduce((x, y) => x + y, 0) / hr.length)}</Value></AverageHeartRateBpm><MaximumHeartRateBpm><Value>${Math.max(...hr)}</Value></MaximumHeartRateBpm>` : '';
+    return `<Lap StartTime="${iso(rec.t[i0] || i0)}"><TotalTimeSeconds>${secs}</TotalTimeSeconds><DistanceMeters>${dist.toFixed(1)}</DistanceMeters><Calories>${kj}</Calories>${hrx}<Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod>
+<Track>
+${tp.slice(i0, i1).join('')}</Track><Extensions><ns3:LX><ns3:AvgWatts>${avgArr(p)}</ns3:AvgWatts></ns3:LX></Extensions></Lap>`;
+  }).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2">
 <Activities><Activity Sport="Biking"><Id>${iso(0)}</Id>
-<Lap StartTime="${iso(0)}"><TotalTimeSeconds>${a.dur}</TotalTimeSeconds><DistanceMeters>${d.toFixed(1)}</DistanceMeters><Calories>${a.kj}</Calories>${a.avgHr ? `<AverageHeartRateBpm><Value>${a.avgHr}</Value></AverageHeartRateBpm><MaximumHeartRateBpm><Value>${a.maxHr}</Value></MaximumHeartRateBpm>` : ''}<Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod>
-<Track>
-${pts}</Track></Lap></Activity></Activities></TrainingCenterDatabase>`;
+${laps}
+</Activity></Activities></TrainingCenterDatabase>`;
 }
 function downloadBlob(blob, name){
   const url = URL.createObjectURL(blob), el = document.createElement('a');
@@ -2587,6 +2714,102 @@ function loadSeries(days = 180){
   }
   return out;
 }
+// ===== Deriva del pulso (Pw:HR): eficiencia (vatios / pulso) de la 1.ª mitad frente a la 2.ª, en sesiones constantes =====
+function decoupling(rec, ftp){
+  if (!rec || !rec.hr) return null;
+  const n = rec.p.length; if (n < 20 * 60) return null;
+  const from = n >= 40 * 60 ? 600 : 300, to = n - (n >= 40 * 60 ? 300 : 120);
+  if (to - from < 15 * 60) return null;
+  const p = rec.p.slice(from, to), h = rec.hr.slice(from, to);
+  if (h.filter(x => x > 0).length < p.length * .8) return null;
+  const avg = p.reduce((a, b) => a + b, 0) / p.length; if (avg < 50) return null;
+  let roll = 0, acc = 0, cnt = 0;
+  for (let i = 0; i < p.length; i++){ roll += p[i]; if (i >= 30) roll -= p[i - 30]; if (i >= 29){ acc += (roll / 30) ** 4; cnt++; } }
+  const np = Math.pow(acc / cnt, .25), vi = np / avg, IF = np / ftp;
+  if (vi > 1.1 || IF < .5 || IF > .88) return null; // solo rodajes y bloques constantes
+  const half = Math.floor(p.length / 2);
+  const ef = (a, b) => { let sp = 0, sh = 0, c = 0; for (let i = a; i < b; i++) if (h[i] > 0){ sp += p[i]; sh += h[i]; c++; } return c ? sp / sh : 0; };
+  const e1 = ef(0, half), e2 = ef(half, p.length); if (!e1 || !e2) return null;
+  return {pct:Math.round((e1 - e2) / e1 * 1000) / 10, ef:Math.round((e1 + e2) / 2 * 100) / 100, e1, e2};
+}
+// valor guardado o calculado una vez para sesiones antiguas (0 = no aplicable)
+function actDec(a){
+  if (a.dec === undefined){ const dc = decoupling(LS.get('ht_act_' + a.id, null), a.ftp || S.ftp); a.dec = dc ? {pct:dc.pct, ef:dc.ef} : 0; saveActs(); }
+  return a.dec || null;
+}
+const decCol = v => v < 5 ? 'var(--ok)' : v < 8 ? 'var(--warnc)' : 'var(--err)';
+function decCard(a){
+  const d = actDec(a); if (!d) return '';
+  const v = d.pct, t = v < 5 ? 'Pulso estable: buena base aeróbica a esta intensidad.' : v < 8 ? 'Algo de deriva. Es normal en sesiones largas, con calor o si bebiste poco.' : 'Mucha deriva: a esta intensidad aún te falta base, o hacía calor o faltó beber.';
+  return `<div class="card" style="margin:12px 0"><div class="row between" style="align-items:baseline"><b>Deriva del pulso</b><b style="font:700 26px var(--num);color:${decCol(v)}">${v > 0 ? '+' : ''}${dec(v)} %</b></div>
+    <div class="small" style="margin-top:2px">${t}</div>
+    <div class="small mut" style="margin-top:6px">Compara vatios por pulsación de la primera mitad con la segunda (sin calentamiento ni vuelta a la calma). Por debajo del 5 % es buena señal. Eficiencia: ${dec(d.ef, 2)} W por pulsación. En rodillo, un ventilador potente la baja mucho.</div></div>`;
+}
+function decTrendCard(){
+  const since = now() - 120 * DAY;
+  const L = ACTS.filter(a => a.date >= since).slice().reverse().map(a => ({a, d:actDec(a)})).filter(x => x.d);
+  if (L.length < 2) return `<div class="card"><h2>Base aeróbica</h2><div class="small mut">Cuando hagas rodajes constantes de 20 minutos o más con pulsómetro (zona 2, tempo, sweet spot), aquí verás si tu pulso se mantiene estable y si mueves más vatios con las mismas pulsaciones. ${L.length ? 'Llevas 1.' : ''}</div></div>`;
+  const xl = [0, L.length - 1].map(i => ({i, t:fdm(L[i].a.date)}));
+  const efs = L.map(x => x.d.ef), lo = Math.min(...efs), hi = Math.max(...efs);
+  const half = Math.floor(L.length / 2), m1 = avgF(efs.slice(0, half)), m2 = avgF(efs.slice(half));
+  const trend = (m2 - m1) / m1 * 100;
+  return `<div class="card"><h2>Base aeróbica</h2>
+    <div class="small mut" style="margin:-4px 0 6px">Deriva del pulso en tus rodajes constantes (últimos 4 meses). Cuanto más baja, mejor.</div>
+    ${lineChart({h:170, yMin:Math.min(-2, Math.floor(Math.min(...L.map(x => x.d.pct)))), yMax:Math.max(12, Math.ceil(Math.max(...L.map(x => x.d.pct)))), zeroLine:true, xLabels:xl,
+      series:[{vals:L.map(() => 5), color:'var(--dash)', w:1, dash:true}, {vals:L.map(x => x.d.pct), color:'var(--hr)', w:1.6, dots:true}]})}
+    ${legend([['var(--hr)', 'Deriva (%)'], ['var(--dash)', 'Límite del 5 %']])}
+    <h3 style="margin-top:14px">Eficiencia (vatios por pulsación)</h3>
+    ${lineChart({h:150, dp:2, yMin:Math.floor(lo * 10 - 1) / 10, yMax:Math.ceil(hi * 10 + 1) / 10, xLabels:xl, series:[{vals:efs, color:'var(--ok)', w:1.6, dots:true}]})}
+    <div class="small" style="margin-top:6px">${L.length >= 4 ? (trend > 2 ? `Tu eficiencia sube un ${dec(trend)} %: mueves más vatios con las mismas pulsaciones. 👍` : trend < -2 ? `Tu eficiencia baja un ${dec(-trend)} %. Puede ser cansancio, calor o vatios del rodillo distintos.` : 'Tu eficiencia se mantiene estable.') : 'Con unas cuantas sesiones más verás la tendencia.'}</div></div>`;
+}
+const avgF = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+// ===== Previsión de forma: CTL/ATL/TSB de los próximos días si cumples el plan (o si sigues como el último mes) =====
+function formProjection(){
+  const ls = loadSeries(120), n = ls.length, tk = today();
+  let mode = 'ritmo', end = 28, plan = {};
+  if (PLAN){
+    const fut = PLAN.sessions.filter(x => x.status === 'pend' && x.date >= tk);
+    if (fut.length){
+      mode = 'plan';
+      fut.forEach(x => { const w = wkById(x.wkId); if (w) plan[x.date] = (plan[x.date] || 0) + wkTSS(w); });
+      const last = fut.map(x => x.date).sort().pop();
+      end = Math.max(14, Math.min(56, Math.round((kdate(last) - kdate(tk)) / DAY) + 3));
+    }
+  }
+  // patrón de las últimas 4 semanas por día de la semana
+  const byDow = [0, 0, 0, 0, 0, 0, 0]; ls.slice(-28).forEach(d => { byDow[dow(d.date)] += d.tss / 4; });
+  if (mode === 'ritmo' && !byDow.some(v => v > 0)) return null;
+  const prev = n > 1 ? ls[n - 2] : {ctl:0, atl:0};
+  let ctl = prev.ctl, atl = prev.atl; const out = [];
+  for (let i = 0; i <= end; i++){
+    const dt = kdate(tk); dt.setDate(dt.getDate() + i); const k = dkey(dt);
+    let t = i === 0 ? ls[n - 1].tss : 0;
+    t += mode === 'plan' ? (plan[k] || 0) : (i === 0 ? 0 : Math.round(byDow[dow(dt.getTime())]));
+    const tsb = ctl - atl; ctl += (t - ctl) / 42; atl += (t - atl) / 7;
+    out.push({k, date:dt.getTime(), tss:t, ctl, atl, tsb});
+  }
+  // mejor día: frescura entre +5 y +25 con la forma más alta
+  const cand = out.slice(3).filter(d => d.tsb >= 5 && d.tsb <= 25);
+  const best = cand.length ? cand.reduce((b, d) => d.ctl > b.ctl ? d : b) : null;
+  return {mode, out, best, now:ls[n - 1], past:ls.slice(-28)};
+}
+function projCard(){
+  const pr = formProjection();
+  if (!pr) return `<div class="card"><h2>Previsión</h2><div class="small mut">Con un plan activo o unas semanas de entrenos, aquí verás cómo evolucionará tu forma y qué día llegarás más fresco.</div></div>`;
+  const all = pr.past.concat(pr.out.slice(1)), P0 = pr.past.length - 1, L = pr.out[pr.out.length - 1];
+  const sol = (k) => all.map((d, i) => i <= P0 ? d[k] : null), fut = (k) => all.map((d, i) => i >= P0 ? d[k] : null);
+  const lo = Math.min(-10, ...all.map(d => d.tsb)), hi = Math.max(20, ...all.map(d => Math.max(d.ctl, d.atl)));
+  const xl = [{i:0, t:fdm(all[0].date)}, {i:P0, t:'hoy'}, {i:all.length - 1, t:fdm(L.date)}];
+  const fs = formState(L.tsb), dC = L.ctl - pr.now.ctl;
+  return `<div class="card"><h2>Previsión</h2>
+    <div class="small mut" style="margin:-4px 0 6px">${pr.mode === 'plan' ? 'Si cumples tu plan tal y como está.' : 'Sin plan: si sigues entrenando como las últimas 4 semanas.'} Línea discontinua = futuro.</div>
+    ${lineChart({h:200, yMin:Math.floor(lo / 10) * 10, yMax:Math.ceil(hi / 10) * 10, zeroLine:true, xLabels:xl,
+      series:[{vals:sol('tsb'), color:'var(--tsb)', w:1.6}, {vals:fut('tsb'), color:'var(--tsb)', w:1.6, dash:true},
+              {vals:sol('ctl'), color:'var(--ctl)', w:2.6}, {vals:fut('ctl'), color:'var(--ctl)', w:2.6, dash:true}]})}
+    ${legend([['var(--ctl)', 'CTL forma'], ['var(--tsb)', 'TSB frescura']])}
+    <div class="form5" style="margin-top:12px"><div><b style="color:var(--ctl)">${Math.round(L.ctl)}</b><span>forma final</span></div><div><b>${dC >= 0 ? '+' : ''}${Math.round(dC)}</b><span>vs hoy</span></div><div><b style="color:var(--tsb)">${L.tsb > 0 ? '+' : ''}${Math.round(L.tsb)}</b><span>frescura</span></div></div>
+    <div class="small" style="margin-top:10px">El ${fdm(L.date)} llegarías <b style="color:${fs.c}">${fs.t.toLowerCase()}</b>.${pr.best ? ` Mejor día para un test o una marcha: <b>${DOWL[dow(pr.best.date)].toLowerCase()} ${fdm(pr.best.date)}</b> (forma ${Math.round(pr.best.ctl)}, frescura +${Math.round(pr.best.tsb)}).` : ' En este periodo no llegas a estar fresco: si tienes una marcha, mete unos días suaves antes.'}</div></div>`;
+}
 function formState(tsb){
   if (tsb > 25) return {t:'Muy fresco', c:'var(--tsb)', d:'Descansado de sobra. Buen momento para un test o una sesión dura. Si llevas muchos días así, estás perdiendo forma.'};
   if (tsb > 5)  return {t:'Fresco', c:'var(--ok)', d:'Piernas listas para entrenar fuerte. Aprovecha para la sesión clave.'};
@@ -2613,7 +2836,7 @@ function swapToday(){
 }
 
 // ================= GRÁFICAS =================
-function lineChart({w = 360, h = 200, series, yMin, yMax, xLabels = [], bars = null, zeroLine = false}){
+function lineChart({w = 360, h = 200, series, yMin, yMax, xLabels = [], bars = null, zeroLine = false, dp = 0}){
   const L = 30, Rr = 6, T = 8, B = 20, iw = w - L - Rr, ih = h - T - B;
   const n = Math.max(...series.map(s => s.vals.length), bars ? bars.vals.length : 0);
   const X = i => L + (n <= 1 ? 0 : i / (n - 1) * iw);
@@ -2621,7 +2844,7 @@ function lineChart({w = 360, h = 200, series, yMin, yMax, xLabels = [], bars = n
   let g = '';
   const step = niceStep((yMax - yMin) / 4);
   for (let v = Math.ceil(yMin / step) * step; v <= yMax; v += step){
-    g += `<line x1="${L}" x2="${w - Rr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 5}" y="${(Y(v) + 4).toFixed(1)}" fill="var(--mut)" font-size="10" text-anchor="end">${Math.round(v)}</text>`;
+    g += `<line x1="${L}" x2="${w - Rr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 5}" y="${(Y(v) + 4).toFixed(1)}" fill="var(--mut)" font-size="10" text-anchor="end">${dp ? dec(v, dp) : Math.round(v)}</text>`;
   }
   if (zeroLine && yMin < 0) g += `<line x1="${L}" x2="${w - Rr}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--dash)" stroke-width="1.2"/>`;
   if (bars){ const bw = Math.max(1, iw / n * .7); bars.vals.forEach((v, i) => { if (v > 0) g += `<rect x="${(X(i) - bw / 2).toFixed(1)}" y="${Y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(Y(yMin) - Y(v)).toFixed(1)}" fill="${bars.color}" opacity=".45" rx="1"/>`; }); }
@@ -2630,7 +2853,7 @@ function lineChart({w = 360, h = 200, series, yMin, yMax, xLabels = [], bars = n
     if (s.dots) s.vals.forEach((v, i) => { if (v != null) g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3" fill="${s.color}"/>`; });
     g += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${s.w || 2}" stroke-linejoin="round" ${s.dash ? 'stroke-dasharray="5 4"' : ''}/>`;
   });
-  xLabels.forEach(l => { g += `<text x="${X(l.i).toFixed(1)}" y="${h - 6}" fill="var(--mut)" font-size="10" text-anchor="middle">${l.t}</text>`; });
+  xLabels.forEach(l => { g += `<text x="${X(l.i).toFixed(1)}" y="${h - 6}" fill="var(--mut)" font-size="10" text-anchor="${l.i === 0 ? 'start' : l.i >= n - 1 ? 'end' : 'middle'}">${l.t}</text>`; });
   return `<svg class="lc" viewBox="0 0 ${w} ${h}">${g}</svg>`;
 }
 function niceStep(x){ const p = Math.pow(10, Math.floor(Math.log10(x || 1))), f = x / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
@@ -2661,7 +2884,7 @@ function homeSay(m){
 }
 let weeklyBusy = false;
 function renderWeekCard(){
-  const el = $('weekCard'); if (!el) return;
+  const el = $('weekRep'); if (!el) return;
   const W = LS.get('ht_week', null);
   if (!S.apiKey || !W || W.ws !== weekStart() || W.hidden){ el.innerHTML = ''; return; }
   const body = W.busy ? '<div class="small mut">Brinco está repasando tu semana…</div>'
@@ -2738,13 +2961,17 @@ function renderHome(){
   }
   $('heroBox').innerHTML = hero;
   $('quickBox').innerHTML = `
-    <button onclick="show('sLib');libTab('workouts')">${ICON.list}<span>Elegir workout<small>30 sesiones</small></span></button>
+    <button onclick="show('sLib');libTab('workouts')">${ICON.list}<span>Elegir workout<small>${allWorkouts().length} sesiones</small></span></button>
     <button onclick="startSession(null)">${ICON.wave}<span>Rodar libre<small>Tú pones la pendiente</small></span></button>`;
 
   // ---- Forma
   const ls = loadSeries(60), last = ls[ls.length - 1], fs = formState(last.tsb), adv = coachAdvice(last), f = FEEL[today()];
   const pos = Math.max(2, Math.min(98, (last.tsb + 40) / 70 * 100));
-  $('formCard').innerHTML = `
+  if (noData()) $('formCard').innerHTML = `<div class="fstate" style="color:var(--mut)">Sin datos todavía</div>
+    <div class="small mut" style="margin-top:6px">Tras tus primeras sesiones verás aquí si estás fresco, equilibrado o cargado, y qué te conviene hoy.</div>
+    <div class="feelq"><h3 style="margin:0">¿Cómo te levantas hoy?</h3>
+      <div class="feel">${FEELS.map((x, i) => `<button class="${f === i ? 'on' : ''}" style="${f === i ? 'background:' + x.c : ''}" onclick="setFeel(${i})">${x.t}</button>`).join('')}</div></div>`;
+  else $('formCard').innerHTML = `
     <div class="row between"><div class="fstate" style="color:${fs.c}">${fs.t}</div><span class="small mut">FTP ${S.ftp} W, ${dec(S.ftp / S.peso, 1)} W/kg</span></div>
     <div class="gauge"><i style="left:${pos}%"></i></div>
     <div class="gscale"><span>Fatigado</span><span>Óptimo</span><span>Fresco</span></div>
@@ -2754,6 +2981,8 @@ function renderHome(){
       <div><b style="color:var(--tsb)">${last.tsb > 0 ? '+' : ''}${Math.round(last.tsb)}</b><span>Frescura (TSB)</span></div>
     </div>
     <div class="advice">${adv.lines.map(esc).join(' ')}</div>
+    ${(() => { const pr = PLAN ? formProjection() : null; if (!pr || pr.mode !== 'plan') return ''; const t = pr.out[Math.min(14, pr.out.length - 1)], dC = t.ctl - pr.now.ctl;
+      return `<div class="small mut" style="margin-top:8px" onclick="show('sAna');anaTab('forma')">📈 Si cumples el plan, el ${fdm(t.date)} tendrás forma ${Math.round(t.ctl)} (${dC >= 0 ? '+' : ''}${Math.round(dC)})${pr.best ? '. Tu mejor día para apretar: ' + fdm(pr.best.date) : ''}.</div>`; })()}
     ${adv.swap ? `<button class="btn sm" style="margin-top:12px" onclick="swapToday()">Cambiar la sesión de hoy por recuperación</button>` : ''}
     <div class="feelq"><h3 style="margin:0">¿Cómo te levantas hoy?</h3>
       <div class="feel">${FEELS.map((x, i) => `<button class="${f === i ? 'on' : ''}" style="${f === i ? 'background:' + x.c : ''}" onclick="setFeel(${i})">${x.t}</button>`).join('')}</div></div>`;
@@ -2775,7 +3004,8 @@ function renderHome(){
       <div><b>${cur.length}</b><span>${cur.length === 1 ? 'sesión' : 'sesiones'}</span></div></div>
     <div class="wstrip">${days.map((x, i) => `<div class="d">
       ${x.done ? `<div class="b" style="height:${Math.max(8, x.done / mx * 64)}px"></div>` : x.plan ? `<div class="b plan" style="height:${Math.max(8, x.plan / mx * 64)}px"></div>` : '<div class="b none"></div>'}
-      <span class="l ${x.k === tk ? 't' : ''}">${DOW[i]}</span></div>`).join('')}</div>`;
+      <span class="l ${x.k === tk ? 't' : ''}">${DOW[i]}</span></div>`).join('')}</div>
+    ${!cur.length && !plannedTSS ? `<div class="small mut" style="margin-top:10px;text-align:center">Nada esta semana todavía. ${ACTS.length ? '¿Rodamos hoy?' : 'Tu primera sesión aparecerá aquí.'}</div>` : ''}`;
 
   // ---- Última
   const a = ACTS[0];
@@ -3165,7 +3395,14 @@ function anaActs(){
   if (SEL && SEL.size) html += `<div style="position:sticky;bottom:calc(84px + env(safe-area-inset-bottom));margin-top:12px"><button class="btn red block lg" onclick="selDelete()">Quitar ${SEL.size} ${SEL.size === 1 ? 'actividad' : 'actividades'}</button></div>`;
   $('anaBox').innerHTML = html;
 }
+// Pantallas vacías: Brinco explica qué aparecerá y lleva a empezar
+const noData = () => !ACTS.length && !EXT.length;
+function emptyBox(title, text, pose = 'saludo'){
+  return `<div class="card emptyc"><img src="mascota/${pose}.webp" alt=""><div><b>${title}</b><div class="small mut" style="margin-top:4px">${text}</div>
+    <div class="row wrap" style="gap:8px;margin-top:12px"><button class="btn acc sm" onclick="show('sLib');libTab('workouts')">Elegir un workout</button>${S.strava ? '' : `<button class="btn sm" onclick="show('sCfg')">Conectar Strava</button>`}</div></div></div>`;
+}
 function anaForma(){
+  if (noData()) return $('anaBox').innerHTML = emptyBox('Aún no hay forma que medir', 'Con cada sesión (y tus salidas de Strava, si lo conectas) calcularé tu forma, tu fatiga y tu frescura, y te diré cómo llegarás a las próximas semanas.');
   const ls = loadSeries(90), last = ls[ls.length - 1], fs = formState(last.tsb), adv = coachAdvice(last);
   const d7 = ls.slice(-7), d28 = ls.slice(-28);
   const t7 = d7.reduce((a, x) => a + x.tss, 0), t28 = d28.reduce((a, x) => a + x.tss, 0);
@@ -3178,11 +3415,14 @@ function anaForma(){
     <div style="color:var(--adv);margin-top:4px">${adv.lines.map(esc).join('<br>')}</div>
     ${adv.swap ? `<button class="btn sm" style="margin-top:10px" onclick="swapToday()">Cambiar la sesión de hoy por Recuperación</button>` : ''}
     <div class="small mut" style="margin-top:12px">CTL = forma (carga media de 6 semanas). ATL = fatiga (última semana). TSB = frescura (CTL − ATL). Ratio = carga de 7 días frente a la de 28: entre 0,8 y 1,3 es la zona segura.</div></div>
+    ${projCard()}
+    ${decTrendCard()}
     <div class="card"><h2>Últimos 14 días</h2>${days.slice().reverse().map(d => `<div class="pr"><span class="mut">${fdate(d.date)}${FEEL[d.k] != null ? ` · <span style="color:${FEELS[FEEL[d.k]].c}">${FEELS[FEEL[d.k]].t}</span>` : ''}</span>
       <span class="small"><b style="font-size:18px">${d.tss}</b> TSS · <span style="color:var(--ctl)">${Math.round(d.ctl)}</span> / <span style="color:var(--atl)">${Math.round(d.atl)}</span> / <span style="color:var(--tsb)">${Math.round(d.tsb)}</span></span></div>`).join('')}</div>
     ${S.strava ? `<button class="btn block" onclick="stravaSync(false)">Sincronizar Strava${S.lastSync ? ' · última ' + fdate(S.lastSync) + ' ' + ftime(S.lastSync) : ''}</button>` : `<div class="small mut">Conecta Strava en Ajustes para que tus salidas y carreras cuenten en la forma.</div>`}`;
 }
 function anaCarga(){
+  if (noData()) return $('anaBox').innerHTML = emptyBox('Aquí verás tu carga', 'Una gráfica con el TSS de cada día y cómo sube tu forma semana a semana. Empieza con cualquier sesión.', 'esfuerzo');
   const all = loadSeries(Math.max(CARGA_D, 180)), ls = all.slice(-CARGA_D);
   const lo = Math.min(-10, ...ls.map(d => d.tsb)), hi = Math.max(20, ...ls.map(d => Math.max(d.ctl, d.atl)), ...ls.map(d => d.tss) .map(v => Math.min(v, 150)));
   const xl = []; const stepL = Math.ceil(ls.length / 5);
@@ -3195,6 +3435,7 @@ function anaCarga(){
     ${legend([['var(--ctl)', 'CTL forma'], ['var(--atl)', 'ATL fatiga'], ['var(--tsb)', 'TSB frescura'], ['#8b93a3', 'TSS del día']])}</div>`;
 }
 function anaSemanas(){
+  if (noData()) return $('anaBox').innerHTML = emptyBox('Tus semanas, de un vistazo', 'TSS, tiempo y sesiones de cada semana para ver si eres constante. Aparecerán en cuanto ruedes.', 'descanso');
   const L = allLoad(), ws0 = weekStart(), rows = [];
   for (let i = 0; i < 12; i++){
     const ws = ws0 - i * 7 * DAY, we = ws + 7 * DAY;
@@ -3293,6 +3534,8 @@ function badgeStats(){
     streak:weekStreak(), early:ACTS.filter(a => hr(a) < 8).length, late:ACTS.filter(a => hr(a) >= 22).length,
     test:ACTS.filter(a => /^(rampa|test20|test20_45)$/.test(a.wkId || '')).length, pr:ACTS.filter(a => a.prs && a.prs.length && !a.noPR).length,
     route:ACTS.filter(a => a.wkId && String(a.wkId).startsWith('route:') && a.ghostRes).length, ghost:ACTS.filter(a => a.ghostRes && a.ghostRes.best && a.ghostRes.prev).length,
+    med:ACTS.filter(a => a.chal && a.chal.got).length, oro:ACTS.filter(a => a.chal && a.chal.got === 'oro').length,
+    real:new Set(ACTS.filter(a => a.chal && a.wkId && /^route:r_/.test(a.wkId)).map(a => a.wkId.replace(/_f$/, ''))).size,
     s45:ACTS.filter(a => a.dur >= 38 * 60 && a.dur <= 47 * 60).length, big:ACTS.filter(a => a.tss >= 100).length,
     plan:PLAN ? PLAN.sessions.filter(s => s.status === 'done').length : 0, planAll:PLAN ? PLAN.sessions.length : 0
   };
@@ -3320,6 +3563,10 @@ const BADGES = [
   ['pr', '🏆', 'Récord', 'Batir un récord de potencia', s => [s.pr, 1]],
   ['route', '🏁', 'Hasta la meta', 'Completar un trayecto', s => [s.route, 1]],
   ['ghost', '👻', 'Cazafantasmas', 'Ganar a tu fantasma en un trayecto', s => [s.ghost, 1]],
+  ['med1', '🎖️', 'Primera medalla', 'Ganar una medalla en un reto de trayecto', s => [s.med, 1]],
+  ['oro', '🥇', 'Rana de oro', 'Medalla de oro en un trayecto', s => [s.oro, 1]],
+  ['med10', '🏅', 'Medallero', '10 medallas en retos de trayecto', s => [s.med, 10]],
+  ['real4', '⛰️', 'Puertos de casa', 'Completar los 4 puertos de la zona (enteros o su final)', s => [s.real, 4]],
   ['s45', '⏱️', 'Exprés', '10 sesiones de 40-45 minutos', s => [s.s45, 10]],
   ['big', '💥', 'Sesión gorda', 'Una sesión de 100 TSS o más', s => [s.big, 1]],
   ['plan', '📅', 'Plan cumplido', 'Hacer todas las sesiones de un plan', s => [s.planAll && s.plan >= s.planAll ? 1 : 0, 1]]
