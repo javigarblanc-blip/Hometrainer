@@ -460,7 +460,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     <select id="iFs"><option value="1">Sí</option><option value="0">No</option></select>
     <label>W' (reserva anaeróbica, julios)</label>
     <div class="row" style="gap:8px"><input type="number" id="iWp" inputmode="numeric" style="flex:1"><button class="btn sm" onclick="wpEstimate()">Estimar</button></div>
-    <div class="small mut" style="margin-top:8px">El W' es la energía que puedes gastar por encima de tu FTP antes de vaciarte. Lo normal en aficionados está entre 12.000 y 25.000 J. Durante la sesión verás cuánto te queda. Los datos de la pantalla de sesión se cambian tocándolos.</div>
+    <div class="small mut" style="margin-top:8px">El W' es la energía que puedes gastar por encima de tu FTP antes de vaciarte. Lo normal en aficionados está entre 12.000 y 25.000 J. Se gasta por encima de tu potencia crítica (CP), que <b id="cpTxt"></b>. Durante la sesión verás cuánto te queda. Los datos de la pantalla de sesión se cambian tocándolos.</div>
   </div>
   <div class="card">
     <h2>Entrenador IA</h2>
@@ -555,7 +555,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.25.0';
+const VER = '0.26.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -2047,10 +2047,27 @@ const gapTxt = s => clock(Math.abs(s));  // v0.23: sin signo; lo dicen el color 
 
 // ================= W' (reserva anaeróbica, modelo de Skiba con CP = FTP) =================
 const wPrime = () => S.wprime > 0 ? S.wprime : 20000;
+// v0.26: el modelo usa la potencia crítica (CP), no el FTP. S.cpPct guarda CP/FTP para que siga al FTP cuando cambie.
+const cpOf = ftp => Math.round(ftp * (S.cpPct > .8 && S.cpPct < 1.2 ? S.cpPct : 1));
 function wStep(bal, w, cp, w0){ return w > cp ? bal - (w - cp) : bal + (cp - w) * (w0 - bal) / w0; }
-function wMinOf(p, ftp){ const w0 = wPrime(); let b = w0, m = w0; for (const w of p){ b = Math.min(w0, wStep(b, w, ftp, w0)); if (b < m) m = b; } return Math.max(0, m / w0); }
+function wMinOf(p, ftp){ const w0 = wPrime(), cp = cpOf(ftp); let b = w0, m = w0; for (const w of p){ b = Math.min(w0, wStep(b, w, cp, w0)); if (b < m) m = b; } return Math.max(0, m / w0); }
 // estimación con tus récords: trabajo = CP·t + W' entre el mejor 5 min y el mejor 20 min
-function wPrimeEstimate(){ const b = allTimeBest(null); if (!b[300] || !b[1200] || b[300].w <= b[1200].w) return null; return Math.round((b[300].w - b[1200].w) * 400 / 500) * 500; }
+// v0.26: CP y W' a la vez, ajustando trabajo = CP·t + W' con tus mejores 2, 5, 10 y 20 min de los últimos 90 días.
+// Antes: solo 5 y 20 min de todo el historial (mezclaba épocas) y el W' salía con una CP que luego no se usaba.
+function cpFit(days = 90){
+  const since = now() - days * DAY, b = {};
+  ACTS.filter(a => a.date >= since && a.best && !a.noPR).forEach(a => [120, 300, 600, 1200].forEach(d => { const v = a.best[d]; if (v && (!b[d] || v > b[d])) b[d] = v; }));
+  const pts = Object.keys(b).map(Number).map(t => [t, b[t] * t]);
+  if (pts.length < 3 || !b[1200] || !(b[120] || b[300])) return null;
+  const n = pts.length, mx = pts.reduce((a, p) => a + p[0], 0) / n, my = pts.reduce((a, p) => a + p[1], 0) / n;
+  const sxx = pts.reduce((a, p) => a + (p[0] - mx) ** 2, 0), sxy = pts.reduce((a, p) => a + (p[0] - mx) * (p[1] - my), 0);
+  const cp = sxy / sxx, wp = my - cp * mx;
+  const r2 = 1 - pts.reduce((a, p) => a + (p[1] - (cp * p[0] + wp)) ** 2, 0) / pts.reduce((a, p) => a + (p[1] - my) ** 2, 0);
+  // si las cifras no son razonables, los récords cortos no eran esfuerzos a tope
+  if (!(wp >= 6000 && wp <= 40000 && cp >= S.ftp * .85 && cp <= S.ftp * 1.15 && r2 > .99)) return {bad:true, n:Object.keys(b).length};
+  return {cp:Math.round(cp), wp:Math.round(wp / 500) * 500, n:Object.keys(b).length};
+}
+function wPrimeEstimate(){ const f = cpFit(); return f && !f.bad ? f.wp : null; }
 const wcol = f => f > .6 ? 'var(--ok)' : f > .3 ? 'var(--warnc)' : 'var(--err)';
 
 // ================= DATOS EN SESIÓN (configurables) =================
@@ -2154,7 +2171,7 @@ function tick(){
     r.p.push(Math.round(pw)); r.hr.push(curHR()); r.c.push(Math.round(curCad())); r.s.push(Math.round(vs * 10)); r.wt.push(P.wt); if (P.wk){ curSeg(); (r.si = r.si || []).push(P.segI); }
     P.dist += vs / 3.6;
     P.wt++;
-    P.wbal = Math.min(P.w0, wStep(P.wbal, pw, S.ftp, P.w0));
+    P.wbal = Math.min(P.w0, wStep(P.wbal, pw, cpOf(S.ftp), P.w0));
     brTick();
     { const n = P.rec.p.length; if (n >= 30){ const a30 = (P.cum[n] - P.cum[n - 30]) / 30; P.np4 += a30 ** 4; P.npN++; } }
     if (P.route && P.rDist >= P.route.dist){ beep(660, 500); toast('¡Trayecto completado!'); return endSession(); }
@@ -3064,6 +3081,9 @@ function renderHome(){
       Tienes una sesión sin guardar: ${esc(live.name)}, ${clock(live.rec.p.length)}.
       <div class="row" style="margin-top:10px"><button class="btn acc sm" onclick="recoverLive(true)">Guardar</button><button class="btn ghost sm" onclick="recoverLive(false)">Descartar</button></div></div>` : '';
 
+  // v0.26: aviso de FTP en inicio (se puede posponer 14 días)
+  { const e = ftpEstimate(), snooze = S.ftpSnooze && now() - S.ftpSnooze < 14 * DAY;
+    $('recover').innerHTML += e && e.w >= S.ftp * 1.03 && !snooze ? ftpCard(e, true).replace('</button></div></div>', `</button> <button class="btn ghost sm" style="margin-top:8px" onclick="S.ftpSnooze=now();saveS();renderHome()">Ahora no</button></div></div>`) : ''; }
   // ---- Hoy
   const ts = todaySess(), nx = nextSess();
   let hero = '';
@@ -3935,15 +3955,16 @@ function renderCfg(){
   }
   $('iModel').innerHTML = COACH_MODELS.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); $('iModel').value = S.coachModel; $('iKey').value = S.apiKey; $('iNotes').value = S.coachNotes;
   $('iSrc').value = S.src; $('iSound').value = String(+S.sound); $('iBrinco').value = String(S.brinco == null ? 1 : +S.brinco); $('iErgG').value = String(S.ergGuard === 0 ? 0 : 1); $('iPm').value = String(S.pmUse === 0 ? 0 : 1); $('iWeek').value = String(S.weekAuto == null ? 1 : +S.weekAuto); $('iSid').value = S.sid; $('iSsec').value = S.ssec;
-  $('iZbg').value = String(S.zoneBg === 0 ? 0 : 1); $('iFs').value = String(S.fullscreen === 0 ? 0 : 1); $('iWp').value = wPrime();
+  $('iZbg').value = String(S.zoneBg === 0 ? 0 : 1); $('iFs').value = String(S.fullscreen === 0 ? 0 : 1); $('iWp').value = wPrime(); $('cpTxt').textContent = S.cpPct && S.cpPct !== 1 ? 'ahora es ' + cpOf(S.ftp) + ' W' : 'mientras no la estimes es tu FTP';
   $('cbDom').textContent = location.hostname || '(tu dominio)';
   $('stravaState').innerHTML = S.strava ? `<span style="color:var(--ok)">● Conectado${S.strava.who ? ' como ' + esc(S.strava.who) : ''}</span>${S.lastSync ? ' · sincronizado ' + fdate(S.lastSync) : ''}` : 'No conectado';
   $('ver').textContent = 'Umbral v' + VER + ' · ' + ACTS.length + ' sesiones · ' + CUSTOM.length + ' workouts propios';
 }
 function wpEstimate(){
-  const e = wPrimeEstimate();
-  if (!e) return toast('Necesito un récord de 5 min y otro de 20 min para estimarlo');
-  if (confirm(`Con tus récords de 5 y 20 minutos tu W' sale de unos ${e.toLocaleString('es-ES')} J. ¿Lo uso?`)){ S.wprime = e; saveS(); renderCfg(); toast('Guardado'); }
+  const f = cpFit();
+  if (!f) return toast('Necesito récords de 2 o 5 min, 10 y 20 min de los últimos 90 días');
+  if (f.bad) return toast('Tus récords cortos no parecen esfuerzos a tope. Haz un test de 3-5 min a tope y vuelve a probar');
+  if (confirm(`Con tus récords de 2 a 20 minutos:\n· Potencia crítica (CP): ${f.cp} W (tu FTP es ${S.ftp} W)\n· W': ${f.wp.toLocaleString('es-ES')} J\n¿Los uso?`)){ S.wprime = f.wp; S.cpPct = Math.round(f.cp / S.ftp * 1000) / 1000; saveS(); renderCfg(); toast('Guardado'); }
 }
 function readCfg(){
   const n = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : d; };
