@@ -234,6 +234,17 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .sheet-x{position:absolute;right:14px;top:16px;background:var(--s2);border:0;width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer;z-index:2;color:var(--mut)}
 .sheet-in h2{font:700 26px/1.05 var(--num);margin-right:44px}
 .chart{width:100%;height:150px;display:block;background:var(--bg);border-radius:12px}
+.cgnow{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}
+.cgnow b{display:block;font:700 40px/1 var(--num)}
+.cgnow span{display:block;font-size:13px;color:var(--mut);margin-top:2px}
+.cgnow em{display:block;font:600 13px var(--body);font-style:normal;margin-top:4px}
+.cgday{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:13px;color:var(--mut);background:var(--s2);border-radius:10px;padding:8px 10px;margin-bottom:6px;min-height:20px}
+.cgday>b{color:var(--txt);font-size:14px;margin-right:2px}
+.cgday b{font:700 16px var(--num)}
+.cgh{display:flex;gap:14px;align-items:center;margin:14px 0 4px;font-size:14px}
+.cgh span{display:flex;align-items:center;gap:6px}
+.cgh i{width:12px;height:4px;border-radius:2px;display:inline-block}
+.cgh small{color:var(--mut);font-weight:500;margin-left:auto}
 .lc{width:100%;height:auto;display:block}
 /* reproductor */
 #player{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;flex-direction:column;padding:calc(10px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));overflow:auto}
@@ -524,7 +535,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.20.0';
+const VER = '0.20.1';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -3421,18 +3432,69 @@ function anaForma(){
       <span class="small"><b style="font-size:18px">${d.tss}</b> TSS · <span style="color:var(--ctl)">${Math.round(d.ctl)}</span> / <span style="color:var(--atl)">${Math.round(d.atl)}</span> / <span style="color:var(--tsb)">${Math.round(d.tsb)}</span></span></div>`).join('')}</div>
     ${S.strava ? `<button class="btn block" onclick="stravaSync(false)">Sincronizar Strava${S.lastSync ? ' · última ' + fdate(S.lastSync) + ' ' + ftime(S.lastSync) : ''}</button>` : `<div class="small mut">Conecta Strava en Ajustes para que tus salidas y carreras cuenten en la forma.</div>`}`;
 }
+// Carga (v0.20.1): tres gráficas separadas con un solo eje de fechas y un dedo que recorre los días
+let CARGA = null;
 function anaCarga(){
   if (noData()) return $('anaBox').innerHTML = emptyBox('Aquí verás tu carga', 'Una gráfica con el TSS de cada día y cómo sube tu forma semana a semana. Empieza con cualquier sesión.', 'esfuerzo');
-  const all = loadSeries(Math.max(CARGA_D, 180)), ls = all.slice(-CARGA_D);
-  const lo = Math.min(-10, ...ls.map(d => d.tsb)), hi = Math.max(20, ...ls.map(d => Math.max(d.ctl, d.atl)), ...ls.map(d => d.tss) .map(v => Math.min(v, 150)));
-  const xl = []; const stepL = Math.ceil(ls.length / 5);
-  for (let i = 0; i < ls.length; i += stepL) xl.push({i, t:fdm(ls[i].date)});
+  const all = loadSeries(Math.max(CARGA_D, 180) + 7), ls = all.slice(-CARGA_D), n = ls.length;
+  // media de TSS de 7 días para leer la carga sin el ruido de los días sueltos
+  const off = all.length - n; ls.forEach((d, i) => { let s = 0; for (let k = 0; k < 7; k++) s += (all[off + i - k] || {tss:0}).tss; d.t7 = s / 7; });
+  CARGA = ls;
+  const L = ls[n - 1], F = ls[0], fs = formState(L.tsb);
+  const dl = (a, b) => { const v = Math.round(a - b); return `<em style="color:${v > 0 ? 'var(--ok)' : v < 0 ? 'var(--err)' : 'var(--mut)'}">${v > 0 ? '▲ +' + v : v < 0 ? '▼ ' + v : '='}</em>`; };
+  const W = 360, Lp = 30, Rp = 8, iw = W - Lp - Rp, X = i => Lp + (n <= 1 ? 0 : i / (n - 1) * iw);
+  const grid = (Y, ticks) => ticks.map(v => `<line x1="${Lp}" x2="${W - Rp}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="var(--grid)"/><text x="${Lp - 5}" y="${(Y(v) + 4).toFixed(1)}" fill="var(--mut)" font-size="11" text-anchor="end">${v}</text>`).join('');
+  const path = (vals, Y) => vals.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join('');
+  // 1) forma y fatiga
+  const H1 = 150, top1 = Math.max(20, Math.ceil(Math.max(...ls.map(d => Math.max(d.ctl, d.atl))) * 1.1 / 10) * 10), Y1 = v => 8 + (1 - v / top1) * (H1 - 16);
+  const t1 = [0, top1 / 2, top1];
+  const c1 = `${grid(Y1, t1)}<path d="${path(ls.map(d => d.ctl), Y1)}L${X(n - 1)},${Y1(0)}L${X(0)},${Y1(0)}Z" fill="var(--ctl)" opacity=".16"/>
+    <path d="${path(ls.map(d => d.atl), Y1)}" fill="none" stroke="var(--atl)" stroke-width="1.6" opacity=".75" stroke-linejoin="round"/>
+    <path d="${path(ls.map(d => d.ctl), Y1)}" fill="none" stroke="var(--ctl)" stroke-width="3" stroke-linejoin="round"/>`;
+  // 2) frescura con bandas de estado
+  const H2 = 130, lo2 = Math.min(-40, Math.floor(Math.min(...ls.map(d => d.tsb)) / 10) * 10), hi2 = Math.max(30, Math.ceil(Math.max(...ls.map(d => d.tsb)) / 10) * 10), Y2 = v => 6 + (hi2 - v) / (hi2 - lo2) * (H2 - 12);
+  const bands = [[hi2, 25, 'var(--tsb)', 'Muy fresco'], [25, 5, 'var(--ok)', 'Fresco'], [5, -10, 'var(--ok)', 'Óptimo'], [-10, -30, 'var(--atl)', 'Cargado'], [-30, lo2, 'var(--err)', 'Muy fatigado']];
+  const c2 = bands.map(([a, b, c, t], k) => `<rect x="${Lp}" y="${Y2(a).toFixed(1)}" width="${iw}" height="${(Y2(b) - Y2(a)).toFixed(1)}" fill="${c}" opacity="${k === 2 ? .13 : .07}"/>
+      ${Y2(b) - Y2(a) >= 13 ? `<text x="${W - Rp - 4}" y="${((Y2(a) + Y2(b)) / 2 + 4).toFixed(1)}" fill="${c}" font-size="10" font-weight="700" text-anchor="end" opacity=".9">${t}</text>` : ''}`).join('')
+    + `<line x1="${Lp}" x2="${W - Rp}" y1="${Y2(0)}" y2="${Y2(0)}" stroke="var(--dash)"/><text x="${Lp - 5}" y="${Y2(0) + 4}" fill="var(--mut)" font-size="11" text-anchor="end">0</text>`
+    + `<path d="${path(ls.map(d => d.tsb), Y2)}" fill="none" stroke="var(--tsb)" stroke-width="2.4" stroke-linejoin="round"/>`;
+  // 3) TSS diario y media de 7 días
+  const H3 = 110, top3 = Math.max(60, Math.ceil(Math.min(200, Math.max(...ls.map(d => d.tss))) / 20) * 20), Y3 = v => 6 + (1 - Math.min(v, top3) / top3) * (H3 - 12), bw = Math.max(1.5, iw / n * .62);
+  const c3 = grid(Y3, [0, top3 / 2, top3]) + ls.map((d, i) => d.tss > 0 ? `<rect x="${(X(i) - bw / 2).toFixed(1)}" y="${Y3(d.tss).toFixed(1)}" width="${bw.toFixed(1)}" height="${(Y3(0) - Y3(d.tss)).toFixed(1)}" rx="1" fill="var(--mut)" opacity=".45"/>` : '').join('')
+    + `<path d="${path(ls.map(d => d.t7), Y3)}" fill="none" stroke="var(--acc)" stroke-width="2.2" stroke-linejoin="round"/>`;
+  // fechas
+  const nl = 4, xl = Array.from({length:nl}, (_, k) => Math.round(k * (n - 1) / (nl - 1)));
+  const dates = xl.map((i, k) => `<text x="${X(i).toFixed(1)}" y="14" fill="var(--mut)" font-size="11" text-anchor="${k === 0 ? 'start' : k === nl - 1 ? 'end' : 'middle'}">${i === n - 1 ? 'hoy' : fdm(ls[i].date)}</text>`).join('');
+  const svg = (h, body, k) => `<svg class="lc cg" data-k="${k}" viewBox="0 0 ${W} ${h}" style="touch-action:pan-y">${body}<line class="cgx" x1="${X(n - 1)}" x2="${X(n - 1)}" y1="0" y2="${h}" stroke="var(--txt)" stroke-width="1" opacity=".35"/></svg>`;
   $('anaBox').innerHTML = `<div class="seg">${[[42, '6 semanas'], [90, '3 meses'], [180, '6 meses']].map(([d, t]) => `<button class="${CARGA_D === d ? 'on' : ''}" onclick="CARGA_D=${d};anaCarga()">${t}</button>`).join('')}</div>
-    <div class="card"><h2>Carga diaria</h2>
-    ${lineChart({h:230, yMin:Math.floor(lo / 10) * 10, yMax:Math.ceil(hi / 10) * 10, zeroLine:true, xLabels:xl,
-      bars:{vals:ls.map(d => Math.min(d.tss, 150)), color:'#8b93a3'},
-      series:[{vals:ls.map(d => d.tsb), color:'var(--tsb)', w:1.6}, {vals:ls.map(d => d.atl), color:'var(--atl)', w:1.6}, {vals:ls.map(d => d.ctl), color:'var(--ctl)', w:2.6}]})}
-    ${legend([['var(--ctl)', 'CTL forma'], ['var(--atl)', 'ATL fatiga'], ['var(--tsb)', 'TSB frescura'], ['#8b93a3', 'TSS del día']])}</div>`;
+    <div class="card"><div class="cgnow">
+      <div><b style="color:var(--ctl)">${Math.round(L.ctl)}</b><span>Forma</span>${dl(L.ctl, F.ctl)}</div>
+      <div><b style="color:var(--atl)">${Math.round(L.atl)}</b><span>Fatiga</span>${dl(L.atl, F.atl)}</div>
+      <div><b style="color:${fs.c}">${L.tsb > 0 ? '+' : ''}${Math.round(L.tsb)}</b><span>Frescura</span><em style="color:${fs.c}">${fs.t}</em></div></div>
+      <div class="small mut" style="margin-top:8px">Flechas: cambio desde el ${fdm(F.date)}. Toca o arrastra sobre las gráficas para ver un día.</div></div>
+    <div class="card" id="cgCard">
+      <div class="cgday" id="cgDay"></div>
+      <h3 class="cgh"><span><i style="background:var(--ctl)"></i>Forma</span><span><i style="background:var(--atl)"></i>Fatiga</span></h3>
+      ${svg(H1, c1, 1)}
+      <h3 class="cgh"><span><i style="background:var(--tsb)"></i>Frescura</span><small>forma − fatiga</small></h3>
+      ${svg(H2, c2, 2)}
+      <h3 class="cgh"><span><i style="background:var(--mut)"></i>TSS del día</span><span><i style="background:var(--acc)"></i>media 7 días</span></h3>
+      ${svg(H3, c3, 3)}
+      <svg class="lc" viewBox="0 0 ${W} 18">${dates}</svg>
+      <div class="small mut" style="margin-top:10px">La <b style="color:var(--ctl)">forma</b> (CTL) es tu carga media de 6 semanas: si sube, estás mejorando. La <b style="color:var(--atl)">fatiga</b> (ATL) es la de la última semana. La <b style="color:var(--tsb)">frescura</b> es la diferencia: en la franja verde estás entrenando bien; muy abajo, toca descansar; muy arriba, estás perdiendo forma.</div></div>`;
+  cargaDay(n - 1);
+  document.querySelectorAll('#cgCard svg.cg').forEach(el => {
+    const mv = e => { const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W; cargaDay(Math.round((x - Lp) / iw * (n - 1))); };
+    el.addEventListener('pointerdown', mv); el.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'mouse') mv(e); });
+  });
+}
+function cargaDay(i){
+  const ls = CARGA; if (!ls) return; const n = ls.length; i = Math.max(0, Math.min(n - 1, i));
+  const d = ls[i], fs = formState(d.tsb), x = 30 + (n <= 1 ? 0 : i / (n - 1) * 322);
+  document.querySelectorAll('#cgCard .cgx').forEach(l => { l.setAttribute('x1', x); l.setAttribute('x2', x); });
+  const dt = new Date(d.date).toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short'});
+  $('cgDay').innerHTML = `<b>${i === n - 1 ? 'Hoy' : dt.charAt(0).toUpperCase() + dt.slice(1)}</b>
+    <span>TSS <b>${d.tss}</b></span><span style="color:var(--ctl)">forma <b>${Math.round(d.ctl)}</b></span><span style="color:var(--atl)">fatiga <b>${Math.round(d.atl)}</b></span><span style="color:${fs.c}">frescura <b>${d.tsb > 0 ? '+' : ''}${Math.round(d.tsb)}</b></span>`;
 }
 function anaSemanas(){
   if (noData()) return $('anaBox').innerHTML = emptyBox('Tus semanas, de un vistazo', 'TSS, tiempo y sesiones de cada semana para ver si eres constante. Aparecerán en cuanto ruedes.', 'descanso');
