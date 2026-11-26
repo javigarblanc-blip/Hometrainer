@@ -311,6 +311,10 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .scene .mk.gh{border-color:var(--mut);border-style:dashed;opacity:.6;filter:grayscale(1);z-index:1}
 .scene .lbl{position:absolute;bottom:5px;white-space:nowrap;font:700 11px var(--body);color:#fff;background:rgba(0,0,0,.5);padding:1px 6px;border-radius:6px;transform:translateX(-50%)}
 .scene .up{margin-top:-30px}
+.scene .zctl{position:absolute;right:6px;top:6px;display:flex;align-items:center;background:var(--s1);border-radius:10px;opacity:.94;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.scene .zctl button{width:40px;height:36px;border:0;background:none;color:var(--txt);font:700 22px/1 var(--num);cursor:pointer}
+.scene .zctl button:disabled{opacity:.3}
+.scene .zctl span{font:700 12px var(--body);color:var(--mut);min-width:34px;text-align:center}
 .scene .gap{position:absolute;left:8px;top:6px;font:700 13px var(--body);padding:3px 8px;border-radius:8px;background:var(--s1);opacity:.92}
 .lost{display:flex;gap:12px;align-items:center;background:var(--warnbg);border:2px solid var(--warnbd);color:var(--warntx);border-radius:16px;padding:12px 14px;margin:10px 0 0}
 .lost img{width:58px;height:58px;object-fit:contain;flex:none}
@@ -551,7 +555,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.23.0';
+const VER = '0.24.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1138,8 +1142,13 @@ function skyDefs(id){
   return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sky1)"/><stop offset="1" style="stop-color:var(--sky2)"/></linearGradient></defs>`;
 }
 // Escena del reproductor: ventana de unos 3 km alrededor de tu posición, con cielo, montañas en paralaje, terreno coloreado por pendiente, Brinco y tu fantasma
+// v0.24: zoom del perfil (1, 3, 6 km o la ruta entera), se guarda en S.sceneZoom
+const SCENE_Z = [1000, 3000, 6000, 0];
+const sceneZi = () => S.sceneZoom == null ? 1 : Math.max(0, Math.min(SCENE_Z.length - 1, S.sceneZoom));
+function sceneZoom(d, ev){ if (ev) ev.stopPropagation(); S.sceneZoom = Math.max(0, Math.min(SCENE_Z.length - 1, sceneZi() + d)); saveS(); buzz(20); if (P.on) drawPlayerChart(); }
 function routeScene(r, pos, gpos){
-  const W = 400, H = 150, span = Math.min(r.dist, 3000), x0 = Math.max(0, Math.min(r.dist - span, pos - span * .22));
+  const zi = sceneZi(), zs = SCENE_Z[zi];
+  const W = 400, H = 150, span = zs ? Math.min(r.dist, zs) : r.dist, x0 = Math.max(0, Math.min(r.dist - span, pos - span * .22));
   const X = x => (x - x0) / span * W;
   let emin = 1e9, emax = -1e9;
   for (let x = x0; x <= x0 + span; x += STEP){ const e = routeEle(r, x); if (e < emin) emin = e; if (e > emax) emax = e; }
@@ -1150,25 +1159,25 @@ function routeScene(r, pos, gpos){
     m2 += `L${u.toFixed(1)},${(H * .58 - ridge(wx * .5 + 9000, 2.1) * H * .14).toFixed(1)}`; }
   m1 += `L${W},${H}Z`; m2 += `L${W},${H}Z`;
   let ground = '', road = '';
-  const sl = 50;
+  const sl = Math.max(50, Math.round(span / 150 / 50) * 50);
   for (let x = x0; x < x0 + span; x += sl){ const x1 = Math.min(x0 + span, x + sl), e0 = routeEle(r, x), e1 = routeEle(r, x1), g = (e1 - e0) / Math.max(1, x1 - x) * 100;
     ground += `<path d="M${X(x).toFixed(1)},${H}L${X(x).toFixed(1)},${Y(e0).toFixed(1)}L${X(x1).toFixed(1)},${Y(e1).toFixed(1)}L${X(x1).toFixed(1)},${H}Z" fill="${gcol(g)}" stroke="${gcol(g)}" stroke-width=".8"/>`;
     road += (road ? 'L' : 'M') + X(x).toFixed(1) + ',' + Y(e0).toFixed(1); }
   road += `L${W},${Y(routeEle(r, x0 + span)).toFixed(1)}`;
   const done = `<rect x="0" y="0" width="${Math.max(0, X(pos)).toFixed(1)}" height="${H}" fill="var(--sky1)" opacity=".28"/>`;
-  let lbl = '', step = span > 2000 ? 1000 : 500;
-  for (let k = Math.ceil(x0 / step) * step; k <= x0 + span; k += step) if (X(k) > 20 && X(k) < W - 20) lbl += `<div class="lbl" style="left:${(X(k) / W * 100).toFixed(2)}%">${dec(k / 1000, step < 1000 ? 1 : 0)} km</div>`;
+  let lbl = '', step = span > 30000 ? 10000 : span > 15000 ? 5000 : span > 7000 ? 2000 : span > 2000 ? 1000 : 250;
+  for (let k = Math.ceil(x0 / step) * step; k <= x0 + span; k += step) if (X(k) > 20 && X(k) < W - 20) lbl += `<div class="lbl" style="left:${(X(k) / W * 100).toFixed(2)}%">${step < 1000 ? (k % 1000 ? dec(k / 1000, k % 500 ? 2 : 1) : k / 1000) : k / 1000} km</div>`;
   const mk = (x, cls) => `<div class="mk${cls}" style="left:${(X(x) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, x)) / H * 100).toFixed(2)}%;background-image:url(mascota/avatar.webp)"></div>`;
   // v0.23: si el dato ya está en la fila de datos, no se repite en la escena
   const fs = P.on ? curFields() : [], inG = P.ghost && fs.includes('ghost'), inC = fs.includes('chal') || (!P.ghost && fs.includes('ghost'));
   const near = x => x != null && Math.abs(X(x) - X(pos)) < W * .07 ? ' up' : '';
   const gp = gpos != null && !inG ? ghostGap() : null, cg = P.on && P.chal && !inC ? chalGap() : null, cpos = P.on && P.chal ? ghostDist(P.chal, P.rec.p.length) : null, cc = P.chal ? chalByK(P.chal.k) : null;
   return `<div class="scene"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${skyDefs('skyP')}
-      <rect width="${W}" height="${H}" fill="url(#skyP)"/><circle cx="${W * .8}" cy="${H * .22}" r="11" style="fill:var(--sun)" opacity=".55"/>
+      <rect width="${W}" height="${H}" fill="url(#skyP)"/><circle cx="${W * .62}" cy="${H * .22}" r="11" style="fill:var(--sun)" opacity=".55"/>
       <path d="${m1}" style="fill:var(--mnt1)"/><path d="${m2}" style="fill:var(--mnt2)"/>
       ${ground}<path d="${road}" fill="none" style="stroke:var(--txt)" stroke-width="1.4" opacity=".55" vector-effect="non-scaling-stroke"/>${done}</svg>
     ${lbl}${cpos != null && cpos >= x0 && cpos <= x0 + span ? `<div class="chm${near(cpos)}" style="left:${(X(cpos) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, cpos)) / H * 100).toFixed(2)}%">${cc.e}</div>` : ''}${gpos != null && gpos >= x0 && gpos <= x0 + span ? mk(gpos, ' gh' + near(gpos)) : ''}${mk(pos, '')}
-    ${gp || cg ? `<div class="gap">${gp ? `<span style="color:${gp.s <= 0 ? 'var(--ok)' : 'var(--err)'}">Fantasma: ${gp.s <= 0 ? 'vas ' + clock(-gp.s) + ' por delante' : 'vas ' + clock(gp.s) + ' por detrás'}</span>` : ''}${gp && cg ? '<br>' : ''}${cg ? `<span style="color:${cg.s <= 0 ? 'var(--ok)' : 'var(--err)'}">${cc.e} ${cg.s <= 0 ? clock(-cg.s) + ' por delante' : clock(cg.s) + ' por detrás'}</span>` : ''}</div>` : ''}</div>`;
+    ${gp || cg ? `<div class="gap">${gp ? `<span style="color:${gp.s <= 0 ? 'var(--ok)' : 'var(--err)'}">Fantasma: ${gp.s <= 0 ? 'vas ' + clock(-gp.s) + ' por delante' : 'vas ' + clock(gp.s) + ' por detrás'}</span>` : ''}${gp && cg ? '<br>' : ''}${cg ? `<span style="color:${cg.s <= 0 ? 'var(--ok)' : 'var(--err)'}">${cc.e} ${cg.s <= 0 ? clock(-cg.s) + ' por delante' : clock(cg.s) + ' por detrás'}</span>` : ''}</div>` : ''}${P.on ? `<div class="zctl"><button onclick="sceneZoom(1,event)"${zi === SCENE_Z.length - 1 ? ' disabled' : ''} aria-label="Alejar">−</button><span>${zs && zs < r.dist ? zs / 1000 + ' km' : 'todo'}</span><button onclick="sceneZoom(-1,event)"${zi === 0 ? ' disabled' : ''} aria-label="Acercar">+</button></div>` : ''}</div>`;
 }
 function routeIdx(r, x){ return Math.max(0, Math.min(r.d.length - 1, Math.round(x / STEP))); }
 const routeGrade = (r, x) => r.g[routeIdx(r, x)];
