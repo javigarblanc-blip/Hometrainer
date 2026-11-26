@@ -475,7 +475,9 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
       <input type="file" id="impFile" accept=".json" style="display:none" onchange="importData(this)">
     </div>
     <div class="small mut" style="margin-top:8px"><span id="backupInfo"></span> En el móvil puedes mandarla a Google Drive, al correo o a WhatsApp. Si pasan 7 días con sesiones nuevas sin copia, Brinco te lo recuerda en Inicio.</div>
-    <div class="small mut" style="margin-top:10px" id="ver"></div>
+    <div class="card" id="cloudBox" style="margin:14px 0 0;background:var(--s2)"></div>
+    <div class="small mut" style="margin-top:10px" id="storeInfo"></div>
+    <div class="small mut" style="margin-top:6px" id="ver"></div>
   </div>
 </section>
 
@@ -535,7 +537,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.20.1';
+const VER = '0.21.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -547,6 +549,73 @@ const LS = {
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ toast('No queda espacio para guardar'); return false; } },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
+// ---- Detalle segundo a segundo de cada sesión (v0.21): en IndexedDB, que no tiene el límite de ~5 MB de localStorage.
+// recSync(id) devuelve lo que ya está en memoria (o lo que quede en localStorage de antes); recLoad(id) lo trae del almacén.
+// Al guardar, primero va a localStorage (síncrono, no se pierde si se cierra la app) y luego se mueve a IndexedDB.
+const RECS = new Map();   // caché en memoria: id -> rec (o null si no existe)
+const REC_MAX = 40;
+const IDB = {
+  db:null, bad:false,
+  open(){
+    if (this.db) return Promise.resolve(this.db);
+    if (this.bad || !window.indexedDB) return Promise.reject(new Error('sin IndexedDB'));
+    return new Promise((ok, ko) => {
+      const r = indexedDB.open('umbral', 1);
+      r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('rec')) r.result.createObjectStore('rec'); };
+      r.onsuccess = () => { this.db = r.result; ok(this.db); };
+      r.onerror = () => { this.bad = true; ko(r.error); };
+    });
+  },
+  async op(mode, fn){
+    const db = await this.open();
+    return new Promise((ok, ko) => { const tx = db.transaction('rec', mode), st = tx.objectStore('rec'); const q = fn(st); tx.oncomplete = () => ok(q ? q.result : undefined); tx.onerror = () => ko(tx.error); tx.onabort = () => ko(tx.error); });
+  },
+  get(id){ return this.op('readonly', st => st.get(String(id))); },
+  put(id, v){ return this.op('readwrite', st => st.put(v, String(id))); },
+  del(id){ return this.op('readwrite', st => st.delete(String(id))); },
+  keys(){ return this.op('readonly', st => st.getAllKeys()); }
+};
+function recCache(id, rec){ RECS.delete(id); RECS.set(id, rec); while (RECS.size > REC_MAX) RECS.delete(RECS.keys().next().value); }
+function recSync(id){ if (RECS.has(id)) return RECS.get(id); return LS.get('ht_act_' + id, null); }
+async function recLoad(id){
+  if (RECS.has(id)) return RECS.get(id);
+  let rec = LS.get('ht_act_' + id, null);
+  if (!rec){ try{ rec = (await IDB.get(id)) || null; }catch(e){ rec = null; } }
+  recCache(id, rec); return rec;
+}
+async function recLoadMany(ids){ for (const id of ids) await recLoad(id); }
+let recWantQ = new Set(), recWantT = null;
+function recWant(ids){
+  ids.forEach(id => recWantQ.add(id));
+  clearTimeout(recWantT);
+  recWantT = setTimeout(async () => {
+    const q = [...recWantQ]; recWantQ = new Set();
+    await recLoadMany(q);
+    try{ if ($('sAna').classList.contains('on')) renderAna(); else if ($('sHome').classList.contains('on')) renderHome(); }catch(e){}
+  }, 50);
+}
+// guarda: localStorage al momento y, en cuanto se puede, al almacén grande (y lo quita de localStorage)
+function recSave(id, rec){
+  recCache(id, rec);
+  const inLS = LS.set('ht_act_' + id, rec);
+  IDB.put(id, rec).then(() => { if (inLS) LS.del('ht_act_' + id); }).catch(() => { if (!inLS) toast('No se ha podido guardar el detalle de la sesión'); });
+}
+function recDel(id){ RECS.delete(id); LS.del('ht_act_' + id); IDB.del(id).catch(() => {}); }
+// Al abrir: lo que quede en localStorage se pasa al almacén grande. Antes se calcula lo que se deriva del detalle
+// (deriva del pulso, desnivel y fantasmas) para no tener que volver a leerlo.
+async function recMigrate(){
+  const keys = []; try{ for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); if (k && k.startsWith('ht_act_')) keys.push(k); } }catch(e){ return; }
+  if (!keys.length) return;
+  try{ await IDB.open(); }catch(e){ return; } // sin IndexedDB se queda como estaba
+  try{ ACTS.forEach(a => { if (typeof actDec === 'function') actDec(a); if (typeof actGain === 'function') actGain(a); });
+    const rids = [...new Set(ACTS.filter(a => a.wkId && String(a.wkId).startsWith('route:')).map(a => String(a.wkId).slice(6)))]; rids.forEach(r => { if (typeof ghostOf === 'function') ghostOf(r); });
+  }catch(e){}
+  let n = 0;
+  for (const k of keys){
+    try{ const v = localStorage.getItem(k); if (!v) continue; await IDB.put(k.slice(7), JSON.parse(v)); localStorage.removeItem(k); n++; }catch(e){}
+  }
+  if (n) console.log('Umbral: ' + n + ' sesiones pasadas al almacén grande');
+}
 const S = Object.assign({apiKey:'', coachModel:'claude-sonnet-5-5', coachNotes:'', todayMult:null, theme:'grafito', ftp:200, peso:75, fcmax:180, lthr:0, name:'', src:'cp', sound:1, sid:'', ssec:'', strava:null, lastSync:0, ftpHist:[]}, LS.get('ht_settings', {}));
 if (!S.lthr) S.lthr = Math.round(S.fcmax * .9);
 if (!S.ftpHist.length) S.ftpHist = [{date:now(), ftp:S.ftp}];
@@ -1316,7 +1385,7 @@ function coachContext(focusActId){
   if (bl.length) L.push(`MEJORES POTENCIAS: ${bl.join(', ')}.`);
   if (focusActId){
     const a = ACTS.find(x => x.id === focusActId);
-    if (a){ const rec = LS.get('ht_act_' + a.id, null); const iv = intervalSummary(a, rec);
+    if (a){ const rec = recSync(a.id); const iv = intervalSummary(a, rec);
       L.push(`SESIÓN A ANALIZAR: ${dkey(a.date)} "${a.name}" ${clock(a.dur)}, TSS ${a.tss}, NP ${a.np}, media ${a.avgP}, máx ${a.maxP}, IF ${dec(a.ifv, 2)}, FC media ${a.avgHr || '-'} máx ${a.maxHr || '-'}, RPE ${a.rpe || '-'}, nota "${a.note || ''}". Tiempo en zonas (s) Z1-Z6: ${(a.zt || []).slice(1).join(', ')}.${iv ? '\nIntervalos:\n' + iv : ''}`); }
   }
   return L.join('\n');
@@ -1351,6 +1420,7 @@ async function coachAsk(userText, focusActId){
 async function coachApi(userText, focusActId, inChat){
   {
     const history = (inChat ? CHAT.slice(-8, -1) : CHAT.slice(-7)).filter(m => m.text && !m.err).map(m => ({role:m.role, content:m.role === 'user' ? m.text : JSON.stringify({texto:m.text, acciones:m.actions || []})}));
+    if (focusActId) await recLoad(focusActId);
     const msgs = history.concat([{role:'user', content:`DATOS ACTUALES DE LA APP:\n${coachContext(focusActId)}\n\nMENSAJE DEL CICLISTA: ${userText}`}]);
     while (msgs.length && msgs[0].role !== 'user') msgs.shift();
     const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST',
@@ -1902,7 +1972,10 @@ function ghostFromRec(rec, dist){
 function ghostOf(id){
   if (GHOSTS[id] !== undefined) return GHOSTS[id];
   const r = routeById(id); let best = null;
-  if (r) ACTS.filter(a => a.wkId === 'route:' + id).forEach(a => { const g = ghostFromRec(LS.get('ht_act_' + a.id, null), r.dist); if (g && (!best || g.dur < best.dur)) best = Object.assign(g, {date:a.date, actId:a.id}); });
+  const mine = r ? ACTS.filter(a => a.wkId === 'route:' + id) : [];
+  const miss = mine.filter(a => recSync(a.id) === null && !RECS.has(a.id));
+  if (miss.length){ recWant(miss.map(a => a.id)); return null; } // aún en el almacén: se calcula al traerlas
+  mine.forEach(a => { const g = ghostFromRec(recSync(a.id), r.dist); if (g && (!best || g.dur < best.dur)) best = Object.assign(g, {date:a.date, actId:a.id}); });
   GHOSTS[id] = best; saveGhosts(); return best;
 }
 // distancia del fantasma en el segundo T y segundo en que el fantasma pasó por la distancia x
@@ -2349,7 +2422,7 @@ function finalize(start, name, wkId, rec, sessKey){
   { const dc = decoupling(rec, S.ftp); meta.dec = dc ? {pct:dc.pct, ef:dc.ef} : 0; }
   meta.prs = BEST_D.filter(d => meta.best[d] && (!prev[d] || meta.best[d] > prev[d].w) && ACTS.length > 0);
   meta.prPrev = {}; meta.prs.forEach(d => { if (prev[d]) meta.prPrev[d] = prev[d].w; });
-  LS.set('ht_act_' + id, rec);
+  recSave(id, rec); setTimeout(() => cloudSoon(6000), 0);
   ACTS = ACTS.filter(a => a.id !== id); ACTS.push(meta); ACTS.sort((a, b) => b.date - a.date); saveActs();
   // plan
   if (PLAN){
@@ -2379,7 +2452,8 @@ function actChart(rec){
 }
 function showAct(id, fresh){
   const a = ACTS.find(x => x.id === id); if (!a) return;
-  const rec = LS.get('ht_act_' + id, null);
+  if (!RECS.has(id) && localStorage.getItem('ht_act_' + id) === null){ recLoad(id).then(() => showAct(id, fresh)); return; }
+  const rec = recSync(id);
   const wk = a.wkId ? BASE_WK.find(w => w.id === a.wkId) : null;
   let testBox = '';
   if (!a.noPR && wk && wk.test === 'rampa' && a.best && a.best[60]){ const f = Math.round(a.best[60] * .75); testBox = testCard('Mejor minuto: ' + a.best[60] + ' W', f); }
@@ -2442,7 +2516,7 @@ const loadImg = src => new Promise(res => { const im = new Image(); im.onload = 
 async function shareCard(id){
   const a = ACTS.find(x => x.id === id); if (!a) return;
   toast('Preparando la imagen…');
-  const rec = LS.get('ht_act_' + id, null), route = a.wkId && a.wkId.startsWith('route:') ? routeById(a.wkId.slice(6)) : null;
+  const rec = await recLoad(id), route = a.wkId && a.wkId.startsWith('route:') ? routeById(a.wkId.slice(6)) : null;
   try{ await document.fonts.ready; await document.fonts.load('700 80px "Barlow Condensed"'); await document.fonts.load('600 30px Barlow'); }catch(e){}
   const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
   const NUM = '"Barlow Condensed", sans-serif', BODY = 'Barlow, sans-serif';
@@ -2529,7 +2603,7 @@ function setFtp(v){
 function delActs(ids){
   if (!ids.length) return;
   const set = new Set(ids);
-  ACTS = ACTS.filter(a => !set.has(a.id)); saveActs(); ids.forEach(id => LS.del('ht_act_' + id));
+  ACTS = ACTS.filter(a => !set.has(a.id)); saveActs(); ids.forEach(id => recDel(id));
   Object.keys(GHOSTS).forEach(k => { if (GHOSTS[k] && set.has(GHOSTS[k].actId)) delete GHOSTS[k]; }); saveGhosts();
   if (PLAN){ PLAN.sessions.forEach(s => { if (set.has(s.actId)){ s.status = 'pend'; s.actId = null; } }); savePlan(); }
 }
@@ -2585,8 +2659,8 @@ function downloadBlob(blob, name){
   const url = URL.createObjectURL(blob), el = document.createElement('a');
   el.href = url; el.download = name; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
-function downloadTCX(id){
-  const a = ACTS.find(x => x.id === id), rec = LS.get('ht_act_' + id, null);
+async function downloadTCX(id){
+  const a = ACTS.find(x => x.id === id), rec = await recLoad(id);
   if (!a || !rec) return toast('No se encuentran los datos');
   downloadBlob(new Blob([buildTCX(a, rec)], {type:'application/vnd.garmin.tcx+xml'}), 'umbral_' + dkey(a.date) + '_' + ftime(a.date).replace(':', '') + '.tcx');
 }
@@ -2647,7 +2721,7 @@ async function stravaToken(){
   return S.strava.at;
 }
 async function stravaUpload(id){
-  const a = ACTS.find(x => x.id === id), rec = LS.get('ht_act_' + id, null);
+  const a = ACTS.find(x => x.id === id), rec = await recLoad(id);
   const btn = $('upBtn');
   if (!a || !rec) return toast('No se encuentran los datos');
   try{
@@ -2745,7 +2819,7 @@ function decoupling(rec, ftp){
 }
 // valor guardado o calculado una vez para sesiones antiguas (0 = no aplicable)
 function actDec(a){
-  if (a.dec === undefined){ const dc = decoupling(LS.get('ht_act_' + a.id, null), a.ftp || S.ftp); a.dec = dc ? {pct:dc.pct, ef:dc.ef} : 0; saveActs(); }
+  if (a.dec === undefined){ const rec = recSync(a.id); if (!rec){ recWant([a.id]); return null; } const dc = decoupling(rec, a.ftp || S.ftp); a.dec = dc ? {pct:dc.pct, ef:dc.ef} : 0; saveActs(); }
   return a.dec || null;
 }
 const decCol = v => v < 5 ? 'var(--ok)' : v < 8 ? 'var(--warnc)' : 'var(--err)';
@@ -3526,7 +3600,8 @@ function actGain(a){
   if (a.gain != null) return a.gain;
   let g = 0;
   if (a.wkId && String(a.wkId).startsWith('route:')){
-    const r = routeById(String(a.wkId).slice(6)), rec = LS.get('ht_act_' + a.id, null);
+    const r = routeById(String(a.wkId).slice(6)), rec = recSync(a.id);
+    if (!rec){ recWant([a.id]); return 0; }
     if (r && rec && rec.rd && rec.rd.length){
       const maxd = Math.max(...rec.rd);
       for (let i = 1; i < r.d.length && r.d[i] <= maxd; i++) if (r.e[i] > r.e[i - 1]) g += r.e[i] - r.e[i - 1];
@@ -3680,7 +3755,7 @@ function anaLogros(){
 // ================= AJUSTES =================
 function renderCfg(){
   applyTheme();
-  renderBackupInfo();
+  renderBackupInfo(); renderCloud(); renderStore();
   $('iFtp').value = S.ftp; $('iPeso').value = S.peso; $('iFc').value = S.fcmax; $('iLthr').value = S.lthr; $('iName').value = S.name;
   {
     const m = today().slice(0, 7), U = S.aiUsage && S.aiUsage.month === m ? S.aiUsage : null, T = S.aiTotal;
@@ -3719,7 +3794,8 @@ function readCfg(){
 }
 ['iKey', 'iModel', 'iNotes', 'iFtp', 'iPeso', 'iFc', 'iLthr', 'iName', 'iSrc', 'iSound', 'iBrinco', 'iErgG', 'iPm', 'iWeek', 'iSid', 'iSsec', 'iZbg', 'iFs', 'iWp'].forEach(id => $(id).addEventListener('change', () => { readCfg(); toast('Guardado'); }));
 async function exportData(share){
-  const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, routes:ROUTES, acts:ACTS.map(a => Object.assign({}, a, {rec:LS.get('ht_act_' + a.id, null)}))};
+  const acts = []; for (const a of ACTS) acts.push(Object.assign({}, a, {rec:await recLoad(a.id)}));
+  const data = {v:2, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), plan:PLAN, feel:FEEL, custom:CUSTOM, routes:ROUTES, acts};
   const name = 'umbral-copia-' + today() + '.json', blob = new Blob([JSON.stringify(data)], {type:'application/json'});
   let done = false;
   if (share){
@@ -3748,13 +3824,145 @@ function renderBackupCard(){
     <div class="row" style="margin-top:8px"><button class="btn acc sm" onclick="exportData(true)">Guardar copia</button><button class="btn ghost sm" onclick="S.backupSnooze=now()+3*DAY;saveS();renderBackupCard()">Luego</button></div></div></div>`;
 }
 function renderBackupInfo(){ const el = $('backupInfo'); if (el) el.textContent = S.lastBackup ? 'Última copia: ' + fdate(S.lastBackup) + ', ' + ftime(S.lastBackup) + '.' : 'Aún no has hecho ninguna copia.'; }
+// ================= COPIA EN LA NUBE (Firebase, v0.21) =================
+// Proyecto de Firebase "umbral" de Javi (Realtime Database en europe-west1), por REST, sin librerías.
+// u/<código>/ses/<id>   cada sesión con su detalle, una vez y para siempre (no se borra aunque la borres en el móvil)
+// u/<código>/snap/c0…c4 las 5 últimas copias del resto (ajustes, plan, lista de sesiones, trayectos...), turnándose
+// Todo va comprimido (gzip + base64). El código es largo y aleatorio; las reglas solo dejan leer/escribir con él.
+// Las claves de Anthropic y de Strava nunca se suben.
+const CLOUD_URL = 'https://umbral-faf44-default-rtdb.europe-west1.firebasedatabase.app';
+const CLOUD_SNAPS = 5;
+const CL = Object.assign({code:'', sent:{}, slot:0, last:0, hash:'', err:''}, LS.get('ht_cloud', {}));
+const saveCL = () => LS.set('ht_cloud', CL);
+function cloudCode(){
+  if (!CL.code){
+    const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = new Uint32Array(24); crypto.getRandomValues(r);
+    CL.code = Array.from(r, n => ch[n % ch.length]).join(''); saveCL();
+  }
+  return CL.code;
+}
+const cloudPretty = c => (c || '').match(/.{1,4}/g).join('-');
+const cloudClean = t => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+// gzip + base64 (CompressionStream, nativo en Chrome)
+function b64(buf){ const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+async function gzip(str){ return b64(await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); }
+async function gunzip(s){ const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
+async function cloudReq(method, path, body){
+  const r = await fetch(`${CLOUD_URL}/u/${path}.json`, {method, headers:{'content-type':'application/json'}, body:body === undefined ? undefined : JSON.stringify(body)});
+  if (!r.ok){ let m = 'error ' + r.status; try{ const j = await r.json(); if (j && j.error) m = j.error; }catch(e){} throw new Error(m); }
+  return r.json();
+}
+// lo que va en cada copia (todo menos el detalle de las sesiones, que va aparte)
+function cloudSnapData(){
+  return {v:1, settings:Object.assign({}, S, {strava:null, ssec:'', apiKey:''}), acts:ACTS, plan:PLAN, feel:FEEL, custom:CUSTOM, routes:ROUTES, ghost:GHOSTS, chat:CHAT.slice(-60)};
+}
+function cloudHash(str){ let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return str.length + ':' + h; }
+let cloudBusy = false, cloudTimer = null;
+function cloudSoon(ms){ clearTimeout(cloudTimer); cloudTimer = setTimeout(() => cloudSync(false), ms || 8000); }
+async function cloudSync(manual){
+  if (cloudBusy) return;
+  if (P.on && !manual) return;                       // nunca en mitad de una sesión
+  if (!navigator.onLine){ if (manual) toast('Sin conexión'); return; }
+  cloudBusy = true; renderCloud(manual ? 'Subiendo…' : null);
+  const code = cloudCode();
+  try{
+    // 1) sesiones que aún no están en la nube (de la más antigua a la más nueva)
+    const pend = ACTS.filter(a => !CL.sent[a.id]).sort((a, b) => a.date - b.date);
+    let up = 0;
+    for (const a of pend){
+      const rec = await recLoad(a.id);
+      await cloudReq('PUT', `${code}/ses/${a.id}`, {fecha:a.date, nombre:a.name, meta:await gzip(JSON.stringify(a)), rec:rec ? await gzip(JSON.stringify(rec)) : null});
+      CL.sent[a.id] = now(); saveCL(); up++;
+      if (manual) renderCloud(`Subiendo sesiones: ${up} de ${pend.length}…`);
+    }
+    // 2) copia del resto, si ha cambiado
+    const json = JSON.stringify(cloudSnapData()), h = cloudHash(json);
+    if (manual || h !== CL.hash){
+      const slot = (CL.slot || 0) % CLOUD_SNAPS, t = now();
+      await cloudReq('PUT', `${code}/snap/c${slot}`, {fecha:t, ver:VER, resumen:{sesiones:ACTS.length, ultima:ACTS[0] ? ACTS[0].name + ' (' + dkey(ACTS[0].date) + ')' : '', plan:PLAN && planById(PLAN.id) ? planById(PLAN.id).name : ''}, data:await gzip(json)});
+      CL.slot = (slot + 1) % CLOUD_SNAPS; CL.hash = h;
+    }
+    CL.last = now(); CL.err = ''; saveCL();
+    renderCloud(manual ? 'Copia subida' + (up ? ` (${up} ${up === 1 ? 'sesión nueva' : 'sesiones nuevas'})` : '') + '.' : null);
+  }catch(e){
+    CL.err = /permission|denied/i.test(e.message) ? 'Firebase no deja guardar: revisa las reglas de la base de datos.' : 'No se pudo subir: ' + e.message; saveCL();
+    renderCloud();
+  }finally{ cloudBusy = false; }
+}
+function renderCloud(msg){
+  const el = $('cloudBox'); if (!el) return;
+  const n = ACTS.filter(a => CL.sent[a.id]).length, pend = ACTS.length - n;
+  el.innerHTML = `<div class="row between" style="align-items:center"><b>Copia en la nube</b>
+      <span class="small" style="font-weight:700;color:${CL.err ? 'var(--err)' : CL.last ? 'var(--ok)' : 'var(--warnc)'}">${CL.err ? 'sin subir' : CL.last ? '✓ ' + fdate(CL.last) + ', ' + ftime(CL.last) : 'sin copia aún'}</span></div>
+    <div class="small mut" style="margin-top:6px">${msg ? esc(msg) : CL.err ? esc(CL.err) : `Se sube sola después de cada sesión y cuando cambias algo. Cada sesión se guarda en la nube para siempre (${n} subidas${pend ? ', ' + pend + ' pendientes' : ''}) y del resto se guardan las ${CLOUD_SNAPS} últimas copias. Las claves de Anthropic y Strava no se suben.`}</div>
+    <div class="small mut" style="margin-top:10px">Tu código (apúntalo fuera del móvil: sin él no se puede recuperar):</div>
+    <div style="font:700 15px var(--num);letter-spacing:.5px;margin-top:2px;white-space:nowrap;user-select:all;-webkit-user-select:all">${cloudPretty(cloudCode())}</div>
+    <div class="row wrap" style="margin-top:10px;gap:8px">
+      <button class="btn sm acc" onclick="cloudSync(true)" ${cloudBusy ? 'disabled' : ''}>Subir ahora</button>
+      <button class="btn sm" onclick="cloudSendCode()">Enviarme el código</button>
+      <button class="btn sm" onclick="cloudRestoreOpen()">Recuperar copia</button>
+    </div>`;
+}
+function cloudSendCode(){
+  const c = cloudPretty(cloudCode());
+  try{ navigator.clipboard && navigator.clipboard.writeText(c); }catch(e){}
+  window.open('https://wa.me/?text=' + encodeURIComponent('Código de la copia en la nube de Umbral (no lo borres): ' + c), '_blank');
+}
+let CLOUD_FOUND = null;
+function cloudRestoreOpen(){
+  openSheet(`<h2>recuperar copia</h2>
+    <div class="small mut" style="margin-top:-6px">Pon el código de la copia. El de este móvil ya viene puesto; en un móvil nuevo, pega el tuyo.</div>
+    <div class="row" style="margin-top:12px;gap:8px"><input id="clCode" value="${cloudPretty(cloudCode())}" autocapitalize="characters" style="flex:1;letter-spacing:1px"><button class="btn acc" onclick="cloudFind()">Buscar</button></div>
+    <div id="clList" style="margin-top:12px"></div>`);
+  cloudFind();
+}
+async function cloudFind(){
+  const box = $('clList'), code = cloudClean($('clCode').value);
+  if (code.length < 24){ box.innerHTML = '<div class="warn">Ese código no parece completo (son 24 letras y números).</div>'; return; }
+  box.innerHTML = '<div class="small mut">Buscando…</div>';
+  try{
+    const snaps = await cloudReq('GET', `${code}/snap`);
+    const list = Object.entries(snaps || {}).filter(([, s]) => s && s.data).sort((a, b) => b[1].fecha - a[1].fecha);
+    if (!list.length){ box.innerHTML = '<div class="warn">No hay copias con ese código.</div>'; return; }
+    CLOUD_FOUND = {code, snaps:Object.fromEntries(list)};
+    box.innerHTML = list.map(([k, s]) => `<div class="li" onclick="cloudRestore('${k}')"><div class="main"><b>${fdate(s.fecha)}, ${ftime(s.fecha)}</b>
+      <div class="meta">${s.resumen ? s.resumen.sesiones + ' sesiones' + (s.resumen.ultima ? ' · última: ' + esc(s.resumen.ultima) : '') + (s.resumen.plan ? ' · plan: ' + esc(s.resumen.plan) : '') : ''} · v${esc(s.ver || '?')}</div></div>
+      <div class="side"><b style="color:var(--acc);font-size:15px">Restaurar</b></div></div>`).join('');
+  }catch(e){ box.innerHTML = `<div class="warn">No se pudo leer: ${esc(e.message)}</div>`; }
+}
+async function cloudRestore(k){
+  const s = CLOUD_FOUND && CLOUD_FOUND.snaps[k]; if (!s) return;
+  if (!confirm(`Vas a restaurar la copia del ${fdate(s.fecha)}, ${ftime(s.fecha)}.\n\nSustituye los ajustes, el plan, las sesiones, los trayectos y los workouts propios de este móvil. La clave de Brinco y la conexión con Strava de este móvil se mantienen. ¿Seguir?`)) return;
+  const box = $('clList'), code = CLOUD_FOUND.code;
+  try{
+    box.innerHTML = '<div class="small mut">Descargando la copia…</div>';
+    const d = JSON.parse(await gunzip(s.data));
+    const acts = d.acts || [];
+    let i = 0, miss = 0;
+    for (const a of acts){
+      i++; box.innerHTML = `<div class="small mut">Recuperando sesiones: ${i} de ${acts.length}…</div>`;
+      const have = await recLoad(a.id);
+      if (have) continue;
+      try{ const ses = await cloudReq('GET', `${code}/ses/${a.id}`); if (ses && ses.rec){ const rec = JSON.parse(await gunzip(ses.rec)); RECS.delete(a.id); await IDB.put(a.id, rec).catch(() => LS.set('ht_act_' + a.id, rec)); } else miss++; }catch(e){ miss++; }
+    }
+    const keep = {apiKey:S.apiKey, coachModel:S.coachModel, strava:S.strava, sid:S.sid, ssec:S.ssec, lastSync:S.lastSync, trainerId:S.trainerId, hrId:S.hrId, cadId:S.cadId};
+    LS.set('ht_settings', Object.assign({}, d.settings || {}, keep));
+    LS.set('ht_acts', acts); LS.set('ht_plan', d.plan || null); LS.set('ht_feel', d.feel || {}); LS.set('ht_custom', d.custom || []);
+    LS.set('ht_routes', d.routes || []); LS.set('ht_ghost', d.ghost || {}); if (d.chat) LS.set('ht_chat', d.chat);
+    // las próximas copias siguen en el mismo sitio, y lo que ya está en la nube no se vuelve a subir
+    const sent = {}; acts.forEach(a => { sent[a.id] = now(); });
+    LS.set('ht_cloud', {code, sent, slot:0, last:0, hash:'', err:''});
+    box.innerHTML = `<div class="small" style="color:var(--ok)">Copia restaurada${miss ? ` (a ${miss} ${miss === 1 ? 'sesión le falta' : 'sesiones les falta'} el detalle)` : ''}. Recargando…</div>`;
+    setTimeout(() => location.reload(), 1200);
+  }catch(e){ box.innerHTML = `<div class="warn">No se pudo restaurar: ${esc(e.message)}</div>`; }
+}
 function importData(inp){
   const f = inp.files[0]; if (!f) return;
   const r = new FileReader();
   r.onload = () => {
     try{
       const d = JSON.parse(r.result); let n = 0;
-      (d.acts || []).forEach(a => { if (a.rec && !ACTS.some(x => x.id === a.id)){ LS.set('ht_act_' + a.id, a.rec); const m = Object.assign({}, a); delete m.rec; ACTS.push(m); n++; } });
+      (d.acts || []).forEach(a => { if (a.rec && !ACTS.some(x => x.id === a.id)){ recSave(a.id, a.rec); const m = Object.assign({}, a); delete m.rec; ACTS.push(m); n++; } });
       ACTS.sort((a, b) => b.date - a.date); saveActs();
       if (d.custom) { d.custom.forEach(c => { if (!CUSTOM.some(x => x.id === c.id)) CUSTOM.push(c); }); LS.set('ht_custom', CUSTOM); }
       if (d.feel) { FEEL = Object.assign({}, d.feel, FEEL); LS.set('ht_feel', FEEL); }
@@ -3799,6 +4007,16 @@ setTimeout(autoSync, 1500);
 // Al abrir, intenta conectar sin selector el rodillo y el pulso de la última vez (si Chrome lo permite)
 setTimeout(() => { if (!btOK() || !navigator.bluetooth.getDevices) return; if (S.trainerId && !trainerOn()) quickConnect(S.trainerId, setupTrainer, 'Rodillo', 15000).then(ok => { if (ok) toast('Rodillo conectado'); }); if (S.hrId && !(BT.hrDev && BT.hrDev.gatt.connected)) quickConnect(S.hrId, setupHR, 'Pulsómetro', 15000).then(ok => { if (ok) toast('Pulso conectado'); }); if (S.cadId && !(BT.cadDev && BT.cadDev.gatt.connected)) quickConnect(S.cadId, setupCad, 'Medidor', 15000).then(ok => { if (ok) toast(BT.cadPM ? 'Medidor conectado' : 'Cadencia conectada'); }); }, 1200);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(autoSync, 800); });
+// Almacén grande y copia en la nube
+recMigrate().then(() => setTimeout(() => cloudSync(false), 15000));
+setInterval(() => cloudSync(false), 3 * 60e3);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') cloudSync(false); });
+async function renderStore(){
+  const el = $('storeInfo'); if (!el) return;
+  let ls = 0; try{ for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); ls += k.length + (localStorage.getItem(k) || '').length; } }catch(e){}
+  let est = null; try{ est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; }catch(e){}
+  el.textContent = `Espacio: ${dec(ls * 2 / 1048576, 1)} MB de unos 5 en el almacén pequeño (ajustes, plan, resúmenes)` + (est && est.quota ? `; ${dec(est.usage / 1048576, 1)} MB usados de ${est.quota > 1073741824 ? dec(est.quota / 1073741824, 1) + ' GB' : Math.round(est.quota / 1048576) + ' MB'} disponibles en el grande (detalle de las sesiones).` : '.');
+}
 // Pide al navegador que no borre los datos de la app por falta de espacio
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 </script>
