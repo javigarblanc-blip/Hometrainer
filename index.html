@@ -188,6 +188,12 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 10px;margin:16px 0}
 .kv div span{display:block;font-size:12px;color:var(--mut)}
 .kv div b{font:700 25px/1.1 var(--num);font-variant-numeric:tabular-nums}
+.kv div em{display:block;margin-top:2px}
+.wtab{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.wtab th{font-size:11px;color:var(--mut);font-weight:600;text-align:left;padding:4px 2px;border-bottom:1px solid var(--line)}
+.wtab td{padding:7px 2px;border-bottom:1px solid var(--line)}
+.wtab tr.cur td{color:var(--acc)}
+.wtab td:last-child,.wtab th:last-child{text-align:right}
 .empty{text-align:center;color:var(--mut);padding:40px 10px}
 .form5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;text-align:center}
 .form5 b{font:700 28px/1 var(--num);display:block;font-variant-numeric:tabular-nums}
@@ -392,7 +398,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
     <button data-t="actividad" onclick="anaTab('actividad')">Actividad</button>
     <button data-t="forma" onclick="anaTab('forma')">Forma</button>
     <button data-t="carga" onclick="anaTab('carga')">Carga</button>
-    <button data-t="semanas" onclick="anaTab('semanas')">Semanas</button>
+    <button data-t="semanas" onclick="anaTab('semanas')">Resumen</button>
     <button data-t="logros" onclick="anaTab('logros')">Logros</button>
   </div>
   <div id="anaBox"></div>
@@ -537,7 +543,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.21.0';
+const VER = '0.22.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -2891,7 +2897,7 @@ function projCard(){
     ${lineChart({h:200, yMin:Math.floor(lo / 10) * 10, yMax:Math.ceil(hi / 10) * 10, zeroLine:true, xLabels:xl,
       series:[{vals:sol('tsb'), color:'var(--tsb)', w:1.6}, {vals:fut('tsb'), color:'var(--tsb)', w:1.6, dash:true},
               {vals:sol('ctl'), color:'var(--ctl)', w:2.6}, {vals:fut('ctl'), color:'var(--ctl)', w:2.6, dash:true}]})}
-    ${legend([['var(--ctl)', 'CTL forma'], ['var(--tsb)', 'TSB frescura']])}
+    ${legend([['var(--ctl)', 'Forma'], ['var(--tsb)', 'Frescura']])}
     <div class="form5" style="margin-top:12px"><div><b style="color:var(--ctl)">${Math.round(L.ctl)}</b><span>forma final</span></div><div><b>${dC >= 0 ? '+' : ''}${Math.round(dC)}</b><span>vs hoy</span></div><div><b style="color:var(--tsb)">${L.tsb > 0 ? '+' : ''}${Math.round(L.tsb)}</b><span>frescura</span></div></div>
     <div class="small" style="margin-top:10px">El ${fdm(L.date)} llegarías <b style="color:${fs.c}">${fs.t.toLowerCase()}</b>.${pr.best ? ` Mejor día para un test o una marcha: <b>${DOWL[dow(pr.best.date)].toLowerCase()} ${fdm(pr.best.date)}</b> (forma ${Math.round(pr.best.ctl)}, frescura +${Math.round(pr.best.tsb)}).` : ' En este periodo no llegas a estar fresco: si tienes una marcha, mete unos días suaves antes.'}</div></div>`;
 }
@@ -3493,16 +3499,18 @@ function anaForma(){
   const t7 = d7.reduce((a, x) => a + x.tss, 0), t28 = d28.reduce((a, x) => a + x.tss, 0);
   const acwr = t28 ? (t7 / 7) / (t28 / 28) : 0;
   const days = ls.slice(-14);
+  const rit = acwr < .8 ? {t:'por debajo de tu media del último mes (estás bajando el ritmo)', c:'var(--tsb)'} : acwr <= 1.3 ? {t:'en la zona segura (0,8-1,3)', c:'var(--ok)'} : acwr <= 1.5 ? {t:'subiendo deprisa: vigila la fatiga', c:'var(--warnc)'} : {t:'subida muy brusca: riesgo de pasarte', c:'var(--err)'};
   $('anaBox').innerHTML = `<div class="card"><h2>Estado actual</h2>
-    <div class="form5"><div><b>${days[days.length - 1].tss}</b><span>TSS hoy</span></div><div><b style="color:var(--atl)">${Math.round(last.atl)}</b><span>ATL</span></div>
-      <div><b style="color:var(--ctl)">${Math.round(last.ctl)}</b><span>CTL</span></div><div><b style="color:var(--tsb)">${Math.round(last.tsb)}</b><span>TSB</span></div><div><b>${acwr ? dec(acwr, 2) : '--'}</b><span>Ratio</span></div></div>
+    <div class="form5"><div><b style="color:var(--ctl)">${Math.round(last.ctl)}</b><span>Forma</span></div><div><b style="color:var(--atl)">${Math.round(last.atl)}</b><span>Fatiga</span></div>
+      <div><b style="color:var(--tsb)">${last.tsb > 0 ? '+' : ''}${Math.round(last.tsb)}</b><span>Frescura</span></div><div><b style="color:${rit.c}">${acwr ? dec(acwr, 1) : '--'}</b><span>Ritmo</span></div><div><b>${days[days.length - 1].tss}</b><span>TSS hoy</span></div></div>
+    ${acwr ? `<div class="small" style="margin-top:8px;color:${rit.c}">Ritmo de carga: ${rit.t}</div>` : ''}
     <div style="font:800 26px var(--hf);color:${fs.c};margin-top:12px">${fs.t.toUpperCase()}</div>
     <div style="color:var(--adv);margin-top:4px">${adv.lines.map(esc).join('<br>')}</div>
     ${adv.swap ? `<button class="btn sm" style="margin-top:10px" onclick="swapToday()">Cambiar la sesión de hoy por Recuperación</button>` : ''}
-    <div class="small mut" style="margin-top:12px">CTL = forma (carga media de 6 semanas). ATL = fatiga (última semana). TSB = frescura (CTL − ATL). Ratio = carga de 7 días frente a la de 28: entre 0,8 y 1,3 es la zona segura.</div></div>
+    <div class="small mut" style="margin-top:12px"><b style="color:var(--ctl)">Forma</b> (CTL): tu carga media de 6 semanas. <b style="color:var(--atl)">Fatiga</b> (ATL): la de la última semana. <b style="color:var(--tsb)">Frescura</b> (TSB): forma − fatiga. <b>Ritmo</b>: carga de esta semana frente a la media del último mes.</div></div>
     ${projCard()}
     ${decTrendCard()}
-    <div class="card"><h2>Últimos 14 días</h2>${days.slice().reverse().map(d => `<div class="pr"><span class="mut">${fdate(d.date)}${FEEL[d.k] != null ? ` · <span style="color:${FEELS[FEEL[d.k]].c}">${FEELS[FEEL[d.k]].t}</span>` : ''}</span>
+    <div class="card"><h2>Últimos 14 días</h2><div class="small mut" style="margin:-4px 0 6px">TSS del día · <span style="color:var(--ctl)">forma</span> / <span style="color:var(--atl)">fatiga</span> / <span style="color:var(--tsb)">frescura</span></div>${days.slice().reverse().map(d => `<div class="pr"><span class="mut">${fdate(d.date)}${FEEL[d.k] != null ? ` · <span style="color:${FEELS[FEEL[d.k]].c}">${FEELS[FEEL[d.k]].t}</span>` : ''}</span>
       <span class="small"><b style="font-size:18px">${d.tss}</b> TSS · <span style="color:var(--ctl)">${Math.round(d.ctl)}</span> / <span style="color:var(--atl)">${Math.round(d.atl)}</span> / <span style="color:var(--tsb)">${Math.round(d.tsb)}</span></span></div>`).join('')}</div>
     ${S.strava ? `<button class="btn block" onclick="stravaSync(false)">Sincronizar Strava${S.lastSync ? ' · última ' + fdate(S.lastSync) + ' ' + ftime(S.lastSync) : ''}</button>` : `<div class="small mut">Conecta Strava en Ajustes para que tus salidas y carreras cuenten en la forma.</div>`}`;
 }
@@ -3570,25 +3578,123 @@ function cargaDay(i){
   $('cgDay').innerHTML = `<b>${i === n - 1 ? 'Hoy' : dt.charAt(0).toUpperCase() + dt.slice(1)}</b>
     <span>TSS <b>${d.tss}</b></span><span style="color:var(--ctl)">forma <b>${Math.round(d.ctl)}</b></span><span style="color:var(--atl)">fatiga <b>${Math.round(d.atl)}</b></span><span style="color:${fs.c}">frescura <b>${d.tsb > 0 ? '+' : ''}${Math.round(d.tsb)}</b></span>`;
 }
+// ================= RESUMEN (v0.22, antes "Semanas") =================
+// Periodo (semana, mes o año) con flechas para ir atrás, comparado con el periodo anterior.
+let RES_P = 'mes', RES_OFF = 0;
+const SPK = [['rodillo', 'Rodillo', 'var(--acc)'], ['bici', 'Bici fuera', '#3d8bff'], ['carrera', 'Carrera', '#2bc48a'], ['gym', 'Gimnasio', '#b07cff'], ['otros', 'Otros', '#8a93a6']];
+function sportKey(s){ s = s || ''; return /EBike/.test(s) ? 'otros' : /Ride/.test(s) ? 'bici' : /Run/.test(s) ? 'carrera' : /Weight|Workout|Crossfit|Yoga|Pilates/.test(s) ? 'gym' : 'otros'; }
+function resItems(t0, t1){
+  return ACTS.filter(a => a.date >= t0 && a.date < t1).map(a => ({k:'rodillo', date:a.date, tss:a.tss || 0, dur:a.dur || 0, km:a.dist || 0, up:actGain(a), kj:a.kj || 0, a}))
+    .concat(EXT.filter(e => e.date >= t0 && e.date < t1).map(e => ({k:sportKey(e.sport), date:e.date, tss:e.tss || 0, dur:e.dur || 0, km:(e.dist || 0) / 1000, up:e.elev || 0, kj:e.kj || 0, e})));
+}
+// límites del periodo: off = 0 el actual, 1 el anterior...
+function resRange(p, off){
+  const d = new Date();
+  if (p === 'semana'){ const s = weekStart() - off * 7 * DAY; return [s, s + 7 * DAY]; }
+  if (p === 'mes'){ const s = new Date(d.getFullYear(), d.getMonth() - off, 1), e = new Date(d.getFullYear(), d.getMonth() - off + 1, 1); return [s.getTime(), e.getTime()]; }
+  const s = new Date(d.getFullYear() - off, 0, 1), e = new Date(d.getFullYear() - off + 1, 0, 1); return [s.getTime(), e.getTime()];
+}
+function resLabel(p, t0, off){
+  if (p === 'semana') return off === 0 ? 'Esta semana' : off === 1 ? 'La semana pasada' : `${fdm(t0)} – ${fdm(t0 + 6 * DAY)}`;
+  if (p === 'mes'){ const m = new Date(t0).toLocaleDateString('es-ES', {month:'long', year:'numeric'}); return off === 0 ? 'Este mes' : m.charAt(0).toUpperCase() + m.slice(1); }
+  return off === 0 ? 'Este año' : String(new Date(t0).getFullYear());
+}
+const sum = (it, k) => it.reduce((a, x) => a + (x[k] || 0), 0);
+function kpi(label, v, prev, fmt, unit){
+  const ch = prev ? (v - prev) / prev * 100 : null;
+  return `<div><span>${label}</span><b>${fmt(v)}<small class="mut" style="font-size:13px;font-weight:600"> ${unit || ''}</small></b>
+    <em style="font-style:normal;font-size:12px;font-weight:700;color:${ch == null ? 'var(--mut)' : ch >= 0 ? 'var(--ok)' : 'var(--err)'}">${ch == null ? (v ? 'nuevo' : '—') : (ch >= 0 ? '▲ +' : '▼ ') + Math.round(ch) + ' %'}</em></div>`;
+}
 function anaSemanas(){
-  if (noData()) return $('anaBox').innerHTML = emptyBox('Tus semanas, de un vistazo', 'TSS, tiempo y sesiones de cada semana para ver si eres constante. Aparecerán en cuanto ruedes.', 'descanso');
-  const L = allLoad(), ws0 = weekStart(), rows = [];
-  for (let i = 0; i < 12; i++){
-    const ws = ws0 - i * 7 * DAY, we = ws + 7 * DAY;
-    const it = L.filter(a => a.date >= ws && a.date < we);
-    rows.push({ws, n:it.length, tss:it.reduce((a, x) => a + x.tss, 0), dur:it.reduce((a, x) => a + x.dur, 0), ht:it.filter(x => x.src === 'ht').length});
+  if (noData()) return $('anaBox').innerHTML = emptyBox('Tus números, de un vistazo', 'Sesiones, horas, kilómetros e intensidad por semana, mes o año, y lo constante que eres. Aparecerán en cuanto ruedes.', 'descanso');
+  const [t0, t1] = resRange(RES_P, RES_OFF), [p0, p1] = resRange(RES_P, RES_OFF + 1);
+  // en el periodo en curso, se compara con el mismo número de días del anterior
+  const cut = RES_OFF === 0 ? Math.min(p1, p0 + (now() - t0)) : p1;
+  const it = resItems(t0, t1), pv = resItems(p0, cut);
+  const bike = x => x.k === 'rodillo' || x.k === 'bici';
+  const h = v => dur(v), n0 = v => nf(v);
+  const nav = `<div class="row between" style="align-items:center;margin:10px 2px 4px">
+      <button class="btn sm" onclick="RES_OFF++;anaSemanas()">‹</button>
+      <b style="font:800 20px var(--num)">${resLabel(RES_P, t0, RES_OFF)}</b>
+      <button class="btn sm" ${RES_OFF ? '' : 'disabled style="opacity:.35"'} onclick="RES_OFF=Math.max(0,RES_OFF-1);anaSemanas()">›</button></div>`;
+  const seg = `<div class="seg">${[['semana', 'Semana'], ['mes', 'Mes'], ['año', 'Año']].map(([k, t]) => `<button class="${RES_P === k ? 'on' : ''}" onclick="RES_P='${k}';RES_OFF=0;anaSemanas()">${t}</button>`).join('')}</div>`;
+  const kpis = `<div class="card"><div class="kv kv3" style="margin:4px 0">
+      ${kpi('Sesiones', it.length, pv.length, n0)}${kpi('Tiempo', sum(it, 'dur'), sum(pv, 'dur'), h)}${kpi('Carga', sum(it, 'tss'), sum(pv, 'tss'), n0, 'TSS')}
+      ${kpi('Bici', sum(it.filter(bike), 'km'), sum(pv.filter(bike), 'km'), n0, 'km')}${kpi('Desnivel', sum(it.filter(bike), 'up'), sum(pv.filter(bike), 'up'), n0, 'm')}${kpi('Trabajo', sum(it, 'kj'), sum(pv, 'kj'), n0, 'kJ')}</div>
+    <div class="small mut">${RES_OFF === 0 ? 'Comparado con el mismo tramo del periodo anterior' : 'Comparado con el periodo anterior'}. Bici = rodillo + salidas.</div></div>`;
+  // reparto por deporte (tiempo)
+  const tot = sum(it, 'dur') || 1, byK = SPK.map(([k, t, c]) => ({k, t, c, d:sum(it.filter(x => x.k === k), 'dur'), n:it.filter(x => x.k === k).length})).filter(x => x.n);
+  const rep = byK.length ? `<div class="card"><h2>en qué se te va el tiempo</h2>
+      <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin:10px 0">${byK.map(x => `<i style="width:${(x.d / tot * 100).toFixed(1)}%;background:${x.c}"></i>`).join('')}</div>
+      ${byK.map(x => `<div class="pr"><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${x.c};margin-right:8px"></i>${x.t}</span><span class="small"><b style="font-size:17px">${dur(x.d)}</b> · ${x.n} ${x.n === 1 ? 'sesión' : 'sesiones'} · ${Math.round(x.d / tot * 100)} %</span></div>`).join('')}</div>` : '';
+  // intensidad del rodillo (tiempo en zonas de potencia)
+  const zt = [0, 0, 0, 0, 0, 0, 0]; it.filter(x => x.a && x.a.zt).forEach(x => x.a.zt.forEach((v, i) => { zt[i] += v; }));
+  const zs = zt.reduce((a, b) => a + b, 0);
+  let inten = '';
+  if (zs){
+    const lo = (zt[1] + zt[2]) / zs, mid = (zt[3] + zt[4]) / zs, hi = (zt[5] + zt[6]) / zs;
+    const msg = lo >= .7 && hi >= .05 ? 'Reparto polarizado: mucho suave y algo muy intenso. Es lo que mejor funciona para la mayoría.'
+      : mid > .45 ? 'Mucho tiempo en la zona media (tempo y umbral). Funciona con poco tiempo, pero cansa: mete algún día suave de verdad.'
+      : lo >= .8 ? 'Casi todo suave: buena base. Si quieres subir el FTP, añade una sesión de calidad por semana.'
+      : 'Reparto variado entre suave, medio e intenso.';
+    inten = `<div class="card"><h2>intensidad en el rodillo</h2>
+      <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin:10px 0">${[1, 2, 3, 4, 5, 6].map(z => `<i style="width:${(zt[z] / zs * 100).toFixed(1)}%;background:${ZH[z]}"></i>`).join('')}</div>
+      <div class="kv kv3" style="margin:8px 0"><div><span>Suave (Z1-Z2)</span><b>${Math.round(lo * 100)} %</b></div><div><span>Medio (Z3-Z4)</span><b>${Math.round(mid * 100)} %</b></div><div><span>Duro (Z5-Z6)</span><b>${Math.round(hi * 100)} %</b></div></div>
+      <div class="small">${msg}</div>
+      <details style="margin-top:8px"><summary class="small mut">Ver por zonas</summary>${zoneBars(zt)}</details></div>`;
   }
-  const mx = Math.max(1, ...rows.map(r => r.tss));
-  const chron = rows.slice().reverse();
-  $('anaBox').innerHTML = `<div class="card"><h2>TSS por semana</h2>
-    ${lineChart({h:180, yMin:0, yMax:Math.ceil(mx * 1.15 / 10) * 10, xLabels:chron.map((r, i) => ({i, t:i % 2 ? '' : fdm(r.ws)})), bars:{vals:chron.map(r => r.tss), color:'var(--acc)'}, series:[]})}</div>` +
-    rows.map((r, i) => {
-      const prev = rows[i + 1], ch = prev && prev.tss ? (r.tss - prev.tss) / prev.tss * 100 : null;
-      return `<div class="card"><div class="row between"><b style="font:800 20px var(--hf)">${fdm(r.ws)} – ${fdm(r.ws + 6 * DAY)}</b>${i === 0 ? '<span class="tag acc">Semana actual</span>' : ''}</div>
-        <div class="kv" style="margin:10px 0 4px"><div><span>TSS</span><b>${r.tss}</b></div><div><span>Tiempo</span><b>${dur(r.dur)}</b></div><div><span>Sesiones</span><b>${r.n}${r.ht ? ` <small class="mut" style="font-size:13px">(${r.ht} rod.)</small>` : ''}</b></div></div>
-        <div class="bar"><i style="width:${r.tss / mx * 100}%"></i></div>
-        ${ch != null ? `<div class="small mut" style="margin-top:6px">Frente a la semana anterior: <b style="color:${Math.abs(ch) > 30 ? 'var(--warnc)' : 'var(--txt)'}">${ch > 0 ? '+' : ''}${Math.round(ch)} %</b></div>` : ''}</div>`;
-    }).join('');
+  // tipos de sesión del rodillo
+  const tipos = {}; it.filter(x => x.a).forEach(x => { const w = x.a.wkId ? wkById(x.a.wkId) : null; const t = x.a.wkId && String(x.a.wkId).startsWith('route:') ? 'Trayecto' : w ? w.tipo : 'Rodar libre'; tipos[t] = (tipos[t] || 0) + 1; });
+  const tip = Object.keys(tipos).length ? `<div class="card"><h2>qué has entrenado</h2><div class="row wrap" style="gap:6px;margin-top:8px">${Object.entries(tipos).sort((a, b) => b[1] - a[1]).map(([t, v]) => `<span class="tag" style="font-size:13px"><b style="color:var(--txt)">${v}</b> ${esc(t)}</span>`).join('')}</div></div>` : '';
+  // plan
+  let plan = '';
+  if (PLAN){ const ss = PLAN.sessions.filter(s => { const t = kdate(s.date).getTime(); return t >= t0 && t < t1 && s.date <= today(); });
+    if (ss.length){ const d = ss.filter(s => s.status === 'done').length, sk = ss.filter(s => s.status === 'skip').length, pct = Math.round(d / ss.length * 100);
+      plan = `<div class="card"><h2>tu plan</h2><div class="kv kv3" style="margin:8px 0"><div><span>Hechas</span><b style="color:var(--ok)">${d}</b></div><div><span>Saltadas</span><b>${sk}</b></div><div><span>Sin hacer</span><b style="color:${ss.length - d - sk ? 'var(--warnc)' : 'var(--txt)'}">${ss.length - d - sk}</b></div></div>
+        <div class="bar"><i style="width:${pct}%"></i></div><div class="small mut" style="margin-top:6px">Has cumplido el ${pct} % de las sesiones que tocaban hasta hoy.</div></div>`; } }
+  $('anaBox').innerHTML = seg + nav + kpis + rep + inten + tip + plan + constCard() + weeksCard();
+}
+// Constancia: calendario de las últimas 18 semanas (color según la carga del día) y rachas
+function constCard(){
+  const W = 18, ws = weekStart() - (W - 1) * 7 * DAY, map = {};
+  resItems(ws, now() + DAY).forEach(x => { const k = dkey(x.date); map[k] = (map[k] || 0) + x.tss; });
+  const col = t => !t ? 'var(--s2)' : t < 40 ? 'rgba(255,122,26,.35)' : t < 80 ? 'rgba(255,122,26,.6)' : t < 130 ? 'rgba(255,122,26,.85)' : '#ff7a1a';
+  const cs = 17, gap = 3, x0 = 22;
+  let cells = '';
+  for (let w = 0; w < W; w++) for (let d = 0; d < 7; d++){
+    const t = ws + (w * 7 + d) * DAY; if (t > now()) continue;
+    const k = dkey(t), v = map[k] || 0;
+    cells += `<rect x="${x0 + w * (cs + gap)}" y="${d * (cs + gap)}" width="${cs}" height="${cs}" rx="4" fill="${col(v)}"${k === today() ? ' stroke="var(--txt)" stroke-width="1.5"' : ''}><title>${fdate(t)}: ${v} TSS</title></rect>`;
+  }
+  const labels = ['L', '', 'X', '', 'V', '', 'D'].map((l, d) => l ? `<text x="0" y="${d * (cs + gap) + 13}" fill="var(--mut)" font-size="11">${l}</text>` : '').join('');
+  const months = []; for (let w = 0; w < W; w++){ const t = new Date(ws + w * 7 * DAY); if ((w === 0 && t.getDate() <= 14) || (w > 0 && t.getDate() <= 7)) months.push(`<text x="${x0 + w * (cs + gap)}" y="${7 * (cs + gap) + 12}" fill="var(--mut)" font-size="10">${t.toLocaleDateString('es-ES', {month:'short'}).replace('.', '')}</text>`); }
+  const width = x0 + W * (cs + gap), height = 7 * (cs + gap) + 16;
+  // rachas de semanas con 2 o más sesiones (cualquier deporte)
+  const cnt = {}; resItems(0, now() + DAY).forEach(x => { const k = weekStart(new Date(x.date)); cnt[k] = (cnt[k] || 0) + 1; });
+  const keys = Object.keys(cnt).map(Number).sort((a, b) => a - b);
+  let best = 0, run = 0, prev = null;
+  keys.forEach(k => { if (cnt[k] >= 2){ run = prev != null && k - prev <= 7 * DAY + 3600e3 && cnt[prev] >= 2 ? run + 1 : 1; best = Math.max(best, run); } else run = 0; prev = k; });
+  let cur = 0, k = weekStart(); if ((cnt[k] || 0) < 2) k -= 7 * DAY; while ((cnt[k] || 0) >= 2){ cur++; k -= 7 * DAY; }
+  const days4 = new Set(resItems(now() - 28 * DAY, now() + DAY).map(x => dkey(x.date))).size;
+  return `<div class="card"><h2>constancia</h2>
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;margin-top:10px">${labels}${cells}${months.join('')}</svg>
+    <div class="row" style="gap:6px;align-items:center;justify-content:flex-end;margin-top:4px" class="small mut"><span class="small mut">menos</span>${[0, 30, 60, 100, 150].map(v => `<i style="width:12px;height:12px;border-radius:3px;background:${col(v)};display:inline-block"></i>`).join('')}<span class="small mut">más carga</span></div>
+    <div class="kv kv3" style="margin:12px 0 4px"><div><span>Racha actual</span><b>${cur}<small class="mut" style="font-size:13px"> sem.</small></b></div><div><span>Mejor racha</span><b>${best}<small class="mut" style="font-size:13px"> sem.</small></b></div><div><span>Días activos</span><b>${nf(days4 / 4, 1)}<small class="mut" style="font-size:13px"> /sem.</small></b></div></div>
+    <div class="small mut">Racha: semanas seguidas con 2 o más sesiones. Días activos: media de las últimas 4 semanas.</div></div>`;
+}
+// Semanas: gráfica de 12 semanas y una tabla compacta
+function weeksCard(){
+  const ws0 = weekStart(), rows = [];
+  for (let i = 0; i < 12; i++){ const ws = ws0 - i * 7 * DAY, it = resItems(ws, ws + 7 * DAY); rows.push({ws, n:it.length, tss:sum(it, 'tss'), dur:sum(it, 'dur')}); }
+  const chron = rows.slice().reverse(), mx = Math.max(1, ...rows.map(r => r.tss));
+  const avg = rows.slice(1, 5).reduce((a, r) => a + r.tss, 0) / 4;
+  return `<div class="card"><h2>últimas 12 semanas</h2>
+    ${lineChart({h:170, yMin:0, yMax:Math.ceil(mx * 1.15 / 10) * 10, xLabels:chron.map((r, i) => ({i, t:i % 3 ? '' : fdm(r.ws)})), bars:{vals:chron.map(r => r.tss), color:'var(--acc)'}, series:[{vals:chron.map(() => avg), color:'var(--mut)', w:1.2, dash:true}]})}
+    <div class="small mut" style="margin:-4px 0 8px">Línea discontinua: tu media de las 4 semanas anteriores (${Math.round(avg)} TSS).</div>
+    <table class="wtab"><tr><th>Semana</th><th>TSS</th><th>Tiempo</th><th>Ses.</th><th></th></tr>
+    ${rows.map((r, i) => { const pv = rows[i + 1], ch = pv && pv.tss ? Math.round((r.tss - pv.tss) / pv.tss * 100) : null;
+      return `<tr${i === 0 ? ' class="cur"' : ''}><td>${i === 0 ? 'Esta' : fdm(r.ws)}</td><td><b>${r.tss}</b></td><td>${r.dur ? dur(r.dur) : '—'}</td><td>${r.n || '—'}</td><td style="color:${ch == null ? 'var(--mut)' : Math.abs(ch) > 30 ? 'var(--warnc)' : 'var(--mut)'}">${ch == null || i === 0 ? '' : (ch > 0 ? '+' : '') + ch + ' %'}</td></tr>`; }).join('')}</table>
+    <div class="small mut" style="margin-top:6px">Subir más de un 30 % de una semana a otra aumenta el riesgo de pasarte.</div></div>`;
 }
 // ================= LOGROS DIVERTIDOS (v0.19) =================
 // Kilómetros, desnivel, energía y horas del año comparados con cosas reales, e insignias que se desbloquean.
@@ -3732,6 +3838,24 @@ function newBadgesCard(ids){
   return `<div class="card" style="margin:12px 0;border-color:var(--acc)"><b style="font-size:17px">🏅 ${bs.length === 1 ? '¡Insignia nueva!' : '¡' + bs.length + ' insignias nuevas!'}</b>
     ${bs.map(([, e, t, d]) => `<div style="display:flex;gap:10px;align-items:center;margin-top:8px"><span style="font-size:30px">${e}</span><span><b>${t}</b><div class="small mut">${d}</div></span></div>`).join('')}</div>`;
 }
+// Progreso mes a mes: mejores 5' y 20' de cada mes y el FTP que tenías
+function progCard(){
+  const ms = []; const d = new Date();
+  for (let i = 5; i >= 0; i--){ const s = new Date(d.getFullYear(), d.getMonth() - i, 1).getTime(), e = new Date(d.getFullYear(), d.getMonth() - i + 1, 1).getTime(); ms.push({s, e}); }
+  ms.forEach(m => { const it = ACTS.filter(a => a.date >= m.s && a.date < m.e && a.best && !a.noPR);
+    m.b5 = Math.max(0, ...it.map(a => a.best[300] || 0)) || null; m.b20 = Math.max(0, ...it.map(a => a.best[1200] || 0)) || null;
+    const fh = S.ftpHist.filter(x => x.date < m.e); m.ftp = fh.length ? fh[fh.length - 1].ftp : null; });
+  if (!ms.some(m => m.b5 || m.b20)) return '';
+  const vals = ms.flatMap(m => [m.b5, m.b20, m.ftp]).filter(Boolean), lo = Math.floor(Math.min(...vals) * .85 / 10) * 10, hi = Math.ceil(Math.max(...vals) * 1.08 / 10) * 10;
+  const last = ms[5].b20 ? ms[5] : ms.slice().reverse().find(m => m.b20), first = ms.find(m => m.b20);
+  const ch = last && first && last !== first ? Math.round((last.b20 - first.b20) / first.b20 * 100) : null;
+  return `<div class="card"><h2>progreso mes a mes</h2>
+    ${lineChart({h:190, yMin:lo, yMax:hi, xLabels:ms.map((m, i) => ({i, t:new Date(m.s).toLocaleDateString('es-ES', {month:'short'}).replace('.', '')})),
+      series:[{vals:ms.map(m => m.ftp), color:'var(--ctl)', w:1.5, dash:true}, {vals:ms.map(m => m.b5), color:'#3d8bff', w:2.2, dots:true}, {vals:ms.map(m => m.b20), color:'var(--acc)', w:2.6, dots:true}]})}
+    ${legend([['var(--acc)', 'Mejor 20 min del mes'], ['#3d8bff', 'Mejor 5 min'], ['var(--ctl)', 'Tu FTP', true]])}
+    <div class="small" style="margin-top:8px">${ch == null ? 'Haz esfuerzos de 20 minutos de vez en cuando para ver tu progreso.' : ch > 0 ? `Tu mejor 20 minutos ha subido un <b style="color:var(--ok)">${ch} %</b> desde ${new Date(first.s).toLocaleDateString('es-ES', {month:'long'})}.` : ch < 0 ? `Tu mejor 20 minutos ha bajado un ${-ch} % desde ${new Date(first.s).toLocaleDateString('es-ES', {month:'long'})}. Puede ser que no hayas hecho esfuerzos largos a tope.` : 'Tu mejor 20 minutos se mantiene.'}</div>
+    <div class="small mut" style="margin-top:4px">Los meses sin esfuerzos largos no tienen punto: no es que hayas bajado.</div></div>`;
+}
 function anaLogros(){
   const top = funCard() + badgeCard();
   const all = allTimeBest(null);
@@ -3743,7 +3867,7 @@ function anaLogros(){
   const est = ftpEstimate();
   const recent = ACTS.filter(a => a.prs && a.prs.length && !a.noPR && a.date > now() - 30 * DAY).slice(0, 6);
   $('anaBox').innerHTML = top + (recent.length ? `<div class="card"><h2>Récords recientes</h2>${recent.map(a => `<div class="pr" onclick="showAct(${a.id})" style="cursor:pointer"><span><b>${esc(a.name)}</b><div class="small mut">${fdate(a.date)}</div></span>
-      <span style="text-align:right">${a.prs.map(d => `<span class="tag acc" style="margin:2px">🏆 ${BEST_L[d]} ${a.best[d]} W</span>`).join('')}</span></div>`).join('')}</div>` : '') + `<div class="card"><h2>Curva de potencia</h2>${curve}${legend([['var(--acc)', 'Histórico'], ['#8b93a3', 'Últimos 6 meses']])}</div>
+      <span style="text-align:right">${a.prs.map(d => `<span class="tag acc" style="margin:2px">🏆 ${BEST_L[d]} ${a.best[d]} W</span>`).join('')}</span></div>`).join('')}</div>` : '') + progCard() + `<div class="card"><h2>Curva de potencia</h2>${curve}${legend([['var(--acc)', 'Histórico'], ['#8b93a3', 'Últimos 6 meses']])}</div>
     <div class="card"><h2>Mejores intervalos</h2>${ds.map(d => `<div class="pr"><span><b style="font-size:20px">${BEST_L[d]}</b><div class="small mut">${fdate(all[d].date)}${six[d] && six[d].w !== all[d].w ? ` · 6 meses: ${six[d].w} W` : ''}</div></span>
       <span style="text-align:right"><b>${all[d].w}</b> <span class="mut">W</span><div class="small mut">${dec(all[d].w / S.peso, 2)} W/kg</div></span></div>`).join('')}</div>
     <div class="card"><h2>FTP</h2>
