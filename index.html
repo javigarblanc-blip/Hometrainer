@@ -555,7 +555,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.26.0';
+const VER = '0.27.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1090,7 +1090,22 @@ REAL_DEF.forEach(([id, name, tr, seed, base, fin, info]) => {
   const part = head ? climbTail(tr.slice().reverse(), km).reverse() : climbTail(tr, km), b0 = head ? base : Math.round(base + tramosGain(tr) - tramosGain(part));
   REAL_ROUTES.push(realClimb(id + '_f', name.replace(/ \(.*\)/, '') + (head ? ': primeros ' : ': últimos ') + km + ' km', part, seed + 1, b0, (head ? 'La parte dura del puerto' : 'Final del puerto') + ', para los días de 40-45 minutos. ' + info));
 });
-const allRoutes = () => ROUTES.concat(REAL_ROUTES, VAR_ROUTES, GEN_ROUTES);
+// v0.27: subidas míticas cortas (perfil aproximado por tramos con los datos publicados)
+const FAMOUS_ROUTES = [
+  ['m_huy', 'Mur de Huy (Flecha Valona)', [[.3,8],[.3,11],[.2,17],[.3,9],[.2,4]], 211, 80,
+    '1,3 km al 9,3 % con una curva en S que pasa del 17 % (puntas del 26 %). Final de la Flecha Valona: no salgas a tope, lo duro está en la mitad.'],
+  ['m_ezaro', 'Mirador de Ézaro', [[.4,13],[.3,16],[.2,24],[.3,12],[.3,17],[.3,10]], 223, 10,
+    '1,8 km al 14,5 % sobre el mar, en la Costa da Morte. Rampas de más del 20 % a 1 km de la cima. Etapa de la Vuelta.'],
+  ['m_bola', 'Bola del Mundo (desde Navacerrada)', [[.6,10],[.5,13],[.4,15],[.5,11],[.4,17],[.5,12],[.3,13]], 227, 1858,
+    '3,2 km al 12,5 % por la pista de cemento desde el puerto de Navacerrada hasta las antenas (2.258 m). Rampas del 18 %. Final de la Vuelta 2010.'],
+  ['m_cabarga', 'Peña Cabarga', [[1,7.5],[1,9.5],[.5,6],[1,8],[.9,8.5],[1.5,12.2]], 229, 25,
+    '5,9 km al 9,2 % sobre la bahía de Santander. El último kilómetro y medio, por encima del 12 %. Ahí ganó Froome en 2011.'],
+  ['m_naranco', 'Alto del Naranco (Oviedo)', [[1,5],[1,6.5],[1,7],[1,5.5],[1,8],[1,6],[.6,4]], 233, 230,
+    '6,6 km al 6,1 %, sin rampas muy duras (máxima cerca del 9 %). Un clásico de la Vuelta y de la Subida al Naranco: para ir rápido.'],
+  ['m_angliru', 'Angliru: los últimos 6 km', [[1,10.5],[1,11.5],[1,12],[.5,15],[.4,13],[.3,22.5],[.3,17],[.4,20],[.3,15],[.3,21],[.5,3]], 239, 784,
+    'Desde Viapará, los 6 km finales al 13 %: Les Picones, Cobayos, la Cueña les Cabres (23,5 %) y el Aviru (21 %). Los 500 m finales casi llanos. Aquí el X3 llegará a su tope.']
+].map(([id, name, tr, seed, base, info]) => { const r = realClimb(id, name, tr, seed, base, info); r.src = 'mitico'; return r; });
+const allRoutes = () => ROUTES.concat(FAMOUS_ROUTES, REAL_ROUTES, VAR_ROUTES, GEN_ROUTES);
 // ===== Retos por medallas (v0.20): tiempos calculados con tu FTP de hoy, así que se endurecen cuando mejoras =====
 const CHAL = [{k:'bronce', n:'Bronce', e:'🥉', f:.70}, {k:'plata', n:'Plata', e:'🥈', f:.80}, {k:'oro', n:'Oro', e:'🥇', f:.90}];
 const chalByK = k => CHAL.find(c => c.k === k);
@@ -1105,6 +1120,52 @@ function chalPace(r, watts){
 }
 function chalGap(){ const c = P.chal; if (!c || P.rDist < 50) return null; return {s:Math.round(P.rec.p.length - ghostTime(c, P.rDist))}; }
 let ROUTE_CHAL = null; // null = la siguiente medalla que no tienes
+// ================= RITMO DE BRINCO (v0.27) =================
+// Reparto de vatios por tramos de 100 m: un poco más en las rampas, menos en lo suave y casi nada bajando.
+// Factor: 1 + 2,5 % por cada punto de pendiente sobre la media de la ruta (entre 55 % y 120 %); bajadas de más del 3 %, al 45 %.
+// La base se busca para llegar justo al tiempo de la medalla (gastando lo mínimo) o, "a tope", la más alta que deja
+// al menos un 10 % de W' y una media que aguantas para esa duración (CP + 85 % del W' repartido; de 20 a 60 min, como mucho del 105 al 95 % del FTP).
+let ROUTE_PACE = 'auto'; // 'auto' (con la medalla elegida), 'max' (a tope) o 'no'
+function paceSegs(r){
+  const segs = []; let up = 0, upd = 0;
+  for (let x = 0; x < r.dist; x += 100){ const x1 = Math.min(r.dist, x + 100), g = (routeEle(r, x1) - routeEle(r, x)) / Math.max(1, x1 - x) * 100; segs.push({x, len:x1 - x, g}); if (g > 0){ up += g * (x1 - x); upd += x1 - x; } }
+  const gm = upd ? up / upd : 0;
+  segs.forEach((s, i) => { const gs = (segs[Math.max(0, i - 1)].g + 2 * s.g + segs[Math.min(segs.length - 1, i + 1)].g) / 4; s.f = gs < -3 ? .45 : Math.max(.55, Math.min(1.2, 1 + .025 * (gs - gm))); });
+  return segs;
+}
+function paceSim(segs, base){
+  const cp = cpOf(S.ftp), w0 = wPrime(); let t = 0, wb = w0, wmin = w0, ej = 0;
+  segs.forEach(s => { const w = base * s.f, dt = s.len / Math.max(.8, eqSpeed(w, s.g)); t += dt; ej += w * dt;
+    const k = Math.max(1, Math.round(dt)); for (let i = 0; i < k; i++){ wb = Math.min(w0, wStep(wb, w, cp, w0)); if (wb < wmin) wmin = wb; } });
+  return {t, wmin:wmin / w0, avg:ej / t};
+}
+function pacePlan(r, mode, targetT){
+  const segs = paceSegs(r), cp = cpOf(S.ftp), w0 = wPrime();
+  let lo = 40, hi = S.ftp * 1.6, sim = null;
+  for (let k = 0; k < 30; k++){ const mid = (lo + hi) / 2, s = paceSim(segs, mid);
+    const lim = cp + .85 * w0 / s.t, cap = s.t < 1200 ? lim : Math.min(lim, S.ftp * (s.t <= 3600 ? 1.05 - .1 * (s.t - 1200) / 2400 : .95));
+    const ok = mode === 'max' ? s.wmin >= .1 && s.avg <= cap : s.t >= targetT;
+    if (ok) lo = mid; else hi = mid; }
+  sim = paceSim(segs, lo);
+  return {base:lo, segs, t:Math.round(sim.t), wmin:sim.wmin, avg:Math.round(sim.avg), mode};
+}
+const paceAt = (pl, x) => { const s = pl.segs[Math.min(pl.segs.length - 1, Math.floor(x / 100))]; return Math.round(pl.base * s.f / 5) * 5; };
+function paceForRoute(r){
+  if (ROUTE_PACE === 'no') return null;
+  const ck = ROUTE_CHAL || chalDefault(r);
+  if (ROUTE_PACE === 'max' || ck === 'no') return pacePlan(r, 'max');
+  return Object.assign(pacePlan(r, 'medal', chalTimes(r)[ck]), {k:ck});
+}
+function paceCard(r){
+  const pl = paceForRoute(r), opt = [['auto', 'Para la medalla'], ['max', 'A tope'], ['no', 'No']];
+  let txt = '';
+  if (pl){ const ws = pl.segs.map(s => pl.base * s.f), hi = Math.round(Math.max(...ws) / 5) * 5, lo_ = Math.round(Math.min(...ws.filter((_, i) => pl.segs[i].g > -3)) / 5) * 5;
+    txt = `${pl.mode === 'max' ? 'A tope' : 'Para ' + chalByK(pl.k).e + ' ' + chalByK(pl.k).n.toLowerCase()}: entre <b>${lo_}</b> y <b>${hi} W</b> según la rampa, media ${pl.avg} W. Tiempo previsto <b>${clock(pl.t)}</b>, y te quedaría al menos un ${Math.round(pl.wmin * 100)} % de W'.`;
+    if (pl.mode === 'medal' && pl.wmin < .1) txt += ' <span style="color:var(--err)">Ojo: con tu FTP es una medalla muy justa.</span>'; }
+  return `<div class="card" style="margin:12px 0"><b>Ritmo de Brinco</b><div class="small mut" style="margin-top:2px">Brinco te dice cuántos vatios llevar en cada tramo: un poco más en las rampas y recuperas en lo suave, sin vaciarte antes de la cima.</div>
+    <div class="seg" id="pcSeg" style="margin:10px 0 0">${opt.map(([v, t]) => `<button data-v="${v}" class="${ROUTE_PACE === v ? 'on' : ''}" onclick="ROUTE_PACE='${v}';$('pcBox').outerHTML=paceCard(routeById('${r.id}'))">${t}</button>`).join('')}</div>
+    <div class="small" style="margin-top:8px">${txt || 'Sin ritmo: vas a tu aire.'}</div></div>`.replace('<div class="card" style="margin:12px 0"><b>Ritmo', '<div class="card" id="pcBox" style="margin:12px 0"><b>Ritmo');
+}
 function chalDefault(r){ const m = medalNow(r), i = m ? CHAL.indexOf(m) : -1; return CHAL[Math.min(CHAL.length - 1, i + 1)].k; }
 function chalCard(r){
   const t = chalTimes(r), g = ghostOf(r.id), m = g ? medalFor(r, g.dur) : null, sel = ROUTE_CHAL || chalDefault(r);
@@ -1117,8 +1178,8 @@ function chalCard(r){
   else if (g) msg = `¡Tienes el oro con tu FTP de hoy! Si tu FTP sube, el reto también.`;
   else msg = 'Complétalo para ganar tu primera medalla.';
   return `<div class="card" style="margin:12px 0"><b>Retos</b><div class="small mut" style="margin-top:2px">Tiempos con tu FTP de hoy (${S.ftp} W) y tu peso: subir al ${CHAL.map(c => Math.round(c.f * 100) + ' %').join(', ')} del FTP. Cuando mejoras, se endurecen.</div>
-    <div class="seg" id="chSeg" style="margin:10px 0 0">${CHAL.map(c => `<button data-v="${c.k}" class="${sel === c.k ? 'on' : ''}" onclick="ROUTE_CHAL='${c.k}';document.querySelectorAll('#chSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v==='${c.k}'))" style="${m && CHAL.indexOf(c) <= CHAL.indexOf(m) ? 'box-shadow:inset 0 0 0 2px var(--ok)' : ''}">${c.e} ${clock(t[c.k])}</button>`).join('')}
-      <button data-v="no" class="${sel === 'no' ? 'on' : ''}" onclick="ROUTE_CHAL='no';document.querySelectorAll('#chSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v==='no'))">Sin reto</button></div>
+    <div class="seg" id="chSeg" style="margin:10px 0 0">${CHAL.map(c => `<button data-v="${c.k}" class="${sel === c.k ? 'on' : ''}" onclick="ROUTE_CHAL='${c.k}';document.querySelectorAll('#chSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v==='${c.k}'));$('pcBox')&&($('pcBox').outerHTML=paceCard(routeById('${r.id}')))" style="${m && CHAL.indexOf(c) <= CHAL.indexOf(m) ? 'box-shadow:inset 0 0 0 2px var(--ok)' : ''}">${c.e} ${clock(t[c.k])}</button>`).join('')}
+      <button data-v="no" class="${sel === 'no' ? 'on' : ''}" onclick="ROUTE_CHAL='no';document.querySelectorAll('#chSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v==='no'));$('pcBox')&&($('pcBox').outerHTML=paceCard(routeById('${r.id}')))">Sin reto</button></div>
     <div class="small" style="margin-top:8px">${msg}</div>
     <div class="small mut" style="margin-top:4px">En la sesión verás si vas por delante o por detrás del ritmo de la medalla que elijas (marcada en la escena).</div></div>`;
 }
@@ -1206,6 +1267,7 @@ function renderRoutes(){
     <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" style="display:none" onchange="importGPX(this)">
     <div class="small mut" style="margin:6px 2px 4px">Exporta el GPX de una ruta de Strava, Wikiloc o Komoot, o usa una salida tuya de Strava. El rodillo reproduce sus pendientes.</div>
     ${ROUTES.length ? `<div class="wkhead"><b>Tus trayectos</b><span>${ROUTES.length}</span></div>${ROUTES.slice().reverse().map(card).join('')}` : ''}
+    <div class="wkhead"><b>Subidas míticas</b><span>cortas, de 1 a 7 km</span></div>${FAMOUS_ROUTES.map(card).join('')}
     <div class="wkhead"><b>Puertos de la zona</b><span>enteros y sus finales de 40-45'</span></div>${REAL_ROUTES.map(card).join('')}
     <div class="wkhead"><b>Trayectos variados</b><span>subidas, llanos y bajadas</span></div>${VAR_ROUTES.map(card).join('')}
     <div class="wkhead"><b>Puertos tipo</b><span>perfiles de ejemplo</span></div>${GEN_ROUTES.map(card).join('')}`;
@@ -1227,7 +1289,7 @@ function openRoute(id){
   let best = {g:-99, at:0}; const w = Math.round(1000 / STEP);
   for (let i = 0; i + w < r.d.length; i += 4){ const g = (r.e[i + w] - r.e[i]) / (r.d[i + w] - r.d[i]) * 100; if (g > best.g) best = {g, at:r.d[i]}; }
   openSheet(`<h2>${esc(r.name)}</h2>
-    <div class="small mut" style="margin-top:2px">${r.src === 'tipo' ? 'Perfil de ejemplo' : r.src === 'real' ? 'Puerto real · perfil aproximado' : r.src === 'strava' ? 'Desde una salida de Strava' : 'Importado de GPX'}</div>
+    <div class="small mut" style="margin-top:2px">${r.src === 'tipo' ? 'Perfil de ejemplo' : r.src === 'real' ? 'Puerto real · perfil aproximado' : r.src === 'mitico' ? 'Subida mítica · perfil aproximado por tramos' : r.src === 'strava' ? 'Desde una salida de Strava' : 'Importado de GPX'}</div>
     <div style="margin-top:14px;background:var(--viz);border-radius:12px;padding:6px 4px 2px">${kmProfileSVG(r)}</div>
     <div class="row small mut" style="gap:12px;margin-top:8px;flex-wrap:wrap">${[[-3, '<0 %'], [2, '0-3'], [4, '3-6'], [7, '6-9'], [10, '9-12'], [13, '>12 %']].map(([g, t]) => `<span><i class="tdot" style="background:${gcol(g)}"></i> ${t}</span>`).join('')}</div>
     <div class="kv">
@@ -1240,6 +1302,7 @@ function openRoute(id){
     </div>
     ${r.info ? `<div class="small mut" style="margin-top:10px">${esc(r.info)} El perfil está hecho por tramos con esos datos, no con un GPX: las rampas reales pueden variar un poco.</div>` : ''}
     ${chalCard(r)}
+    ${paceCard(r)}
     ${(() => { const g = ghostOf(r.id); return g ? `<div class="card" style="margin:12px 0;display:flex;gap:12px;align-items:center"><div style="width:44px;height:44px;border-radius:50%;border:3px dashed var(--mut);background:url(mascota/avatar.webp) center/cover;filter:grayscale(1);opacity:.7;flex:none"></div>
       <div style="flex:1;min-width:0"><b>Tu mejor vez: ${clock(g.dur)}</b><div class="small mut">${fdate(g.date)}. Tu fantasma sale contigo y verás si vas por delante o por detrás.</div>
       <div class="seg" id="ghSeg" style="margin:8px 0 0">${[[1, 'Con fantasma'], [0, 'Sin fantasma']].map(([v, t]) => `<button data-v="${v}" class="${+ROUTE_GHOST === v ? 'on' : ''}" onclick="ROUTE_GHOST=${!!v};document.querySelectorAll('#ghSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===${v}))">${t}</button>`).join('')}</div></div></div>`
@@ -1883,7 +1946,7 @@ function startSession(wk, sessKey, route){
     wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
     start:null, rec:newRec(), dist:0, cum:[0], prRef:liveRef(), prSaid:{}, brAt:0, brStart:0, brHalf:0, brKm:0, brRamp:0, lastSent:null, lastChart:0, p3:[],
     w0:wPrime(), wbal:wPrime(), wLow:0, cutAt:0, origTotal:0, rescN:0, resc:null, edits:0, np4:0, npN:0, ghost:route && ROUTE_GHOST ? ghostOf(route.id) : null, gSide:null, brGh:0,
-    chal:(() => { if (!route) return null; const k = ROUTE_CHAL || chalDefault(route); const c = chalByK(k); return c ? Object.assign(chalPace(route, S.ftp * c.f), {k, ftp:S.ftp}) : null; })(), cSide:null, brCh:0,
+    chal:(() => { if (!route) return null; const k = ROUTE_CHAL || chalDefault(route); const c = chalByK(k); return c ? Object.assign(chalPace(route, S.ftp * c.f), {k, ftp:S.ftp}) : null; })(), cSide:null, brCh:0, pace:route ? paceForRoute(route) : null, paceLast:0, brPc:0,
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
     total: wk ? wkDur(wk) : 0
   });
@@ -1983,7 +2046,7 @@ function brTick(){
     if (!P.brKm && P.route.dist > 3000 && P.route.dist - P.rDist <= 1000){ P.brKm = 1; brSay(brPick('lastkm'), 'puerto'); }
     const g = routeGrade(P.route, P.rDist) * P.diff;
     if (g >= 8 && now() - P.brRamp > 180000 && now() - P.brAt > 20000){ P.brRamp = now(); brSay(brPick('ramp', {g:Math.round(g)}), 'puerto'); }
-    brGhost(); brChal();
+    brGhost(); brChal(); brPace();
   }
   if (!P.wk && P.wt > 0 && P.wt % 1200 === 0) brSay(brPick('drink'), 'bebe');
   if (P.wbal != null && P.wk && P.wbal / P.w0 < .2 && !P.wLow && now() - P.brAt > 15000){ P.wLow = 1; brSay(brPick('wlow')); }
@@ -2033,6 +2096,12 @@ function brGhost(){
     else if (behind && P.gSide === 'a'){ P.brGh = now(); brSay(brPick('glost')); }
   }
   if (ahead) P.gSide = 'a'; else if (behind) P.gSide = 'b';
+}
+// v0.27: Brinco avisa cuando el ritmo cambia mucho en los próximos 200 m
+function brPace(){
+  const pl = P.pace; if (!pl || P.rDist < 100 || now() - P.brPc < 60000 || now() - P.brAt < 15000) return;
+  const a = paceAt(pl, P.rDist), b = paceAt(pl, P.rDist + 200);
+  if (Math.abs(b - a) >= Math.max(25, a * .12)){ P.brPc = now(); brSay(b > a ? `Llega rampa: sube a ${b} W y aguanta.` : `Se suaviza: baja a ${b} W y recupera.`); }
 }
 function brChal(){
   const gp = chalGap(); if (!gp || P.rDist < 300) return;
@@ -2206,11 +2275,14 @@ function render(){
   else if (P.resc) st = 'Resistencia quitada: sube la cadencia (' + Math.max(0, Math.ceil((P.resc.until - now()) / 1000)) + ' s)';
   else if (!trainerOn()) st = 'Esperando al rodillo';
   else if (!P.running) st = P.rec.p.length ? 'Pausa automática. Pedalea para seguir' : 'Empieza a pedalear';
+  else if (P.route && P.pace && pw > 0){ const tw = paceAt(P.pace, P.rDist), dl = pw - tw; st = `Brinco: ${tw} W · ${Math.abs(dl) <= 8 ? 'clavado' : (dl > 0 ? '+' : '−') + Math.abs(dl) + ' W'}`; }
+  else if (P.route && P.pace) st = 'Brinco: ' + paceAt(P.pace, P.rDist) + ' W';
   else if (P.route && P.diff !== 1) st = 'Dificultad al ' + Math.round(P.diff * 100) + ' %';
   else if (P.mode === 'grade' && P.wk) st = 'Modo pendiente, ' + dec(P.grade) + ' %';
   else if (P.wk && P.mult !== 1) st = 'Intensidad al ' + Math.round(P.mult * 100) + ' %';
   else if (P.mode === 'erg' && tgt && pw > 0) { const dlt = pw - tgt; st = Math.abs(dlt) <= 5 ? 'En el objetivo' : (dlt > 0 ? '+' : '') + dlt + ' W del objetivo'; }
   $('pState').textContent = st;
+  $('pState').style.color = /^Brinco: .*clavado/.test(st) ? 'var(--ok)' : /^Brinco: .* [+−]\d/.test(st) ? 'var(--warnc)' : '';
   const nxEl = $('pNext'); let soon = false;
   if (P.route) renderRoute();
   else if (P.wk){
