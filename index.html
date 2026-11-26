@@ -555,7 +555,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.28.0';
+const VER = '0.29.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1137,7 +1137,219 @@ const FAMOUS_ROUTES = [
   ['m_angliru', 'Angliru: los últimos 6 km', [[1,10.5],[1,11.5],[1,12],[.5,15],[.4,13],[.3,22.5],[.3,17],[.4,20],[.3,15],[.3,21],[.5,3]], 239, 784,
     'Desde Viapará, los 6 km finales al 13 %: Les Picones, Cobayos, la Cueña les Cabres (23,5 %) y el Aviru (21 %). Los 500 m finales casi llanos. Aquí el X3 llegará a su tope.']
 ].map(([id, name, tr, seed, base, info]) => { const r = realClimb(id, name, tr, seed, base, info); r.src = 'mitico'; return r; });
-const allRoutes = () => ROUTES.concat(FAMOUS_ROUTES, REAL_ROUTES, VAR_ROUTES, GEN_ROUTES);
+// ================= MODO VUELTA (v0.29) =================
+// "Vuelta a Salamanca": 6 etapas contra un pelotón virtual hecho con tus datos. Los rivales tienen el FTP fijo
+// desde que empieza la Vuelta: si entrenas y mejoras, les vas ganando. Estado en S.vuelta (va en la copia de seguridad).
+const VU_STAGES = [
+  {n:1, name:'Salamanca – Ledesma', tipo:'Llana', icf:.84, cut:1.15, sprint:8300, seed:301, base:780,
+    tr:[[3,.3],[2,1],[2,-.8],[3,.5],[2,1.5],[2,-1],[2,.2]], pre:'Etapa llana y rápida por la vega del Tormes. Sprint intermedio en el km 8 y llegada al sprint: el Sprinter es el favorito, pero si vas con el grupo hasta el final puedes pelear la bonificación.'},
+  {n:2, name:'Béjar – Candelario', tipo:'Media montaña', icf:.86, cut:1.20, sprint:6300, seed:307, base:950,
+    tr:[[2,.5],[2,4.5],[1.5,6],[2,-4],[2,1],[2,5.5],[1,-2],[1.5,1]], pre:'Dos subidas puntuables antes de llegar a Candelario. La segunda es la buena: si te guardas en la primera, puedes atacar ahí.'},
+  {n:3, name:'Contrarreloj de Alba de Tormes', tipo:'Contrarreloj', icf:.93, cut:1.25, sprint:0, seed:311, base:820,
+    tr:[[2,.5],[1,2],[2,-.5],[2,1],[1,-1.5],[2,.5]], pre:'Diez kilómetros tú solo contra el reloj. Aquí no hay rueda que coger: reparte bien, sal un poco por debajo y vacíate en los últimos 3 km. El Rodador es el rival a batir.'},
+  {n:4, name:'Rompepiernas de La Armuña', tipo:'Rompepiernas', icf:.86, cut:1.20, sprint:7200, seed:317, base:800,
+    tr:[[1,1],[.6,6],[.8,-3],[1,.5],[.7,7],[1,-4],[1,1],[.5,8],[1,-3],[1.4,.5],[.6,6],[.8,-2],[1.6,.5]], pre:'Sube, baja y vuelve a subir: repechos cortos y duros que puntúan para la montaña. No te cebes en el primero; los que llegan enteros al último ganan.'},
+  {n:5, name:'Etapa reina: La Covatilla', tipo:'Alta montaña', icf:.88, cut:1.25, sprint:3000, seed:331, base:1350,
+    tr:[[2,.5],[1.5,3],[1,-2],[1,1],[2,6],[1.5,8],[1.5,7.5],[1,9],[.9,6]], pre:'La etapa que decide la Vuelta: casi 7 km finales al 7 % hasta la estación de esquí. El Escalador volará. Sube a tu ritmo, que aquí se pierden minutos, no segundos.'},
+  {n:6, name:'Paseo final: Plaza Mayor', tipo:'Llana', icf:.80, cut:1.15, sprint:5300, seed:337, base:800,
+    tr:[[2,.5],[2,-.5],[2,.5],[2,-.5],[2,.3]], pre:'Etapa de fiesta por Salamanca, pero el último sprint de la Vuelta da puntos dobles. Si el maillot verde está en juego, hoy se decide.'}
+];
+const VUELTA_ROUTES = VU_STAGES.map(st => { const r = genRoute('vu_' + st.n, 'Etapa ' + st.n + ': ' + st.name, st.tr, st.seed, st.base); r.src = 'vuelta'; r.vu = st.n; return r; });
+const vuStage = n => VU_STAGES[n - 1], vuRoute = n => VUELTA_ROUTES[n - 1];
+// puertos de la etapa: tramos con más de 30 m seguidos de subida (descensos de menos de 15 m no los cortan)
+function vuClimbs(r){
+  const out = [], push = (lo, hi) => { const gain = hi.e - lo.e, len = hi.x - lo.x; if (gain < 30 || len < 200 || gain / len * 100 < 2.5) return; const g = gain / len * 100, sc = gain * g / 10;
+    out.push({x0:lo.x, x1:hi.x, gain:Math.round(gain), g, cat:sc >= 300 ? 'E' : sc >= 120 ? '1' : sc >= 50 ? '2' : '3'}); };
+  let lo = {x:0, e:routeEle(r, 0)}, hi = null;
+  for (let x = 100; x <= r.dist + 99; x += 100){ const xx = Math.min(x, r.dist), e = routeEle(r, xx);
+    if (!hi){ if (e < lo.e) lo = {x:xx, e}; else hi = {x:xx, e}; }
+    else if (e >= hi.e) hi = {x:xx, e};
+    else if (hi.e - e > 15){ push(lo, hi); lo = {x:xx, e}; hi = null; }
+  }
+  if (hi) push(lo, hi);
+  return out;
+}
+const VU_CAT = {E:'Especial', 1:'1ª', 2:'2ª', 3:'3ª'};
+const VU_KOM = {E:[20, 15, 12, 10, 8, 6, 4, 2], 1:[10, 8, 6, 4, 2, 1], 2:[5, 3, 2, 1], 3:[3, 2, 1]};
+const vuFinPts = st => st.tipo === 'Llana' ? (st.n === 6 ? [50, 40, 32, 28, 24, 20, 16, 12, 8] : [25, 20, 16, 14, 12, 10, 8, 6, 4]) : st.tipo === 'Contrarreloj' ? [10, 8, 6, 4, 2] : [15, 12, 10, 8, 6, 4, 2];
+const VU_SPR = [10, 6, 4, 2], VU_BON = [10, 6, 4], VU_BON_SPR = [3, 2, 1];
+function vuMe(){ return {id:'yo', name:S.name || 'Tú', e:'🫵', me:true}; }
+function vuNewRiders(){
+  const f0 = S.ftp, k0 = S.peso, d3 = now() - 90 * DAY;
+  const fh = S.ftpHist.filter(h => h.date <= d3), f3 = fh.length ? fh[fh.length - 1].ftp : Math.round(f0 * .96);
+  const ph = (S.pesoHist || []).filter(h => h.date <= d3), k3 = ph.length ? ph[ph.length - 1].kg : k0 + 1;
+  const R = (id, name, e, ftp, kg, t, d) => ({id, name, e, ftp:Math.round(ftp), kg:Math.round(kg * 10) / 10, t, d});
+  return [
+    R('yo3', 'Tú hace 3 meses', '🕰️', Math.min(f3, f0 * .99), k3, 'clon', 'Tu FTP y tu peso de hace 3 meses'),
+    R('yo0', 'Tu clon', '🪞', f0, k0, 'clon', 'Tú el día que empezó la Vuelta'),
+    R('yo5', 'Tú +5 %', '⚡', f0 * 1.05, k0, 'clon', 'Tu clon con un 5 % más de FTP'),
+    R('brinco', 'Brinco', '🐸', f0 * 1.02, k0 - 2, 'todo', 'Completo, y cada día con una forma distinta'),
+    R('esc', 'El Escalador', '🐐', f0 * .93, k0 - 9, 'esc', 'Ligero: vuela cuando sube del 4 %'),
+    R('rod', 'El Rodador', '🚂', f0 * 1.08, k0 + 7, 'rod', 'Mucho motor y muchos kilos: manda en el llano y la crono'),
+    R('spr', 'El Sprinter', '🚀', f0 * .98, k0 + 4, 'spr', 'Guarda fuerzas y lo da todo en los sprints'),
+    R('greg', 'El Gregario', '🧢', f0 * .97, k0, 'greg', 'Constante: nunca falla, nunca brilla')
+  ];
+}
+// ritmo de un rival en la etapa: segundo en que pasa por cada 100 m (mismo formato que el fantasma)
+function vuPace(rv, n){
+  const st = vuStage(n), r = vuRoute(n), V = S.vuelta, rnd = rng(V.seed + n * 31 + rv.id.length * 7 + rv.id.charCodeAt(0));
+  const form = 1 + (rnd() - .5) * (rv.t === 'todo' ? .08 : .05), base = rv.ftp * st.icf * form;
+  const sprints = [[st.sprint - 300, st.sprint], [r.dist - 300, r.dist]].filter(s => s[1] > 0);
+  const t = [0]; let acc = 0;
+  for (let x = 0; x < r.dist; x += 100){
+    const x1 = Math.min(r.dist, x + 100), g = (routeEle(r, x1) - routeEle(r, x)) / Math.max(1, x1 - x) * 100;
+    let f = g < -3 ? .45 : 1;
+    if (rv.t === 'esc') f *= g > 3 ? 1.07 : g < 1 ? .95 : 1;
+    if (rv.t === 'rod') f *= st.tipo === 'Contrarreloj' ? 1.03 : g < 2 ? 1.05 : g > 4 ? .93 : 1;
+    if (rv.t === 'spr') f *= sprints.some(s => x >= s[0] && x < s[1]) && st.tipo !== 'Contrarreloj' ? 1.7 : g > 5 ? .94 : .985;
+    if (rv.t === 'greg' && st.tipo === 'Alta montaña') f *= .97;
+    acc += (x1 - x) / Math.max(.8, eqSpeed(base * f, g, rv.kg)); t.push(Math.round(acc * 10) / 10);
+  }
+  return {t, dur:Math.round(acc)};
+}
+const VU_PC = {};
+function vuPaces(n){ const k = S.vuelta.seed + ':' + n; if (!VU_PC[k]) VU_PC[k] = S.vuelta.riders.map(rv => ({rv, pace:vuPace(rv, n)})); return VU_PC[k]; }
+// tus tiempos de paso: primer segundo en que tu distancia llega a x
+function vuMyTime(rec, x){ const rd = rec.rd; for (let i = 0; i < rd.length; i++) if (rd[i] >= x - 1) return i + 1; return null; }
+// clasifica a todos en un punto: [{id, t}] ordenado
+function vuRankAt(n, x, myT){ const a = vuPaces(n).map(p => ({id:p.rv.id, t:ghostTime(p.pace, x)})); if (myT != null) a.push({id:'yo', t:myT}); return a.sort((p, q) => p.t - q.t); }
+function vuStart(){
+  if (S.vuelta && !S.vuelta.done && !confirm('Ya tienes una Vuelta en marcha. ¿Empezar otra desde cero?')) return;
+  S.vuelta = {seed:Math.floor(Math.random() * 1e6), started:now(), ftp0:S.ftp, kg0:S.peso, riders:vuNewRiders(), res:{}, done:false};
+  saveS(); toast('¡Arranca la Vuelta a Salamanca!'); openVuelta();
+}
+function vuQuit(){ if (!confirm('¿Abandonar la Vuelta? Se pierde la clasificación.')) return; S.vuelta = null; saveS(); closeSheet(); renderHome(); toast('Vuelta abandonada'); }
+const vuNext = () => { const V = S.vuelta; if (!V) return null; for (let n = 1; n <= 6; n++) if (!V.res[n]) return n; return null; };
+// resultado de una etapa al terminarla (P.vu activo)
+function vuFinish(meta, rec){
+  const n = P.vu.n, st = vuStage(n), r = vuRoute(n), V = S.vuelta;
+  if (!rec.rd.length || rec.rd[rec.rd.length - 1] < r.dist - 30){ meta.vu = {n, dnf:true}; saveActs(); return; }
+  const myT = rec.rd.length, fin = vuRankAt(n, r.dist, myT), win = fin[0].t;
+  const ott = myT > win * st.cut;
+  const res = {actId:meta.id, date:meta.date, ftp:S.ftp, fin:fin.map(p => ({id:p.id, t:Math.round(p.t)})), ott};
+  if (st.sprint){ const tS = vuMyTime(rec, st.sprint); res.spr = vuRankAt(n, st.sprint, tS).slice(0, 4).map(p => p.id); }
+  res.koms = vuClimbs(r).map(c => ({cat:c.cat, x:c.x1, ids:vuRankAt(n, c.x1, vuMyTime(rec, c.x1)).slice(0, VU_KOM[c.cat].length).map(p => p.id)}));
+  // combatividad: tú, si has ido más del 15 % del tiempo por encima del FTP; si no, un rival al azar (fijo por etapa)
+  const over = rec.p.filter(w => w > S.ftp).length / rec.p.length;
+  res.comb = over >= .15 ? 'yo' : V.riders[Math.floor(rng(V.seed + n * 101)() * V.riders.length)].id; res.over = Math.round(over * 100);
+  V.res[n] = res; if (n === 6) V.done = true; saveS();
+  meta.vu = {n}; saveActs();
+}
+// clasificaciones acumuladas
+function vuStandings(){
+  const V = S.vuelta, all = [vuMe()].concat(V.riders), T = {};
+  all.forEach(rv => T[rv.id] = {rv, t:0, pts:0, kom:0, ott:0, wins:0, comb:0});
+  for (let n = 1; n <= 6; n++){ const R = V.res[n]; if (!R) continue; const st = vuStage(n);
+    R.fin.forEach((p, i) => { const x = T[p.id]; x.t += p.t - (VU_BON[i] || 0); if (!(p.id === 'yo' && R.ott)) x.pts += vuFinPts(st)[i] || 0; if (!i) x.wins++; });
+    if (R.ott) T.yo.t += 60;
+    (R.spr || []).forEach((id, i) => { if (!(id === 'yo' && R.ott)) T[id].pts += VU_SPR[i] || 0; T[id].t -= VU_BON_SPR[i] || 0; });
+    (R.koms || []).forEach(k => k.ids.forEach((id, i) => { if (!(id === 'yo' && R.ott)) T[id].kom += VU_KOM[k.cat][i] || 0; }));
+    if (T[R.comb]) T[R.comb].comb++;
+  }
+  const L = Object.values(T);
+  const gc = L.slice().sort((a, b) => a.t - b.t), pts = L.slice().sort((a, b) => b.pts - a.pts || a.t - b.t), kom = L.slice().sort((a, b) => b.kom - a.kom || a.t - b.t);
+  return {gc, pts, kom, n:Object.keys(V.res).length};
+}
+const vuName = id => id === 'yo' ? '<span style="font-weight:700">' + esc(vuMe().name) + '</span>' : (r => r ? r.e + ' ' + esc(r.name) : id)(S.vuelta.riders.find(x => x.id === id));
+const vuSign = s => (s < 0 ? '−' : '+') + clock(Math.abs(Math.round(s)));
+let VU_TAB = 'gc';
+function vuTable(sd){
+  const L = sd[VU_TAB], lead = L[0];
+  return `<div class="seg" id="vuTabs" style="margin:10px 0 8px">${[['gc', '🔴 General'], ['pts', '🟢 Puntos'], ['kom', '⛰️ Montaña']].map(([k, t]) => `<button class="${VU_TAB === k ? 'on' : ''}" onclick="VU_TAB='${k}';openVuelta()">${t}</button>`).join('')}</div>
+    ${L.map((x, i) => `<div class="pr" style="${x.rv.me ? 'background:var(--s2);border-radius:10px;padding-left:8px;padding-right:8px' : ''}"><span style="font-size:15px"><span style="display:inline-block;width:28px;font-weight:700">${i + 1}º</span>${vuName(x.rv.id)}</span>
+      <span style="font-variant-numeric:tabular-nums;font-size:15px;white-space:nowrap">${VU_TAB === 'gc' ? (i ? vuSign(x.t - lead.t) : clock(Math.round(x.t))) : VU_TAB === 'pts' ? x.pts + ' pts' : x.kom + ' pts'}</span></div>`).join('')}`;
+}
+function vuPreview(n){
+  const st = vuStage(n), r = vuRoute(n), cl = vuClimbs(r), ps = vuPaces(n).slice().sort((a, b) => a.pace.dur - b.pace.dur);
+  return `<div class="card" style="margin:12px 0"><div class="small mut">Etapa ${n} de 6 · ${st.tipo}</div><b style="font-size:19px">${esc(st.name)}</b>
+    <div style="margin-top:10px;background:var(--viz);border-radius:12px;padding:6px 4px 2px">${kmProfileSVG(r)}</div>
+    <div class="kv" style="margin:8px 0"><div><span>Distancia</span><b>${kmTxt(r.dist)}</b></div><div><span>Desnivel +</span><b>${r.gain} m</b></div><div><span>Ganador previsto</span><b>${clock(ps[0].pace.dur)}</b></div></div>
+    <div class="small">${st.sprint ? `🟢 Sprint intermedio en el km ${dec(st.sprint / 1000, 1)}. ` : ''}${cl.length ? cl.map(c => `⛰️ ${VU_CAT[c.cat]} en el km ${dec(c.x1 / 1000, 1)} (${dec((c.x1 - c.x0) / 1000, 1)} km al ${dec(c.g)} %)`).join('. ') + '.' : 'Sin puertos puntuables.'}</div>
+    <div class="row" style="gap:10px;margin-top:10px;align-items:flex-start"><img src="mascota/entrenador.webp" onerror="this.src='mascota/avatar.webp'" style="width:46px;height:46px;object-fit:contain;flex:none" alt=""><div class="small"><b>Brinco:</b> ${st.pre} Favorito: ${ps[0].rv.e} ${esc(ps[0].rv.name)}.</div></div>
+    <div class="small mut" style="margin-top:8px">Fuera de control si llegas más de un ${Math.round((st.cut - 1) * 100)} % por detrás del ganador: entras con 1 minuto de castigo y sin puntos.</div>
+    <button class="btn acc block lg" style="margin-top:12px" onclick="vuRun(${n})">${ICON.play} Correr la etapa ${n}</button></div>`;
+}
+function vuBanner(){
+  const V = S.vuelta, n = vuNext();
+  if (!V) return `<div class="card" onclick="openVuelta()" style="cursor:pointer;margin:0 0 12px;display:flex;gap:12px;align-items:center;border:1px solid var(--acc)"><div style="font-size:34px">🔴</div><div style="flex:1;min-width:0"><b>Vuelta a Salamanca</b><div class="small mut">6 etapas contra un pelotón hecho con tus datos. Maillots, sprints y puertos.</div></div><b style="color:var(--acc)">›</b></div>`;
+  const sd = vuStandings(), g = sd.gc.findIndex(x => x.rv.me) + 1;
+  return `<div class="card" onclick="openVuelta()" style="cursor:pointer;margin:0 0 12px;display:flex;gap:12px;align-items:center;border:1px solid var(--acc)"><div style="font-size:34px">${g === 1 && sd.n ? '🔴' : '🚴'}</div><div style="flex:1;min-width:0"><b>Vuelta a Salamanca${V.done ? ': terminada' : ''}</b><div class="small mut">${V.done ? 'Acabaste ' + g + 'º en la general' : 'Toca la etapa ' + n + ': ' + esc(vuStage(n).name) + (sd.n ? ' · vas ' + g + 'º' : '')}</div></div><b style="color:var(--acc)">›</b></div>`;
+}
+function vuRun(n){ VU_RUN = n; closeSheet(); startSession(null, null, vuRoute(n)); }
+let VU_RUN = null;
+function openVuelta(){
+  const V = S.vuelta;
+  if (!V){
+    const rs = vuNewRiders();
+    openSheet(`<h2>Vuelta a Salamanca</h2><div class="small mut" style="margin-top:-4px">6 etapas · una por semana, el día que quieras</div>
+      <p>Corres contra un pelotón virtual hecho con tus datos. Sus FTP quedan fijos el día que empieza la Vuelta: si entrenas y mejoras durante estas semanas, les irás ganando.</p>
+      <div class="card" style="margin:10px 0">${rs.map(r => `<div class="pr"><span>${r.e} <span style="font-weight:700;font-size:16px">${esc(r.name)}</span><div class="small mut">${esc(r.d)}</div></span><span style="text-align:right;flex:none"><b style="font-size:18px;white-space:nowrap">${r.ftp} W</b><div class="small mut">${dec(r.ftp / r.kg, 2)} W/kg</div></span></div>`).join('')}</div>
+      <div class="small">🔴 <b>General</b>: suma de tiempos con bonificaciones de 10, 6 y 4 s en meta y 3, 2 y 1 s en los sprints.<br>🟢 <b>Puntos</b>: sprints intermedios y llegadas (el último día, dobles).<br>⛰️ <b>Montaña</b>: puntos al coronar cada puerto según su categoría.<br>🎽 <b>Combatividad</b>: para quien más tiempo va por encima del umbral.</div>
+      <div class="small mut" style="margin-top:8px">Durante la etapa verás tu puesto en directo y a tus rivales en el perfil. No hace falta que pase una semana entre etapas: es lo recomendado.</div>
+      <button class="btn acc block lg" style="margin-top:14px" onclick="vuStart()">Empezar la Vuelta</button>`);
+    return;
+  }
+  const sd = vuStandings(), n = vuNext(), me = x => x.findIndex(y => y.rv.me) + 1;
+  const jer = [['🔴', 'General', sd.gc], ['🟢', 'Puntos', sd.pts], ['⛰️', 'Montaña', sd.kom]];
+  const stages = VU_STAGES.map(st => { const R = V.res[st.n]; if (!R) return `<div class="pr"><span class="mut">Etapa ${st.n}: ${esc(st.name)}</span><span class="mut">${st.n === n ? 'siguiente' : ''}</span></div>`;
+    const pos = R.fin.findIndex(p => p.id === 'yo') + 1;
+    return `<div class="pr" onclick="showAct(${R.actId})" style="cursor:pointer"><span style="font-size:15px"><span style="font-weight:700">Etapa ${st.n}</span>: ${esc(st.name)}<div class="small mut">Gana ${vuName(R.fin[0].id)}${R.comb === 'yo' ? ' · 🎽 combativo' : ''}${R.ott ? ' · fuera de control' : ''}</div></span><span><b style="font-size:20px">${pos}º</b></span></div>`; }).join('');
+  openSheet(`<h2>Vuelta a Salamanca</h2><div class="small mut" style="margin-top:-4px">${V.done ? 'Terminada' : 'Etapa ' + n + ' de 6'} · empezó el ${fdm(V.started)} con ${V.ftp0} W · ahora tienes ${S.ftp} W</div>
+    ${V.done ? vuFinal(sd) : ''}
+    <div class="kv" style="margin:12px 0">${jer.map(([e, t, L]) => `<div><span>${e} ${t}</span><b style="font-size:15px">${sd.n ? vuName(L[0].rv.id) : '--'}</b><span class="small mut">tú, ${me(L)}º</span></div>`).join('')}</div>
+    ${n ? vuPreview(n) : ''}
+    ${sd.n ? `<h3>Clasificaciones</h3>${vuTable(sd)}` : ''}
+    <h3 style="margin-top:14px">Etapas</h3>${stages}
+    <button class="btn ${V.done ? 'acc' : 'ghost'} block" style="margin-top:16px" onclick="${V.done ? 'S.vuelta=null;saveS();openVuelta()' : 'vuQuit()'}">${V.done ? 'Preparar otra Vuelta' : 'Abandonar la Vuelta'}</button>`);
+}
+function vuFinal(sd){
+  const p = sd.gc.findIndex(x => x.rv.me) + 1, mine = [['🔴', 'General', sd.gc], ['🟢', 'Puntos', sd.pts], ['⛰️', 'Montaña', sd.kom]].filter(j => j[2][0].rv.me);
+  const txt = `Vuelta a Salamanca en Umbral: ${p}º en la general${mine.length ? ', ' + mine.map(j => j[0] + ' ' + j[1]).join(', ') : ''}. FTP de ${S.vuelta.ftp0} a ${S.ftp} W.`;
+  return `<div class="card" style="margin:12px 0;text-align:center;border:2px solid var(--acc)"><div style="font-size:44px">${p === 1 ? '🏆' : p <= 3 ? ['🥇', '🥈', '🥉'][p - 1] : '🚴'}</div>
+    <b style="font:700 26px/1.1 var(--num)">${p}º en la general</b><div class="small mut" style="margin-top:4px">${mine.length ? 'Maillots: ' + mine.map(j => j[0] + ' ' + j[1]).join(' · ') : 'Sin maillot esta vez'} · FTP de ${S.vuelta.ftp0} a ${S.ftp} W</div>
+    <button class="btn sm" style="margin-top:10px" onclick="navigator.share ? navigator.share({text:${JSON.stringify(txt).replace(/"/g, '&quot;')}}).catch(()=>{}) : (navigator.clipboard.writeText(${JSON.stringify(txt).replace(/"/g, '&quot;')}), toast('Copiado'))">Compartir</button></div>`;
+}
+// tarjeta en el análisis de la sesión
+function vuActCard(a){
+  const V = S.vuelta, n = a.vu.n;
+  if (a.vu.dnf) return `<div class="card" style="margin:12px 0"><b>Vuelta: etapa ${n} sin terminar</b><div class="small mut">Para que cuente tienes que llegar a meta. La etapa sigue abierta.</div></div>`;
+  const R = V && V.res[n]; if (!R || R.actId !== a.id) return '';
+  const pos = R.fin.findIndex(p => p.id === 'yo') + 1, sd = vuStandings(), g = sd.gc.findIndex(x => x.rv.me) + 1, w = R.fin[0];
+  const myT = R.fin[pos - 1].t;
+  return `<div class="card" style="margin:12px 0;border:1px solid var(--acc)"><b style="font-size:17px">${pos === 1 ? '🏆 ¡Ganas la etapa ' + n + '!' : 'Etapa ' + n + ': llegas ' + pos + 'º'}</b>
+    <div class="small mut" style="margin:2px 0 8px">${pos === 1 ? (R.fin[1].t - myT < 1 ? 'Por menos de un segundo sobre ' : 'Le sacas ' + clock(Math.round(R.fin[1].t - myT)) + ' a ') + vuName(R.fin[1].id).replace(/<[^>]+>/g, '') : 'A ' + clock(Math.round(myT - w.t)) + ' de ' + vuName(w.id).replace(/<[^>]+>/g, '')}${R.ott ? ' · fuera de control: +1 min y sin puntos' : ''}</div>
+    ${R.fin.slice(0, 3).map((p, i) => `<div class="pr"><span>${['🥇', '🥈', '🥉'][i]} ${vuName(p.id)}</span><span>${i ? vuSign(p.t - w.t) : clock(Math.round(p.t))}</span></div>`).join('')}
+    <div class="small" style="margin-top:8px">${R.spr ? '🟢 Sprint: ' + R.spr.slice(0, 3).map(vuName).join(', ') + '. ' : ''}${R.koms.length ? '⛰️ ' + R.koms.map(k => VU_CAT[k.cat] + ': ' + vuName(k.ids[0])).join(', ') + '. ' : ''}🎽 Combativo: ${vuName(R.comb)}${R.comb === 'yo' ? ' (' + R.over + ' % por encima del FTP)' : ''}.</div>
+    <div class="small" style="margin-top:6px">General: vas <b>${g}º</b>${g > 1 ? ', a ' + clock(Math.round(sd.gc[g - 1].t - sd.gc[0].t)) + ' del líder' : ' ¡y llevas el maillot rojo! 🔴'}.</div>
+    <button class="btn sm" style="margin-top:10px" onclick="openVuelta()">Ver la Vuelta</button></div>`;
+}
+// ---- en directo
+function vuLive(){
+  const v = P.vu; if (!v || P.rDist < 30) return null;
+  const T = P.rec.p.length, ps = vuPaces(v.n);
+  const g = ps.map(p => ({rv:p.rv, gap:T - ghostTime(p.pace, P.rDist)})); // gap > 0: va por delante de ti
+  const ahead = g.filter(x => x.gap > 0).sort((a, b) => a.gap - b.gap), behind = g.filter(x => x.gap <= 0).sort((a, b) => b.gap - a.gap);
+  return {pos:ahead.length + 1, of:ps.length + 1, ahead:ahead[0], behind:behind[0]};
+}
+function vuLiveTxt(){
+  const L = vuLive(); if (!L) return '';
+  if (L.pos === 1) return `🏁 Vas 1º de ${L.of}${L.behind ? ' · le sacas ' + clock(Math.round(-L.behind.gap)) + ' a ' + L.behind.rv.e + ' ' + L.behind.rv.name : ''}`;
+  return `🏁 ${L.pos}º de ${L.of} · a ${clock(Math.round(L.ahead.gap))} de ${L.ahead.rv.e} ${L.ahead.rv.name}`;
+}
+function brVuelta(){
+  const v = P.vu; if (!v) return; const st = vuStage(v.n), x = P.rDist, L = vuLive(); if (!L) return;
+  const say = (k, t) => { if (v.said[k]) return; v.said[k] = 1; brSay(t); };
+  if (st.sprint && x > st.sprint - 800 && x < st.sprint - 300) say('s0', 'Sprint intermedio en 500 m: los tres primeros puntúan y bonifican. ¡Prepárate!');
+  if (st.sprint && x >= st.sprint && x < st.sprint + 200){ const p = vuRankAt(v.n, st.sprint, vuMyTime(P.rec, st.sprint)).findIndex(q => q.id === 'yo') + 1; say('s1', p <= 4 ? `Pasas ${p}º por el sprint: +${VU_SPR[p - 1]} puntos.` : `Pasas ${p}º por el sprint, sin puntos. Toca guardar.`); }
+  v.climbs.forEach((c, i) => {
+    if (x >= c.x0 && x < c.x0 + 150) say('c' + i, `Empieza un puerto de ${VU_CAT[c.cat]}: ${dec((c.x1 - c.x0) / 1000, 1)} km al ${dec(c.g)} %.`);
+    if (x >= c.x1 && x < c.x1 + 200){ const p = vuRankAt(v.n, c.x1, vuMyTime(P.rec, c.x1)).findIndex(q => q.id === 'yo') + 1, pts = VU_KOM[c.cat][p - 1]; say('k' + i, pts ? `Coronas ${p}º: +${pts} puntos de la montaña.` : `Coronas ${p}º, fuera de los puntos.`); }
+  });
+  if (x > P.route.dist - 1000) say('f1', L.pos <= 3 ? `Último kilómetro y vas ${L.pos}º: ¡a por la bonificación!` : `Último kilómetro. Vas ${L.pos}º: vacía lo que te quede.`);
+  if (v.last && L.pos < v.last && now() - v.ovAt > 25000 && L.behind){ v.ovAt = now(); brSay(`¡Adelantas a ${L.behind.rv.e} ${L.behind.rv.name}! Ahora vas ${L.pos}º.`); buzz([60, 40, 60]); }
+  v.last = L.pos;
+}
+const allRoutes = () => ROUTES.concat(FAMOUS_ROUTES, REAL_ROUTES, VAR_ROUTES, GEN_ROUTES, VUELTA_ROUTES);
 // ===== Retos por medallas (v0.20): tiempos calculados con tu FTP de hoy, así que se endurecen cuando mejoras =====
 const CHAL = [{k:'bronce', n:'Bronce', e:'🥉', f:.70}, {k:'plata', n:'Plata', e:'🥈', f:.80}, {k:'oro', n:'Oro', e:'🥇', f:.90}];
 const chalByK = k => CHAL.find(c => c.k === k);
@@ -1264,20 +1476,24 @@ function routeScene(r, pos, gpos){
   // v0.23: si el dato ya está en la fila de datos, no se repite en la escena
   const fs = P.on ? curFields() : [], inG = P.ghost && fs.includes('ghost'), inC = fs.includes('chal') || (!P.ghost && fs.includes('ghost'));
   const near = x => x != null && Math.abs(X(x) - X(pos)) < W * .07 ? ' up' : '';
+  // v0.29: rivales de la Vuelta en el perfil
+  let vuMk = '';
+  if (P.on && P.vu && P.route === r){ const T = P.rec.p.length; vuPaces(P.vu.n).forEach((p, i) => { const d = ghostDist(p.pace, T); if (d < x0 || d > x0 + span) return;
+    vuMk += `<div class="chm${Math.abs(X(d) - X(pos)) < W * .05 ? ' up' : ''}" style="left:${(X(d) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, d)) / H * 100).toFixed(2)}%;font-size:17px;margin-top:${-(i % 3) * 4}px">${p.rv.e}</div>`; }); }
   const gp = gpos != null && !inG ? ghostGap() : null, cg = P.on && P.chal && !inC ? chalGap() : null, cpos = P.on && P.chal ? ghostDist(P.chal, P.rec.p.length) : null, cc = P.chal ? chalByK(P.chal.k) : null;
   return `<div class="scene"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${skyDefs('skyP')}
       <rect width="${W}" height="${H}" fill="url(#skyP)"/><circle cx="${W * .62}" cy="${H * .22}" r="11" style="fill:var(--sun)" opacity=".55"/>
       <path d="${m1}" style="fill:var(--mnt1)"/><path d="${m2}" style="fill:var(--mnt2)"/>
       ${ground}<path d="${road}" fill="none" style="stroke:var(--txt)" stroke-width="1.4" opacity=".55" vector-effect="non-scaling-stroke"/>${done}</svg>
-    ${lbl}${cpos != null && cpos >= x0 && cpos <= x0 + span ? `<div class="chm${near(cpos)}" style="left:${(X(cpos) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, cpos)) / H * 100).toFixed(2)}%">${cc.e}</div>` : ''}${gpos != null && gpos >= x0 && gpos <= x0 + span ? mk(gpos, ' gh' + near(gpos)) : ''}${mk(pos, '')}
+    ${lbl}${vuMk}${cpos != null && cpos >= x0 && cpos <= x0 + span ? `<div class="chm${near(cpos)}" style="left:${(X(cpos) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, cpos)) / H * 100).toFixed(2)}%">${cc.e}</div>` : ''}${gpos != null && gpos >= x0 && gpos <= x0 + span ? mk(gpos, ' gh' + near(gpos)) : ''}${mk(pos, '')}
     ${gp || cg ? `<div class="gap">${gp ? `<span style="color:${gp.s <= 0 ? 'var(--ok)' : 'var(--err)'}">Fantasma: ${gp.s <= 0 ? 'vas ' + clock(-gp.s) + ' por delante' : 'vas ' + clock(gp.s) + ' por detrás'}</span>` : ''}${gp && cg ? '<br>' : ''}${cg ? `<span style="color:${cg.s <= 0 ? 'var(--ok)' : 'var(--err)'}">${cc.e} ${cg.s <= 0 ? clock(-cg.s) + ' por delante' : clock(cg.s) + ' por detrás'}</span>` : ''}</div>` : ''}${P.on ? `<div class="zctl"><button onclick="sceneZoom(1,event)"${zi === SCENE_Z.length - 1 ? ' disabled' : ''} aria-label="Alejar">−</button><span>${zs && zs < r.dist ? zs / 1000 + ' km' : 'todo'}</span><button onclick="sceneZoom(-1,event)"${zi === 0 ? ' disabled' : ''} aria-label="Acercar">+</button></div>` : ''}</div>`;
 }
 function routeIdx(r, x){ return Math.max(0, Math.min(r.d.length - 1, Math.round(x / STEP))); }
 const routeGrade = (r, x) => r.g[routeIdx(r, x)];
 const routeEle = (r, x) => r.e[routeIdx(r, x)];
 // velocidad virtual de equilibrio (m/s) para una potencia y pendiente
-function eqSpeed(P_, g){
-  const m = (S.peso || 75) + 9, G = 9.81, crr = .005, cda = .32, rho = 1.2, th = Math.atan(g / 100);
+function eqSpeed(P_, g, kg){
+  const m = (kg || S.peso || 75) + 9, G = 9.81, crr = .005, cda = .32, rho = 1.2, th = Math.atan(g / 100);
   const a = .5 * rho * cda, b = m * G * (crr * Math.cos(th) + Math.sin(th)), c = Math.max(0, P_) * .97;
   const f = v => a * v * v * v + b * v - c;
   let lo = .05, hi = 40; if (f(lo) > 0) return lo;
@@ -1292,7 +1508,7 @@ function renderRoutes(){
       <div style="min-width:0"><span class="nm">${(m => m ? m.e + ' ' : '')(medalNow(r))}${esc(r.name)}</span><div class="meta">${kmTxt(r.dist)}, +${r.gain} m, media ${dec(r.avgG)} %</div></div>
       <div class="side"><b>${dur(routeETA(r, S.ftp * .75))}</b><span>a ${Math.round(S.ftp * .75)} W</span></div></div></div>`;
   ROUTE_CHAL = null;
-  $('libBox').innerHTML = `<div class="grid2" style="margin-bottom:6px">
+  $('libBox').innerHTML = vuBanner() + `<div class="grid2" style="margin-bottom:6px">
       <button class="btn" onclick="$('gpxFile').click()">${ICON.plus.replace(/22/g, '16')} Importar GPX</button>
       <button class="btn" onclick="stravaRoutesSheet()">Desde Strava</button></div>
     <button class="btn ghost block" style="margin:6px 0" onclick="openTrainerTest()">Probar la resistencia del rodillo</button>
@@ -1977,11 +2193,13 @@ function startSession(wk, sessKey, route){
     on:true, wk, route:route || null, mult:(S.todayMult && S.todayMult.date === today() && wk) ? S.todayMult.mult : 1, free:!wk && !route, sessKey:sessKey || null, mode: wk ? (wk.modo || 'erg') : 'grade', rDist:0, vSpd:0, gain:0, diff:ROUTE_DIFF, gSent:null, gAt:0, grade:0, ergW: Math.round(S.ftp * .6 / 5) * 5,
     wt:0, segI:0, lastSegI:0, running:false, auto:true, manual:false, zero:0,
     start:null, rec:newRec(), dist:0, cum:[0], prRef:liveRef(), prSaid:{}, brAt:0, brStart:0, brHalf:0, brKm:0, brRamp:0, lastSent:null, lastChart:0, p3:[],
-    w0:wPrime(), wbal:wPrime(), wLow:0, cutAt:0, origTotal:0, rescN:0, resc:null, edits:0, np4:0, npN:0, ghost:route && ROUTE_GHOST ? ghostOf(route.id) : null, gSide:null, brGh:0,
-    chal:(() => { if (!route) return null; const k = ROUTE_CHAL || chalDefault(route); const c = chalByK(k); return c ? Object.assign(chalPace(route, S.ftp * c.f), {k, ftp:S.ftp}) : null; })(), cSide:null, brCh:0, pace:route ? paceForRoute(route) : null, paceLast:0, brPc:0,
+    w0:wPrime(), wbal:wPrime(), wLow:0, cutAt:0, origTotal:0, rescN:0, resc:null, edits:0, np4:0, npN:0, ghost:route && ROUTE_GHOST && !VU_RUN ? ghostOf(route.id) : null, gSide:null, brGh:0,
+    chal:(() => { if (!route || VU_RUN) return null; const k = ROUTE_CHAL || chalDefault(route); const c = chalByK(k); return c ? Object.assign(chalPace(route, S.ftp * c.f), {k, ftp:S.ftp}) : null; })(), cSide:null, brCh:0, pace:route ? (VU_RUN ? (ROUTE_PACE === 'no' ? null : pacePlan(route, 'max')) : paceForRoute(route)) : null, paceLast:0, brPc:0,
+    vu:route && VU_RUN && S.vuelta ? {n:VU_RUN, said:{}, climbs:vuClimbs(route), last:0, ovAt:0} : null,
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
     total: wk ? wkDur(wk) : 0
   });
+  VU_RUN = null;
   $('pName').textContent = wk ? wk.name : route ? route.name : 'Rodar libre';
   $('pSub').className = 'small mut'; $('pIntBox').classList.remove('rt'); $('pTgt').classList.remove('t2');
   $('pSub').textContent = wk ? (wk.test === 'rampa' ? 'Test · hasta agotarte' : dur(P.total) + ' con FTP de ' + S.ftp + ' W') : route ? kmTxt(route.dist) + ', +' + route.gain + ' m' + (P.diff !== 1 ? ', dificultad ' + Math.round(P.diff * 100) + ' %' : '') : 'Controla tú la resistencia';
@@ -2010,7 +2228,7 @@ function renderRoute(){
   $('pTgt').classList.add('t2');
   if (ahead > 50){ $('pTgtLab').textContent = `Próximos ${Math.round(ahead)} m`; $('pTgt').innerHTML = `<span style="color:${gcol(gA)}">${dec(gA)}<small>%</small></span>`; }
   else { $('pTgtLab').textContent = 'Meta en'; $('pTgt').innerHTML = `<span style="color:var(--ok)">${Math.round(left)}<small>m</small></span>`; }
-  $('pNext').textContent = '';
+  $('pNext').textContent = P.vu ? vuLiveTxt() : '';
 }
 // ================= BRINCO EN LA SESIÓN =================
 const BR = {
@@ -2078,7 +2296,7 @@ function brTick(){
     if (!P.brKm && P.route.dist > 3000 && P.route.dist - P.rDist <= 1000){ P.brKm = 1; brSay(brPick('lastkm'), 'puerto'); }
     const g = routeGrade(P.route, P.rDist) * P.diff;
     if (g >= 8 && now() - P.brRamp > 180000 && now() - P.brAt > 20000){ P.brRamp = now(); brSay(brPick('ramp', {g:Math.round(g)}), 'puerto'); }
-    brGhost(); brChal(); brPace();
+    brGhost(); brChal(); brPace(); brVuelta();
   }
   if (!P.wk && P.wt > 0 && P.wt % 1200 === 0) brSay(brPick('drink'), 'bebe');
   if (P.wbal != null && P.wk && P.wbal / P.w0 < .2 && !P.wLow && now() - P.brAt > 15000){ P.wLow = 1; brSay(brPick('wlow')); }
@@ -2498,6 +2716,7 @@ function endSession(){
       saveActs();
     }
   }
+  if (P.vu) vuFinish(meta, P.rec);
   if (document.fullscreenElement){ try{ document.exitFullscreen().catch(() => {}); }catch(e){} }
   renderHome();
   showAct(meta.id, true);
@@ -2638,6 +2857,7 @@ function showAct(id, fresh){
     ${fresh ? newBadgesCard(checkBadges()) : ''}
     ${fresh && !testBox && (() => { const e = ftpEstimate(); return e && e.w >= S.ftp * 1.03 ? ftpCard(e, true) : ''; })() || ''}
     ${testBox}
+    ${a.vu ? vuActCard(a) : ''}
     ${a.ghostRes ? `<div class="card" style="margin:12px 0;${a.ghostRes.best ? 'border:1px solid var(--acc)' : ''}"><b style="font-size:17px">${a.ghostRes.best ? (a.ghostRes.prev ? '⏱️ ¡Nueva mejor vez! ' + clock(a.ghostRes.dur) : '⏱️ Primera vez completado: ' + clock(a.ghostRes.dur)) : '⏱️ ' + clock(a.ghostRes.dur) + ' en este trayecto'}</b>
       <div class="small mut">${a.ghostRes.prev ? (a.ghostRes.best ? clock(a.ghostRes.prev - a.ghostRes.dur) + ' menos que tu anterior mejor vez (' + clock(a.ghostRes.prev) + ').' : 'Tu mejor vez sigue siendo ' + clock(a.ghostRes.prev) + ' (' + clock(a.ghostRes.dur - a.ghostRes.prev) + ' más).') : 'La próxima vez correrás contra este tiempo.'}</div></div>` : ''}
     ${a.chal ? (() => { const c = a.chal, got = c.got ? chalByK(c.got) : null, nx = CHAL.find(x => !got || CHAL.indexOf(x) > CHAL.indexOf(got));
@@ -3188,6 +3408,7 @@ function renderHome(){
   // v0.26: aviso de FTP en inicio (se puede posponer 14 días)
   { const e = ftpEstimate(), snooze = S.ftpSnooze && now() - S.ftpSnooze < 14 * DAY;
     $('recover').innerHTML += e && e.w >= S.ftp * 1.03 && !snooze ? ftpCard(e, true).replace('</button></div></div>', `</button> <button class="btn ghost sm" style="margin-top:8px" onclick="S.ftpSnooze=now();saveS();renderHome()">Ahora no</button></div></div>`) : ''; }
+  if (S.vuelta && !S.vuelta.done) $('recover').innerHTML += vuBanner();
   // ---- Hoy
   const ts = todaySess(), nx = nextSess();
   let hero = '';
