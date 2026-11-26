@@ -291,6 +291,13 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .pint .t{font-size:clamp(46px,15vw,76px);white-space:nowrap}
 .pint .t small{font-size:.5em;margin-left:3px}
 .pnext{font:600 15px var(--body);color:var(--mut);margin:8px 2px 0;min-height:20px;padding:0;border-radius:12px;transition:background .3s,color .3s,padding .3s}
+.pnext:empty{min-height:0;margin:0}
+.pint.rt{padding-bottom:12px}
+.pint.rt .ibar{display:none}
+.pint .t.t2{font-size:clamp(30px,9vw,44px);margin-top:8px}
+.pint .t.t2 small{font-size:.55em}
+.psub-live{font:600 15px/1.25 var(--body);color:var(--mut);font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap}
+.psub-live b{color:var(--txt);font-weight:700}
 .pnext.soon{background:var(--acc);color:var(--ontint);padding:10px 14px;font:700 22px/1.1 var(--num);letter-spacing:.01em}
 #pChart{width:100%;height:110px;display:block;background:var(--s1);border-radius:14px}
 #player::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;background-color:var(--zt,transparent);opacity:.2;transition:background-color 1.2s;-webkit-mask-image:radial-gradient(120% 70% at 50% 35%,#000 0,transparent 80%);mask-image:radial-gradient(120% 70% at 50% 35%,#000 0,transparent 80%)}
@@ -302,7 +309,8 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .emptyc img{width:84px;height:84px;object-fit:contain;flex:none}
 .scene .chm{position:absolute;transform:translate(-50%,-100%);font-size:20px;line-height:1;z-index:1;transition:left 1s linear,top 1s linear;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
 .scene .mk.gh{border-color:var(--mut);border-style:dashed;opacity:.6;filter:grayscale(1);z-index:1}
-.scene .lbl{position:absolute;bottom:4px;font:700 11px var(--body);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);transform:translateX(-50%)}
+.scene .lbl{position:absolute;bottom:5px;white-space:nowrap;font:700 11px var(--body);color:#fff;background:rgba(0,0,0,.5);padding:1px 6px;border-radius:6px;transform:translateX(-50%)}
+.scene .up{margin-top:-30px}
 .scene .gap{position:absolute;left:8px;top:6px;font:700 13px var(--body);padding:3px 8px;border-radius:8px;background:var(--s1);opacity:.92}
 .lost{display:flex;gap:12px;align-items:center;background:var(--warnbg);border:2px solid var(--warnbd);color:var(--warntx);border-radius:16px;padding:12px 14px;margin:10px 0 0}
 .lost img{width:58px;height:58px;object-fit:contain;flex:none}
@@ -543,7 +551,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.22.0';
+const VER = '0.23.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -1151,12 +1159,15 @@ function routeScene(r, pos, gpos){
   let lbl = '', step = span > 2000 ? 1000 : 500;
   for (let k = Math.ceil(x0 / step) * step; k <= x0 + span; k += step) if (X(k) > 20 && X(k) < W - 20) lbl += `<div class="lbl" style="left:${(X(k) / W * 100).toFixed(2)}%">${dec(k / 1000, step < 1000 ? 1 : 0)} km</div>`;
   const mk = (x, cls) => `<div class="mk${cls}" style="left:${(X(x) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, x)) / H * 100).toFixed(2)}%;background-image:url(mascota/avatar.webp)"></div>`;
-  const gp = gpos != null ? ghostGap() : null, cg = P.on && P.chal ? chalGap() : null, cpos = P.on && P.chal ? ghostDist(P.chal, P.rec.p.length) : null, cc = P.chal ? chalByK(P.chal.k) : null;
+  // v0.23: si el dato ya está en la fila de datos, no se repite en la escena
+  const fs = P.on ? curFields() : [], inG = P.ghost && fs.includes('ghost'), inC = fs.includes('chal') || (!P.ghost && fs.includes('ghost'));
+  const near = x => x != null && Math.abs(X(x) - X(pos)) < W * .07 ? ' up' : '';
+  const gp = gpos != null && !inG ? ghostGap() : null, cg = P.on && P.chal && !inC ? chalGap() : null, cpos = P.on && P.chal ? ghostDist(P.chal, P.rec.p.length) : null, cc = P.chal ? chalByK(P.chal.k) : null;
   return `<div class="scene"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${skyDefs('skyP')}
       <rect width="${W}" height="${H}" fill="url(#skyP)"/><circle cx="${W * .8}" cy="${H * .22}" r="11" style="fill:var(--sun)" opacity=".55"/>
       <path d="${m1}" style="fill:var(--mnt1)"/><path d="${m2}" style="fill:var(--mnt2)"/>
       ${ground}<path d="${road}" fill="none" style="stroke:var(--txt)" stroke-width="1.4" opacity=".55" vector-effect="non-scaling-stroke"/>${done}</svg>
-    ${lbl}${cpos != null && cpos >= x0 && cpos <= x0 + span ? `<div class="chm" style="left:${(X(cpos) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, cpos)) / H * 100).toFixed(2)}%">${cc.e}</div>` : ''}${gpos != null && gpos >= x0 && gpos <= x0 + span ? mk(gpos, ' gh') : ''}${mk(pos, '')}
+    ${lbl}${cpos != null && cpos >= x0 && cpos <= x0 + span ? `<div class="chm${near(cpos)}" style="left:${(X(cpos) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, cpos)) / H * 100).toFixed(2)}%">${cc.e}</div>` : ''}${gpos != null && gpos >= x0 && gpos <= x0 + span ? mk(gpos, ' gh' + near(gpos)) : ''}${mk(pos, '')}
     ${gp || cg ? `<div class="gap">${gp ? `<span style="color:${gp.s <= 0 ? 'var(--ok)' : 'var(--err)'}">Fantasma: ${gp.s <= 0 ? 'vas ' + clock(-gp.s) + ' por delante' : 'vas ' + clock(gp.s) + ' por detrás'}</span>` : ''}${gp && cg ? '<br>' : ''}${cg ? `<span style="color:${cg.s <= 0 ? 'var(--ok)' : 'var(--err)'}">${cc.e} ${cg.s <= 0 ? clock(-cg.s) + ' por delante' : clock(cg.s) + ' por detrás'}</span>` : ''}</div>` : ''}</div>`;
 }
 function routeIdx(r, x){ return Math.max(0, Math.min(r.d.length - 1, Math.round(x / STEP))); }
@@ -1868,6 +1879,7 @@ function startSession(wk, sessKey, route){
     total: wk ? wkDur(wk) : 0
   });
   $('pName').textContent = wk ? wk.name : route ? route.name : 'Rodar libre';
+  $('pSub').className = 'small mut'; $('pIntBox').classList.remove('rt'); $('pTgt').classList.remove('t2');
   $('pSub').textContent = wk ? (wk.test === 'rampa' ? 'Test · hasta agotarte' : dur(P.total) + ' con FTP de ' + S.ftp + ' W') : route ? kmTxt(route.dist) + ', +' + route.gain + ' m' + (P.diff !== 1 ? ', dificultad ' + Math.round(P.diff * 100) + ' %' : '') : 'Controla tú la resistencia';
   $('player').classList.add('on');
   if (S.fullscreen !== 0 && document.fullscreenEnabled && !document.fullscreenElement && !matchMedia('(display-mode: standalone)').matches){ try{ document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(() => {}); }catch(e){} }
@@ -1885,11 +1897,16 @@ function renderRoute(){
   const r = P.route, g = routeGrade(r, P.rDist), left = Math.max(0, r.dist - P.rDist);
   $('pIntName').textContent = 'Pendiente';
   $('pIntT').innerHTML = `<span style="color:${gcol(g)}">${dec(g)}<small>%</small></span>`;
-  $('pTgtLab').textContent = 'Quedan'; $('pTgt').innerHTML = kmTxt(left).replace(' km', '<small>km</small>');
   const pc = P.rDist / r.dist * 100; $('pIntProg').style.width = pc + '%'; $('pProg').style.width = pc + '%';
-  { const b = $('pIntBox'); b.style.setProperty('--ip', pc.toFixed(1) + '%'); b.style.setProperty('--ic', gcol(g)); b.classList.remove('end'); }
+  { const b = $('pIntBox'); b.style.setProperty('--ip', '0%'); b.style.setProperty('--ic', gcol(g)); b.classList.remove('end'); b.classList.add('rt'); }
+  // v0.23: llevas / total en la cabecera; a la derecha, la media de lo que viene
+  $('pSub').className = 'psub-live';
+  $('pSub').innerHTML = `<b>${dec(P.rDist / 1000, 1)}</b> / ${kmTxt(r.dist)} · <b>+${Math.round(P.gain || 0)}</b> / ${r.gain} m`;
   const ahead = Math.min(500, left), gA = ahead > 50 ? (routeEle(r, P.rDist + ahead) - routeEle(r, P.rDist)) / ahead * 100 : 0;
-  $('pNext').textContent = ahead > 50 ? `Próximos ${Math.round(ahead)} m: media del ${dec(gA)} %` : 'Últimos metros';
+  $('pTgt').classList.add('t2');
+  if (ahead > 50){ $('pTgtLab').textContent = `Próximos ${Math.round(ahead)} m`; $('pTgt').innerHTML = `<span style="color:${gcol(gA)}">${dec(gA)}<small>%</small></span>`; }
+  else { $('pTgtLab').textContent = 'Meta en'; $('pTgt').innerHTML = `<span style="color:var(--ok)">${Math.round(left)}<small>m</small></span>`; }
+  $('pNext').textContent = '';
 }
 // ================= BRINCO EN LA SESIÓN =================
 const BR = {
@@ -2017,7 +2034,7 @@ function brChal(){
   }
   if (ahead) P.cSide = 'a'; else if (behind) P.cSide = 'b';
 }
-const gapTxt = s => (s > 0 ? '+' : s < 0 ? '−' : '') + clock(Math.abs(s));
+const gapTxt = s => clock(Math.abs(s));  // v0.23: sin signo; lo dicen el color y "por delante/detrás"
 
 // ================= W' (reserva anaeróbica, modelo de Skiba con CP = FTP) =================
 const wPrime = () => S.wprime > 0 ? S.wprime : 20000;
@@ -2225,8 +2242,7 @@ function renderCtl(){
   if (P.route){
     $('pCtl').innerHTML = `<button class="btn" onclick="togglePause()">${P.manual ? ICON.resume : ICON.pause}${P.manual ? 'Seguir' : 'Pausa'}</button>
       <button class="btn" onclick="adj(-1)">${ICON.minus}Más fácil</button><button class="btn" onclick="adj(1)">${ICON.plus}Más duro</button>
-      <button class="btn" onclick="adj(0)">${ICON.reset}${Math.round(P.diff * 100)} %</button>
-      <div class="full small mut" style="text-align:center;padding:4px 0 0">Los botones cambian la dureza de las pendientes, no la velocidad.</div>`;
+      <button class="btn" onclick="adj(0)"${P.diff === 1 ? ' style="opacity:.75"' : ''}><span class="small mut" style="font-size:11px">Dureza</span><b style="font:700 20px/1 var(--num)">${Math.round(P.diff * 100)} %</b></button>`;
     return;
   }
   const b = [];
@@ -2266,6 +2282,7 @@ function segLen(dir){
   wake(); render(); drawPlayerChart();
 }
 function adj(dir){
+  if (P.route && dir && !S.diffTip){ S.diffTip = 1; saveS(); setTimeout(() => toast('Cambia la dureza de las pendientes, no la velocidad. Toca Dureza para volver al 100 %'), 50); }
   if (P.route){ P.diff = dir === 0 ? 1 : Math.max(.25, Math.min(1.5, Math.round((P.diff + dir * .25) * 100) / 100)); P.gSent = null; routeGradeSend(true); renderCtl(); render(); return; }
   if (P.mode === 'grade'){ P.grade = dir === 0 ? 0 : Math.max(-5, Math.min(15, P.grade + dir * .5)); sendGrade(P.grade); }
   else if (P.wk){ P.mult = Math.max(.5, Math.min(1.5, Math.round((P.mult + dir * .05) * 100) / 100)); applyTarget(true); }
