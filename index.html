@@ -320,14 +320,29 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 .lost img{width:58px;height:58px;object-fit:contain;flex:none}
 .lost b{font:700 20px/1.1 var(--num);display:block}
 .bri img.pose{width:64px;height:64px;object-fit:contain;border-radius:0}
+/* v0.31: en horizontal (móvil girado o tele) todo crece con la altura y el perfil ocupa el hueco libre */
 @media (orientation:landscape) and (min-width:640px){
-  .pmain{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;align-items:start}
-  .pw{font-size:clamp(100px,30vh,210px)}
-  .pint .t{font-size:clamp(40px,12vh,66px)}
-  .scene svg{height:120px}
-  #pChart{height:90px}
+  #player.on{overflow:hidden}
+  .pmain{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;flex:1;min-height:0}
+  .pmain>div{display:flex;flex-direction:column;min-height:0}
+  .pmain>div:first-child .ptile{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center}
+  #pChartBox .scene>svg circle{display:none}
+  .pw{font-size:clamp(100px,36vh,480px)}
+  .pint .t{font-size:clamp(40px,11vh,120px)}
+  .pint .t.t2{font-size:clamp(30px,7.5vh,80px)}
+  .pint .lab,.ptile .zl{font-size:clamp(13px,2.2vh,26px)}
+  .pstate{font-size:clamp(15px,3vh,34px)!important}
+  .pnext{font-size:clamp(14px,2.6vh,30px)}
+  .pstats b{font-size:clamp(32px,8.5vh,100px)}
+  .pstats span{font-size:clamp(12px,1.9vh,22px)}
+  .ptop .nm{font-size:clamp(22px,4.2vh,46px)}
+  .ptop .tt b{font-size:clamp(24px,5.5vh,60px)}
+  #pChartBox{flex:1;min-height:110px;display:flex;flex-direction:column}
+  #pChartBox .scene{flex:1;min-height:0}
+  #pChartBox .scene>svg{position:absolute;inset:0;height:100%}
+  #pChart{flex:1;width:100%;height:auto;min-height:90px}
   .pctl{margin-top:8px}
-  .pctl .btn{padding:9px 4px}
+  .pctl .btn{padding:9px 4px;font-size:clamp(13px,2.2vh,24px)}
 }
 .pctl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
 .pctl .btn{padding:12px 4px;font-size:13px;flex-direction:column;gap:4px;border:0;background:var(--s1);border-radius:14px}
@@ -512,7 +527,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
   <div class="bri" id="pBri" onclick="this.classList.remove('on')"><img id="pBriImg" src="mascota/avatar.webp" alt="Brinco"><div id="pBriT"></div></div>
   <div class="ptop">
     <div style="min-width:0"><div class="nm" id="pName"></div><div class="small mut" id="pSub"></div></div>
-    <div class="row" style="gap:14px"><div class="tt"><b id="pTime">0:00</b><span>tiempo</span></div><button class="btn sm" onclick="askEnd()">Terminar</button></div>
+    <div class="row" style="gap:14px"><div class="tt"><b id="pTime">0:00</b><span>tiempo</span></div><button class="btn sm" onclick="toggleLand()" title="Pantalla en horizontal" aria-label="Pantalla en horizontal" style="padding:8px 10px;font-size:18px">⤢</button><button class="btn sm" onclick="askEnd()">Terminar</button></div>
   </div>
   <div class="pprog"><i id="pProg"></i></div>
   <div id="pWarn"></div>
@@ -555,7 +570,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.30.0';
+const VER = '0.31.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -952,6 +967,7 @@ function afinaCard(curW){
       <div><span>W/kg</span><b style="color:var(--ok)">${dec(wkg, 2)}</b>${wkg0 ? `<span class="small mut">al empezar ${dec(wkg0, 2)}</span>` : ''}</div></div>
     ${chart}
     <div class="row" style="gap:8px;margin-top:8px"><input type="number" id="afPeso" inputmode="decimal" step="0.1" placeholder="Peso de hoy (kg)" style="flex:1"><button class="btn sm acc" onclick="logPeso($('afPeso').value)">Apuntar</button></div>
+    ${(() => { const L = ACTS.filter(x => x.dec != null).slice(-5); return L.length >= 2 ? `<div class="small" style="margin-top:10px">Desacople aeróbico de tus últimos rodajes regulares: ${L.map(x => `<b style="color:${x.dec < 5 ? 'var(--ok)' : x.dec < 8 ? 'var(--warnc)' : 'var(--err)'}">${dec(x.dec)} %</b>`).join(' → ')}. Si baja, tu fondo mejora.</div>` : ''; })()}
     <div class="small mut" style="margin-top:6px">Pésate siempre igual, mejor por la mañana. Con menos kilos y el mismo FTP subes más rápido: es lo que mide el W/kg.</div></div>`;
 }
 // Versión de 45' de cada workout largo (para adaptar cualquier plan)
@@ -1156,6 +1172,23 @@ const VU_STAGES = [
 ];
 const VUELTA_ROUTES = VU_STAGES.map(st => { const r = genRoute('vu_' + st.n, 'Etapa ' + st.n + ': ' + st.name, st.tr, st.seed, st.base); r.src = 'vuelta'; r.vu = st.n; return r; });
 const vuStage = n => VU_STAGES[n - 1], vuRoute = n => VUELTA_ROUTES[n - 1];
+// ---- v0.31: maillots. Imágenes en mascota/maillot_<k>.webp (cuerpo entero) y mascota/avatar_<k>.webp (cara); si faltan, aro de color
+const JERSEYS = {rojo:{c:'#e3262f', n:'maillot rojo', t:'líder de la general', e:'🔴'}, montana:{c:'#2f6fe0', n:'maillot de lunares', t:'líder de la montaña', e:'⛰️'},
+  verde:{c:'#21b35a', n:'maillot verde', t:'líder por puntos', e:'🟢'}, combativo:{c:'#ff4d4d', n:'dorsal rojo', t:'el más combativo', e:'🎽'}};
+const JER_OK = {}, JERF_OK = {};
+Object.keys(JERSEYS).forEach(k => { const a = new Image(); a.onload = () => { JER_OK[k] = 1; }; a.src = 'mascota/avatar_' + k + '.webp'; const b = new Image(); b.onload = () => { JERF_OK[k] = 1; }; b.src = 'mascota/maillot_' + k + '.webp'; });
+let VU_JC = null;
+function vuJerseys(){
+  const V = S.vuelta; if (!V) return {}; const key = V.seed + ':' + Object.keys(V.res).join(','); if (VU_JC && VU_JC.k === key) return VU_JC.o;
+  const sd = vuStandings(); if (!sd.n) return {};
+  const o = {}, add = (id, k) => (o[id] = o[id] || []).push(k);
+  add(sd.gc[0].rv.id, 'rojo'); if (sd.kom[0].kom > 0) add(sd.kom[0].rv.id, 'montana'); if (sd.pts[0].pts > 0) add(sd.pts[0].rv.id, 'verde');
+  const last = Math.max(...Object.keys(V.res).map(Number)); if (V.res[last] && V.res[last].comb) add(V.res[last].comb, 'combativo');
+  VU_JC = {k:key, o}; return o;
+}
+const jerOf = id => (vuJerseys()[id] || [])[0] || null;           // el más importante que lleva
+const myAvatar = () => { const k = jerOf('yo'); return k && JER_OK[k] ? 'mascota/avatar_' + k + '.webp' : 'mascota/avatar.webp'; };
+const jerImg = (k, h) => JERF_OK[k] ? `<img src="mascota/maillot_${k}.webp" alt="" style="height:${h}px;width:auto;object-fit:contain">` : `<span style="font-size:${Math.round(h * .6)}px">${JERSEYS[k].e}</span>`;
 // puertos de la etapa: tramos con más de 30 m seguidos de subida (descensos de menos de 15 m no los cortan)
 function vuClimbs(r){
   const out = [], push = (lo, hi) => { const gain = hi.e - lo.e, len = hi.x - lo.x; if (gain < 30 || len < 200 || gain / len * 100 < 2.5) return; const g = gain / len * 100, sc = gain * g / 10;
@@ -1296,6 +1329,7 @@ function openVuelta(){
     return `<div class="pr" onclick="showAct(${R.actId})" style="cursor:pointer"><span style="font-size:15px"><span style="font-weight:700">Etapa ${st.n}</span>: ${esc(st.name)}<div class="small mut">Gana ${vuName(R.fin[0].id)}${R.comb === 'yo' ? ' · 🎽 combativo' : ''}${R.ott ? ' · fuera de control' : ''}</div></span><span><b style="font-size:20px">${pos}º</b></span></div>`; }).join('');
   openSheet(`<h2>Vuelta a Salamanca</h2><div class="small mut" style="margin-top:-4px">${V.done ? 'Terminada' : 'Etapa ' + n + ' de 6'} · empezó el ${fdm(V.started)} con ${V.ftp0} W · ahora tienes ${S.ftp} W</div>
     ${V.done ? vuFinal(sd) : ''}
+    ${(() => { const js = vuJerseys().yo || []; return js.length ? `<div class="card" style="margin:12px 0;display:flex;gap:12px;align-items:center;border:2px solid ${JERSEYS[js[0]].c}">${jerImg(js[0], 92)}<div><b style="font-size:17px">Llevas el ${JERSEYS[js[0]].n}</b><div class="small mut">${js.map(k => JERSEYS[k].e + ' ' + JERSEYS[k].t).join(' · ')}</div></div></div>` : ''; })()}
     <div class="kv" style="margin:12px 0">${jer.map(([e, t, L]) => `<div><span>${e} ${t}</span><b style="font-size:15px">${sd.n ? vuName(L[0].rv.id) : '--'}</b><span class="small mut">tú, ${me(L)}º</span></div>`).join('')}</div>
     ${n ? vuPreview(n) : ''}
     ${sd.n ? `<h3>Clasificaciones</h3>${vuTable(sd)}` : ''}
@@ -1320,6 +1354,7 @@ function vuActCard(a){
     <div class="small mut" style="margin:2px 0 8px">${pos === 1 ? (R.fin[1].t - myT < 1 ? 'Por menos de un segundo sobre ' : 'Le sacas ' + clock(Math.round(R.fin[1].t - myT)) + ' a ') + vuName(R.fin[1].id).replace(/<[^>]+>/g, '') : 'A ' + clock(Math.round(myT - w.t)) + ' de ' + vuName(w.id).replace(/<[^>]+>/g, '')}${R.ott ? ' · fuera de control: +1 min y sin puntos' : ''}</div>
     ${R.fin.slice(0, 3).map((p, i) => `<div class="pr"><span>${['🥇', '🥈', '🥉'][i]} ${vuName(p.id)}</span><span>${i ? vuSign(p.t - w.t) : clock(Math.round(p.t))}</span></div>`).join('')}
     <div class="small" style="margin-top:8px">${R.spr ? '🟢 Sprint: ' + R.spr.slice(0, 3).map(vuName).join(', ') + '. ' : ''}${R.koms.length ? '⛰️ ' + R.koms.map(k => VU_CAT[k.cat] + ': ' + vuName(k.ids[0])).join(', ') + '. ' : ''}🎽 Combativo: ${vuName(R.comb)}${R.comb === 'yo' ? ' (' + R.over + ' % por encima del FTP)' : ''}.</div>
+    ${(() => { const js = vuJerseys().yo || []; return js.length && n === Math.max(...Object.keys(V.res).map(Number)) ? `<div style="display:flex;gap:12px;align-items:center;margin-top:10px">${jerImg(js[0], 84)}<div class="small"><b style="font-size:15px">¡Te pones el ${JERSEYS[js[0]].n}!</b><br>${js.map(k => JERSEYS[k].t).join(', ')}</div></div>` : ''; })()}
     <div class="small" style="margin-top:6px">General: vas <b>${g}º</b>${g > 1 ? ', a ' + clock(Math.round(sd.gc[g - 1].t - sd.gc[0].t)) + ' del líder' : ' ¡y llevas el maillot rojo! 🔴'}.</div>
     <button class="btn sm" style="margin-top:10px" onclick="openVuelta()">Ver la Vuelta</button></div>`;
 }
@@ -1400,6 +1435,47 @@ function paceForRoute(r){
   if (ROUTE_PACE === 'max' || ck === 'no') return pacePlan(r, 'max');
   return Object.assign(pacePlan(r, 'medal', chalTimes(r)[ck]), {k:ck});
 }
+// ================= ATAQUES SORPRESA (v0.31) =================
+// En cada trayecto se sortean de 0 a 3 ataques (dónde, quién, cuánto dura y a cuántos vatios), según el terreno:
+// tirón en rampa (20-40 s al 130-150 % del FTP), relevo en llano (1,5-3 min al 105-112 %), ataque antes de coronar
+// (45-75 s al 118-128 %) y sprint final (12-18 s al 170-200 %). Si aguantas de media el 92 % del objetivo, lo sigues.
+const ATK_RIV = [['🐐', 'El Escalador'], ['🚂', 'El Rodador'], ['🚀', 'El Sprinter'], ['🧢', 'El Gregario'], ['🦊', 'Un local'], ['🐺', 'El Lobo'], ['🦅', 'El Águila'], ['🐗', 'El Jabalí'], ['🐸', 'Brinco']];
+const ATK_T = {tiron:{d:[20, 40], f:[1.3, 1.5], pts:10, txt:'tirón en la rampa'}, relevo:{d:[90, 180], f:[1.05, 1.12], pts:15, txt:'relevo largo'},
+  cima:{d:[45, 75], f:[1.18, 1.28], pts:15, txt:'ataque antes de coronar'}, sprint:{d:[12, 18], f:[1.7, 2.0], pts:10, txt:'sprint'}};
+function atkPlan(r, seed){
+  const rnd = rng(seed), pick = a => a[Math.floor(rnd() * a.length)], lerp = ([a, b]) => a + (b - a) * rnd();
+  const n = r.dist < 2500 ? (rnd() < .5 ? 0 : 1) : pick([0, 1, 1, 2, 2, 2, 3, 3]);
+  const cand = [];
+  for (let x = 600; x < r.dist - 300; x += 100){ const g = routeGrade(r, x);
+    if (g >= 4) cand.push({type:'tiron', x});
+    else if (Math.abs(g) < 2 && x + 1500 < r.dist && Math.abs(routeEle(r, x + 1500) - routeEle(r, x)) < 30) cand.push({type:'relevo', x}); }
+  vuClimbs(r).forEach(c => { if (c.x1 - c.x0 > 1200) for (let x = c.x1 - 900; x <= c.x1 - 500; x += 100) cand.push({type:'cima', x}); });
+  if (r.dist > 2000 && Math.abs(routeGrade(r, r.dist - 300)) < 3) for (let k = 0; k < 6; k++) cand.push({type:'sprint', x:r.dist - 350});
+  const out = [];
+  for (let k = 0; k < 60 && out.length < n && cand.length; k++){ const c = pick(cand);
+    if (out.some(o => Math.abs(o.x - c.x) < Math.max(1200, r.dist * .18))) continue;
+    const T = ATK_T[c.type], [e, name] = pick(ATK_RIV);
+    out.push({type:c.type, x:c.x, e, name, d:Math.round(lerp(T.d) / 5) * 5, w:Math.round(S.ftp * lerp(T.f) / 5) * 5, pts:T.pts}); }
+  return out.sort((a, b) => a.x - b.x);
+}
+function atkCard(){
+  const on = !S.atkOff;
+  return `<div class="card" id="atkBox" style="margin:12px 0"><b>Ataques sorpresa</b><div class="small mut" style="margin-top:2px">Brinco puede lanzarte de 0 a 3 ataques por sorpresa: un tirón en una rampa, un relevo largo en el llano, un ataque antes de coronar o un sprint. Cada vez distintos. Si los sigues, sumas puntos.</div>
+    <div class="seg" style="margin:10px 0 0">${[[1, 'Sí'], [0, 'No']].map(([v, t]) => `<button class="${(on ? 1 : 0) === v ? 'on' : ''}" onclick="S.atkOff=${v ? 'false' : 'true'};saveS();$('atkBox').outerHTML=atkCard()">${t}</button>`).join('')}</div></div>`;
+}
+function atkTick(pw){
+  const A = P.atk; if (!A) return;
+  if (A.cur){ const c = A.cur; c.sum += pw; c.n++;
+    if (c.n === 1){ beep(990, 200); buzz([120, 60, 120]); }
+    if (c.n >= c.d){ const avg = c.sum / c.n, ok = avg >= c.w * .92; A.done.push({type:c.type, ok, avg:Math.round(avg), w:c.w});
+      if (ok){ A.ok++; A.pts += c.pts; brSay(`¡Seguido! ${Math.round(avg)} W de media. ${c.e} ${c.name} no se ha podido ir. +${c.pts} puntos.`); beep(1320, 250); }
+      else brSay(`${c.e} ${c.name} se ha ido (${Math.round(avg)} de ${c.w} W). No pasa nada: vuelve a tu ritmo.`);
+      A.cur = null; }
+    return; }
+  const nx = A.list[A.i]; if (!nx || P.rDist < nx.x) return;
+  A.i++; A.cur = Object.assign({}, nx, {sum:0, n:0});
+  P.brAt = 0; brSay(`¡Ataque! ${nx.e} ${nx.name}: ${ATK_T[nx.type].txt}. Síguele a ${nx.w} W durante ${nx.d} s.`);
+}
 function paceCard(r){
   const pl = paceForRoute(r), opt = [['auto', 'Para la medalla'], ['max', 'A tope'], ['no', 'No']];
   let txt = '';
@@ -1472,14 +1548,15 @@ function routeScene(r, pos, gpos){
   const done = `<rect x="0" y="0" width="${Math.max(0, X(pos)).toFixed(1)}" height="${H}" fill="var(--sky1)" opacity=".28"/>`;
   let lbl = '', step = span > 30000 ? 10000 : span > 15000 ? 5000 : span > 7000 ? 2000 : span > 2000 ? 1000 : 250;
   for (let k = Math.ceil(x0 / step) * step; k <= x0 + span; k += step) if (X(k) > 20 && X(k) < W - 20) lbl += `<div class="lbl" style="left:${(X(k) / W * 100).toFixed(2)}%">${step < 1000 ? (k % 1000 ? dec(k / 1000, k % 500 ? 2 : 1) : k / 1000) : k / 1000} km</div>`;
-  const mk = (x, cls) => `<div class="mk${cls}" style="left:${(X(x) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, x)) / H * 100).toFixed(2)}%;background-image:url(mascota/avatar.webp)"></div>`;
+  const myJ = P.on && P.vu ? jerOf('yo') : null;
+  const mk = (x, cls) => `<div class="mk${cls}" style="left:${(X(x) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, x)) / H * 100).toFixed(2)}%;background-image:url(${cls ? 'mascota/avatar.webp' : myAvatar()})${!cls && myJ ? ';border-color:' + JERSEYS[myJ].c : ''}"></div>`;
   // v0.23: si el dato ya está en la fila de datos, no se repite en la escena
   const fs = P.on ? curFields() : [], inG = P.ghost && fs.includes('ghost'), inC = fs.includes('chal') || (!P.ghost && fs.includes('ghost'));
   const near = x => x != null && Math.abs(X(x) - X(pos)) < W * .07 ? ' up' : '';
   // v0.29: rivales de la Vuelta en el perfil
   let vuMk = '';
   if (P.on && P.vu && P.route === r){ const T = P.rec.p.length; vuPaces(P.vu.n).forEach((p, i) => { const d = ghostDist(p.pace, T); if (d < x0 || d > x0 + span) return;
-    vuMk += `<div class="chm${Math.abs(X(d) - X(pos)) < W * .05 ? ' up' : ''}" style="left:${(X(d) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, d)) / H * 100).toFixed(2)}%;font-size:17px;margin-top:${-(i % 3) * 4}px">${p.rv.e}</div>`; }); }
+    vuMk += `<div class="chm${Math.abs(X(d) - X(pos)) < W * .05 ? ' up' : ''}" style="left:${(X(d) / W * 100).toFixed(2)}%;top:${(Y(routeEle(r, d)) / H * 100).toFixed(2)}%;font-size:17px;margin-top:${-(i % 3) * 4}px${(j => j ? ';background:' + JERSEYS[j].c + ';border-radius:50%;padding:3px;box-shadow:0 0 0 2px #fff' : '')(jerOf(p.rv.id))}">${p.rv.e}</div>`; }); }
   const gp = gpos != null && !inG ? ghostGap() : null, cg = P.on && P.chal && !inC ? chalGap() : null, cpos = P.on && P.chal ? ghostDist(P.chal, P.rec.p.length) : null, cc = P.chal ? chalByK(P.chal.k) : null;
   return `<div class="scene"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${skyDefs('skyP')}
       <rect width="${W}" height="${H}" fill="url(#skyP)"/><circle cx="${W * .62}" cy="${H * .22}" r="11" style="fill:var(--sun)" opacity=".55"/>
@@ -1551,6 +1628,7 @@ function openRoute(id){
     ${r.info ? `<div class="small mut" style="margin-top:10px">${esc(r.info)} El perfil está hecho por tramos con esos datos, no con un GPX: las rampas reales pueden variar un poco.</div>` : ''}
     ${chalCard(r)}
     ${paceCard(r)}
+    ${atkCard()}
     ${(() => { const g = ghostOf(r.id); return g ? `<div class="card" style="margin:12px 0;display:flex;gap:12px;align-items:center"><div style="width:44px;height:44px;border-radius:50%;border:3px dashed var(--mut);background:url(mascota/avatar.webp) center/cover;filter:grayscale(1);opacity:.7;flex:none"></div>
       <div style="flex:1;min-width:0"><b>Tu mejor vez: ${clock(g.dur)}</b><div class="small mut">${fdate(g.date)}. Tu fantasma sale contigo y verás si vas por delante o por detrás.</div>
       <div class="seg" id="ghSeg" style="margin:8px 0 0">${[[1, 'Con fantasma'], [0, 'Sin fantasma']].map(([v, t]) => `<button data-v="${v}" class="${+ROUTE_GHOST === v ? 'on' : ''}" onclick="ROUTE_GHOST=${!!v};document.querySelectorAll('#ghSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.v===${v}))">${t}</button>`).join('')}</div></div></div>`
@@ -2196,6 +2274,7 @@ function startSession(wk, sessKey, route){
     w0:wPrime(), wbal:wPrime(), wLow:0, cutAt:0, origTotal:0, rescN:0, resc:null, edits:0, np4:0, npN:0, ghost:route && ROUTE_GHOST && !VU_RUN ? ghostOf(route.id) : null, gSide:null, brGh:0,
     chal:(() => { if (!route || VU_RUN) return null; const k = ROUTE_CHAL || chalDefault(route); const c = chalByK(k); return c ? Object.assign(chalPace(route, S.ftp * c.f), {k, ftp:S.ftp}) : null; })(), cSide:null, brCh:0, pace:route ? (VU_RUN ? (ROUTE_PACE === 'no' ? null : pacePlan(route, 'max')) : paceForRoute(route)) : null, paceLast:0, brPc:0,
     vu:route && VU_RUN && S.vuelta ? {n:VU_RUN, said:{}, climbs:vuClimbs(route), last:0, ovAt:0} : null,
+    atk:route && !VU_RUN && !S.atkOff ? {list:atkPlan(route, Date.now() % 1e9), i:0, cur:null, ok:0, pts:0, done:[]} : null,
     starts: wk ? wk.segs.reduce((a, s, i) => (a.push(i ? a[i-1] + wk.segs[i-1].d : 0), a), []) : [],
     total: wk ? wkDur(wk) : 0
   });
@@ -2289,6 +2368,17 @@ function brPR(){
     if (avg > P.prRef[d]){ P.prSaid[d] = 1; brSay('¡Récord de ' + BEST_L[d] + '! ' + avg + ' W, antes ' + P.prRef[d] + '. ¡Croac!'); buzz([100, 60, 100, 60, 200]); return; }
   }
 }
+// v0.31: aviso de cansancio. Cada minuto, desde el 15, compara los últimos 5 min con el primer tramo de 5 min (pasado el 5)
+// con vatios parecidos (±5 %). Si el pulso ha subido 8 lpm o más, Brinco avisa (como mucho cada 10 min).
+function brDrift(){
+  const n = P.rec.p.length; if (n < 900 || n % 60 || now() - (P.drAt || 0) < 600000 || now() - P.brAt < 15000) return;
+  const p = P.rec.p, h = P.rec.hr, win = (a) => { let sp = 0, sh = 0, k = 0; for (let i = a; i < a + 300; i++) if (h[i] > 0){ sp += p[i]; sh += h[i]; k++; } return k > 240 ? {p:sp / k, h:sh / k} : null; };
+  const cur = win(n - 300); if (!cur || cur.p < 60) return;
+  for (let a = 300; a <= n - 600; a += 60){ const b = win(a); if (!b || Math.abs(b.p - cur.p) > cur.p * .05) continue;
+    const d = Math.round(cur.h - b.h);
+    if (d >= 8){ P.drAt = now(); brSay(`Tu pulso ha subido ${d} lpm para los mismos ${Math.round(cur.p)} W que en el minuto ${Math.round(a / 60) + 5}. Bebe y, si sigue subiendo, afloja un poco.`, 'bebe'); }
+    return; }
+}
 function brTick(){
   brPR();
   if (P.wk && P.total >= 1200 && !P.brHalf && P.wt >= P.total / 2 && now() - P.brAt > 20000){ P.brHalf = 1; brSay(brPick('half')); }
@@ -2298,6 +2388,7 @@ function brTick(){
     if (g >= 8 && now() - P.brRamp > 180000 && now() - P.brAt > 20000){ P.brRamp = now(); brSay(brPick('ramp', {g:Math.round(g)}), 'puerto'); }
     brGhost(); brChal(); brPace(); brVuelta();
   }
+  brDrift();
   if (!P.wk && P.wt > 0 && P.wt % 1200 === 0) brSay(brPick('drink'), 'bebe');
   if (P.wbal != null && P.wk && P.wbal / P.w0 < .2 && !P.wLow && now() - P.brAt > 15000){ P.wLow = 1; brSay(brPick('wlow')); }
   if (P.wbal != null && P.wLow && P.wbal / P.w0 > .6) P.wLow = 0;
@@ -2491,6 +2582,7 @@ function tick(){
     P.dist += vs / 3.6;
     P.wt++;
     P.wbal = Math.min(P.w0, wStep(P.wbal, pw, cpOf(S.ftp), P.w0));
+    if (P.route) atkTick(pw);
     brTick();
     { const n = P.rec.p.length; if (n >= 30){ const a30 = (P.cum[n] - P.cum[n - 30]) / 30; P.np4 += a30 ** 4; P.npN++; } }
     if (P.route && P.rDist >= P.route.dist){ beep(660, 500); toast('¡Trayecto completado!'); return endSession(); }
@@ -2525,6 +2617,7 @@ function render(){
   else if (P.resc) st = 'Resistencia quitada: sube la cadencia (' + Math.max(0, Math.ceil((P.resc.until - now()) / 1000)) + ' s)';
   else if (!trainerOn()) st = 'Esperando al rodillo';
   else if (!P.running) st = P.rec.p.length ? 'Pausa automática. Pedalea para seguir' : 'Empieza a pedalear';
+  else if (P.atk && P.atk.cur){ const c = P.atk.cur, avg = c.n ? Math.round(c.sum / c.n) : 0; st = `⚔️ ${c.e} ${c.name}: ${avg} / ${c.w} W · ${Math.max(0, c.d - c.n)} s`; }
   else if (P.route && P.pace && pw > 0){ const tw = paceAt(P.pace, P.rDist), dl = pw - tw; st = `Brinco: ${tw} W · ${Math.abs(dl) <= 8 ? 'clavado' : (dl > 0 ? '+' : '−') + Math.abs(dl) + ' W'}`; }
   else if (P.route && P.pace) st = 'Brinco: ' + paceAt(P.pace, P.rDist) + ' W';
   else if (P.route && P.diff !== 1) st = 'Dificultad al ' + Math.round(P.diff * 100) + ' %';
@@ -2532,7 +2625,7 @@ function render(){
   else if (P.wk && P.mult !== 1) st = 'Intensidad al ' + Math.round(P.mult * 100) + ' %';
   else if (P.mode === 'erg' && tgt && pw > 0) { const dlt = pw - tgt; st = Math.abs(dlt) <= 5 ? 'En el objetivo' : (dlt > 0 ? '+' : '') + dlt + ' W del objetivo'; }
   $('pState').textContent = st;
-  $('pState').style.color = /^Brinco: .*clavado/.test(st) ? 'var(--ok)' : /^Brinco: .* [+−]\d/.test(st) ? 'var(--warnc)' : '';
+  $('pState').style.color = P.atk && P.atk.cur ? (P.atk.cur.n && P.atk.cur.sum / P.atk.cur.n >= P.atk.cur.w * .92 ? 'var(--ok)' : 'var(--warnc)') : /^Brinco: .*clavado/.test(st) ? 'var(--ok)' : /^Brinco: .* [+−]\d/.test(st) ? 'var(--warnc)' : '';
   const nxEl = $('pNext'); let soon = false;
   if (P.route) renderRoute();
   else if (P.wk){
@@ -2658,6 +2751,16 @@ function renderPlayerWarn(){
   $('pWarn').innerHTML = lost + w.map(x => `<div class="warn" style="margin:8px 0 0">${x}</div>`).join('');
 }
 setInterval(() => { if (P.on && P.running && BT.cmd) resendCmd(); }, 10000);
+// v0.31: pantalla completa en horizontal (y vuelta atrás). Para la tele: "Enviar" en el menú de Chrome refleja la pantalla.
+async function toggleLand(){
+  const so = screen.orientation;
+  try{
+    if (so && so.type && so.type.startsWith('landscape') && document.fullscreenElement){ try{ so.unlock(); }catch(e){} await document.exitFullscreen(); return; }
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({navigationUI:'hide'});
+    if (so && so.lock) await so.lock('landscape');
+  }catch(e){ toast('Gira el móvil: la pantalla se adapta sola en horizontal'); }
+  setTimeout(() => { if (P.on) drawPlayerChart(); }, 400);
+}
 function askEnd(){
   if (!P.rec.p.length){ if (confirm('No has empezado a rodar. ¿Salir?')) endSession(); return; }
   const coolLeft = P.wk && P.wk.segs.slice(P.segI).every(s => segInt(s) < .62);
@@ -2716,6 +2819,7 @@ function endSession(){
       saveActs();
     }
   }
+  if (P.atk && P.atk.done.length){ meta.atk = {ok:P.atk.ok, n:P.atk.done.length, pts:P.atk.pts}; saveActs(); }
   if (P.vu) vuFinish(meta, P.rec);
   if (document.fullscreenElement){ try{ document.exitFullscreen().catch(() => {}); }catch(e){} }
   renderHome();
@@ -2730,6 +2834,18 @@ function bestAvg(p, win){
   let s = 0, best = 0;
   for (let i = 0; i < p.length; i++){ s += p[i]; if (i >= win) s -= p[i - win]; if (i >= win - 1) best = Math.max(best, s / win); }
   return Math.round(best);
+}
+// v0.31: desacople aeróbico (Pa:HR). Sin los 5 primeros minutos, compara vatios/pulso de la 1ª y la 2ª mitad.
+// Solo con ≥ 30 min, pulso en ≥ 80 % de la sesión y ritmo bastante regular (NP/media ≤ 1,15). < 5 % = buen fondo.
+function decoupling(rec){
+  const p = rec.p, h = rec.hr, n = p.length; if (n < 1800) return null;
+  const i0 = 300, mid = Math.floor((i0 + n) / 2);
+  const half = (a, b) => { let sp = 0, sh = 0, k = 0; for (let i = a; i < b; i++) if (h[i] > 0){ sp += p[i]; sh += h[i]; k++; } return k > (b - a) * .8 ? {p:sp / k, h:sh / k} : null; };
+  const A = half(i0, mid), B = half(mid, n); if (!A || !B || A.p < 50) return null;
+  const sum = p.slice(i0).reduce((x, y) => x + y, 0), avg = sum / (n - i0);
+  let roll = 0, acc = 0, c = 0; for (let i = i0; i < n; i++){ roll += p[i]; if (i - i0 >= 30) roll -= p[i - 30]; if (i - i0 >= 29){ acc += (roll / 30) ** 4; c++; } }
+  if (Math.pow(acc / c, .25) / avg > 1.15) return null;
+  return Math.round(((A.p / A.h) - (B.p / B.h)) / (A.p / A.h) * 1000) / 10;
 }
 function calcStats(rec, ftp){
   const p = rec.p, n = p.length;
@@ -2751,6 +2867,7 @@ function calcStats(rec, ftp){
     avgHr: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null,
     maxHr: hrs.length ? Math.max(...hrs) : null,
     avgC: cads.length ? Math.round(cads.reduce((a, b) => a + b, 0) / cads.length) : null,
+    dec: decoupling(rec),
     kj: Math.round(sum / 1000), zt, best, hz, wMin: n ? Math.round(wMinOf(p, ftp) * 100) / 100 : null
   };
 }
@@ -2857,7 +2974,11 @@ function showAct(id, fresh){
     ${fresh ? newBadgesCard(checkBadges()) : ''}
     ${fresh && !testBox && (() => { const e = ftpEstimate(); return e && e.w >= S.ftp * 1.03 ? ftpCard(e, true) : ''; })() || ''}
     ${testBox}
+    ${(() => { const d = a.dec != null ? a.dec : rec ? decoupling(rec) : null; if (d == null) return '';
+      const [c, t] = d < 5 ? ['var(--ok)', 'buen fondo aeróbico: el pulso apenas se ha despegado de los vatios'] : d < 8 ? ['var(--warnc)', 'el pulso se ha ido despegando: algo de cansancio, calor o poca agua'] : ['var(--err)', 'el pulso ha subido mucho a igual potencia: demasiado fuerte para tu fondo actual, o calor y deshidratación'];
+      return `<div class="card" style="margin:12px 0"><b>Desacople aeróbico: <span style="color:${c}">${dec(d)} %</span></b><div class="small mut">${t}. Por debajo del 5 % es bueno; si en tus rodajes suaves va bajando semana a semana, tu fondo mejora.</div></div>`; })()}
     ${a.vu ? vuActCard(a) : ''}
+    ${a.atk ? `<div class="card" style="margin:12px 0"><b>⚔️ Ataques: seguiste ${a.atk.ok} de ${a.atk.n}</b><div class="small mut">${a.atk.pts ? '+' + a.atk.pts + ' puntos de ataque para los retos del mes.' : 'Esta vez se te fueron todos. La próxima.'}</div></div>` : ''}
     ${a.ghostRes ? `<div class="card" style="margin:12px 0;${a.ghostRes.best ? 'border:1px solid var(--acc)' : ''}"><b style="font-size:17px">${a.ghostRes.best ? (a.ghostRes.prev ? '⏱️ ¡Nueva mejor vez! ' + clock(a.ghostRes.dur) : '⏱️ Primera vez completado: ' + clock(a.ghostRes.dur)) : '⏱️ ' + clock(a.ghostRes.dur) + ' en este trayecto'}</b>
       <div class="small mut">${a.ghostRes.prev ? (a.ghostRes.best ? clock(a.ghostRes.prev - a.ghostRes.dur) + ' menos que tu anterior mejor vez (' + clock(a.ghostRes.prev) + ').' : 'Tu mejor vez sigue siendo ' + clock(a.ghostRes.prev) + ' (' + clock(a.ghostRes.dur - a.ghostRes.prev) + ' más).') : 'La próxima vez correrás contra este tiempo.'}</div></div>` : ''}
     ${a.chal ? (() => { const c = a.chal, got = c.got ? chalByK(c.got) : null, nx = CHAL.find(x => !got || CHAL.indexOf(x) > CHAL.indexOf(got));
@@ -3424,11 +3545,35 @@ function homeSay(m){
   const ts = todaySess(), wk = ts ? wkById(ts.wkId) : null;
   return a[h % a.length].replace('{s}', wk ? wk.name : 'tu sesión');
 }
+// v0.31: datos extra para el informe semanal (y resumen sin IA si no hay clave)
+function weekNums(ws){
+  const p0 = ws - 7 * DAY, L = ACTS.filter(a => a.date >= p0 && a.date < ws);
+  const kcal = L.reduce((a, x) => a + (x.kj || 0), 0), km = L.reduce((a, x) => a + (x.dist || 0), 0), up = L.reduce((a, x) => a + actGain(x), 0), t = L.reduce((a, x) => a + (x.dur || 0), 0);
+  const ph = (S.pesoHist || []).filter(h => h.date < ws), pw = ph.filter(h => h.date >= p0), pb = ph.filter(h => h.date < p0);
+  const dKg = pw.length && pb.length ? pw[pw.length - 1].kg - pb[pb.length - 1].kg : null;
+  const atk = L.reduce((a, x) => (x.atk ? [a[0] + x.atk.ok, a[1] + x.atk.n] : a), [0, 0]), decs = L.filter(x => x.dec != null).map(x => x.dec);
+  return {n:L.length, kcal, km, up, t, dKg, atk, decs};
+}
+function weekExtra(ws){
+  const w = weekNums(ws), out = [`Datos de la semana: ${w.n} sesiones en el rodillo, ${dur(w.t)}, ${dec(w.km, 0)} km, ${Math.round(w.up)} m de desnivel, ~${w.kcal} kcal.`];
+  if (w.dKg != null) out.push(`Peso: ${w.dKg > 0 ? '+' : ''}${dec(w.dKg, 1)} kg en la semana (ahora ${dec(S.peso, 1)} kg, ${dec(S.ftp / S.peso, 2)} W/kg).`);
+  if (w.atk[1]) out.push(`Ataques sorpresa: siguió ${w.atk[0]} de ${w.atk[1]}.`);
+  if (w.decs.length) out.push(`Desacople aeróbico en rodajes regulares: ${w.decs.map(d => dec(d) + ' %').join(', ')} (por debajo del 5 % es bueno).`);
+  try { const r = retosMes(); out.push(`Retos de ${r.mes}: ${r.items.map(i => i.n + ' (' + i.fmt(i.v) + ')').join('; ')}.`); } catch(e){}
+  if (S.vuelta){ const sd = vuStandings(); if (sd.n) out.push(`Vuelta a Salamanca: ${sd.n} de 6 etapas, va ${sd.gc.findIndex(x => x.rv.me) + 1}º en la general${(vuJerseys().yo || []).length ? ' y lleva el ' + JERSEYS[vuJerseys().yo[0]].n : ''}.`); }
+  if (PLAN && PLAN.id === 'afina') out.push('Está con el Plan afinamiento (bajar peso sin perder forma).');
+  return out.join(' ') + ' Menciona en una frase lo más destacado de estos datos.';
+}
 let weeklyBusy = false;
 function renderWeekCard(){
   const el = $('weekRep'); if (!el) return;
   const W = LS.get('ht_week', null);
-  if (!S.apiKey || !W || W.ws !== weekStart() || W.hidden){ el.innerHTML = ''; return; }
+  if (!S.apiKey){ // sin IA: resumen con números de la semana pasada
+    const w = weekNums(weekStart()); if (!w.n || (S.weekNumHide === weekStart())){ el.innerHTML = ''; return; }
+    el.innerHTML = `<div class="card coachcard weekcard"><div class="av"><img src="mascota/entrenador.webp" alt="" style="width:100%;height:100%;object-fit:cover;object-position:50% 0"></div>
+      <div style="flex:1;min-width:0"><b style="font-weight:600">Tu semana pasada</b><div class="small mut">${w.n} sesiones · ${dur(w.t)} · ${dec(w.km, 0)} km · +${nf(Math.round(w.up))} m · ~${nf(w.kcal)} kcal${w.dKg != null ? ' · ' + (w.dKg > 0 ? '+' : '') + dec(w.dKg, 1) + ' kg' : ''}${w.atk[1] ? ' · ⚔️ ' + w.atk[0] + '/' + w.atk[1] : ''}</div>
+      <button class="btn sm ghost" style="margin-top:6px" onclick="S.weekNumHide=weekStart();saveS();renderWeekCard()">Ocultar</button></div></div>`; return; }
+  if (!W || W.ws !== weekStart() || W.hidden){ el.innerHTML = ''; return; }
   const body = W.busy ? '<div class="small mut">Brinco está repasando tu semana…</div>'
     : W.err ? `<div class="small mut">No he podido hacer el informe (${esc(W.err)}).</div><button class="btn sm ghost" style="margin-top:8px" onclick="event.stopPropagation();weeklyReport(true)">Reintentar</button>`
     : `<div class="small mut clamp3">${esc(W.text.replace(/\*\*/g, ''))}</div>`;
@@ -3450,7 +3595,7 @@ async function weeklyReport(force){
     if (!ACTS.some(a => a.date >= prev && a.date < ws) && !EXT.some(a => a.date >= prev && a.date < ws)) return;
   }
   weeklyBusy = true; LS.set('ht_week', {ws, busy:true}); renderWeekCard();
-  const q = 'Hazme el informe de la semana pasada (de lunes a domingo): qué hice, cómo han ido la carga y la fatiga, y uno o dos ajustes concretos para esta semana. Máximo 120 palabras. No propongas acciones salvo que sea muy claro.';
+  const q = 'Hazme el informe de la semana pasada (de lunes a domingo): qué hice, cómo han ido la carga y la fatiga, y uno o dos ajustes concretos para esta semana. Máximo 150 palabras. No propongas acciones salvo que sea muy claro.\n' + weekExtra(ws);
   try{
     const res = await coachApi(q);
     CHAT.push({role:'user', text:'📋 Informe de la semana', at:now()}, res.msg); saveChat();
@@ -3459,7 +3604,7 @@ async function weeklyReport(force){
   weeklyBusy = false; renderWeekCard();
   if ($('sHome').classList.contains('on')) renderHome();
 }
-function setMascot(){ const el = $('mascot'); if (!el) return; const m = mascotState(), src = 'mascota/' + m + '.webp'; if (!el.src.endsWith(src)) el.src = src; el.dataset.m = m; $('hSay').textContent = homeSay(m); }
+function setMascot(){ const el = $('mascot'); if (!el) return; const st = mascotState(); let m = st; const j = S.vuelta ? jerOf('yo') : null; if (j && JERF_OK[j] && m !== 'descanso') m = 'maillot_' + j; const src = 'mascota/' + m + '.webp'; if (!el.src.endsWith(src)) el.src = src; el.dataset.m = st; $('hSay').textContent = m !== st ? `¡Llevas el ${JERSEYS[j].n} de la Vuelta! ${homeSay(st)}` : homeSay(st); }
 function renderHome(){
   const d = new Date(), h = d.getHours();
   const ds = d.toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'});
@@ -3479,6 +3624,7 @@ function renderHome(){
   { const e = ftpEstimate(), snooze = S.ftpSnooze && now() - S.ftpSnooze < 14 * DAY;
     $('recover').innerHTML += e && e.w >= S.ftp * 1.03 && !snooze ? ftpCard(e, true).replace('</button></div></div>', `</button> <button class="btn ghost sm" style="margin-top:8px" onclick="S.ftpSnooze=now();saveS();renderHome()">Ahora no</button></div></div>`) : ''; }
   if (S.vuelta && !S.vuelta.done) $('recover').innerHTML += vuBanner();
+  try { if (ACTS.length) $('recover').innerHTML += retosCard(true); } catch(e){}
   // ---- Hoy
   const ts = todaySess(), nx = nextSess();
   let hero = '';
@@ -4277,6 +4423,51 @@ function checkBadges(){
   S.badges = got; saveS();
   return fresh;
 }
+
+// ================= RETOS DEL MES (v0.31) =================
+// Tres retos fijos (km, desnivel y sesiones, un 10 % por encima de tu media de los 3 meses anteriores) y uno especial que va rotando.
+// Los objetivos se fijan el primer día que se ven en el mes (S.retos[ym]). Con los cuatro, insignia del mes (S.retoBadges[ym]).
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const RETO_SP = [
+  {k:'atk', e:'⚔️', n:'Consigue 60 puntos siguiendo ataques', goal:60, f:L => L.reduce((a, x) => a + (x.atk ? x.atk.pts : 0), 0)},
+  {k:'mit', e:'🏔️', n:'Sube 2 subidas míticas distintas', goal:2, f:L => new Set(L.filter(a => String(a.wkId || '').startsWith('route:m_')).map(a => a.wkId)).size},
+  {k:'z2', e:'🫁', n:'4 rodajes suaves de 40 minutos o más', goal:4, f:L => L.filter(a => (a.dur || 0) >= 2400 && a.ifv && a.ifv < .76).length},
+  {k:'kcal', e:'🔥', n:'Gasta 5.000 kcal en el rodillo', goal:5000, f:L => L.reduce((a, x) => a + (x.kj || 0), 0)},
+  {k:'sem', e:'📅', n:'Rueda 3 veces en una misma semana', goal:1, f:L => { const w = {}; L.forEach(a => { const k = weekStart(new Date(a.date)); w[k] = (w[k] || 0) + 1; }); return Object.values(w).some(v => v >= 3) ? 1 : 0; }},
+  {k:'trz', e:'🗺️', n:'Completa 4 trayectos', goal:4, f:L => L.filter(a => String(a.wkId || '').startsWith('route:')).length}
+];
+const ymOf = d => { const x = new Date(d); return x.getFullYear() * 100 + x.getMonth() + 1; };
+function retosMes(ym = ymOf(now())){
+  S.retos = S.retos || {};
+  if (!S.retos[ym]){
+    const y = Math.floor(ym / 100), m = ym % 100, t0 = new Date(y, m - 4, 1).getTime(), t1 = new Date(y, m - 1, 1).getTime();
+    const L = ACTS.filter(a => a.date >= t0 && a.date < t1), k = L.length ? 3 : 0;
+    const km = k ? L.reduce((a, x) => a + (x.dist || 0), 0) / 3 : 0, up = k ? L.reduce((a, x) => a + actGain(x), 0) / 3 : 0, ses = k ? L.length / 3 : 0;
+    S.retos[ym] = {km:Math.max(100, Math.round(km * 1.1 / 10) * 10), up:Math.max(1000, Math.round(up * 1.1 / 100) * 100), ses:Math.max(6, Math.round(ses * 1.1)), sp:RETO_SP[(y * 12 + m) % RETO_SP.length].k};
+    saveS();
+  }
+  const R = S.retos[ym], y = Math.floor(ym / 100), m = ym % 100, t0 = new Date(y, m - 1, 1).getTime(), t1 = new Date(y, m, 1).getTime();
+  const L = ACTS.filter(a => a.date >= t0 && a.date < t1), sp = RETO_SP.find(x => x.k === R.sp) || RETO_SP[0];
+  const items = [
+    {e:'🚴', n:`${R.km} km`, v:L.reduce((a, x) => a + (x.dist || 0), 0), goal:R.km, fmt:v => dec(v, 0) + ' km'},
+    {e:'⛰️', n:`${nf(R.up)} m de desnivel`, v:L.reduce((a, x) => a + actGain(x), 0), goal:R.up, fmt:v => nf(Math.round(v)) + ' m'},
+    {e:'✅', n:`${R.ses} sesiones`, v:L.length, goal:R.ses, fmt:v => v + ''},
+    {e:sp.e, n:sp.n, v:sp.f(L), goal:sp.goal, fmt:v => sp.goal === 1 ? (v ? 'hecho' : 'pendiente') : nf(Math.round(v))}
+  ];
+  const all = items.every(i => i.v >= i.goal);
+  if (all && !(S.retoBadges || {})[ym]){ S.retoBadges = Object.assign({}, S.retoBadges, {[ym]:now()}); saveS(); }
+  return {ym, mes:MESES[m - 1], items, all, done:items.filter(i => i.v >= i.goal).length};
+}
+function retosCard(compact){
+  const r = retosMes();
+  const bar = i => `<div style="margin:8px 0 0"><div class="row" style="justify-content:space-between;font-size:14px"><span>${i.e} ${esc(i.n)}</span><span class="mut" style="white-space:nowrap">${i.v >= i.goal ? '✓' : i.fmt(i.v)}</span></div>
+    <div style="height:7px;border-radius:4px;background:var(--line);margin-top:4px;overflow:hidden"><div style="height:100%;width:${Math.min(100, i.v / i.goal * 100).toFixed(0)}%;background:${i.v >= i.goal ? 'var(--ok)' : 'var(--acc)'}"></div></div></div>`;
+  const past = Object.keys(S.retoBadges || {}).map(Number).sort();
+  return `<div class="card" ${compact ? 'onclick="show(\'sAna\');anaTab(\'logros\')" style="cursor:pointer"' : ''}><h2>retos de ${r.mes}</h2>
+    <div class="small mut" style="margin-top:-4px">${r.all ? '¡Los cuatro conseguidos! Insignia del mes en el bolsillo. 🏅' : r.done + ' de 4. Con los cuatro, insignia del mes.'}</div>
+    ${r.items.map(bar).join('')}
+    ${!compact && past.length ? `<div class="small mut" style="margin-top:12px">Insignias de mes: ${past.map(ym => `🏅 ${MESES[ym % 100 - 1]} ${Math.floor(ym / 100)}`).join(' · ')}</div>` : ''}</div>`;
+}
 function badgeCard(){
   checkBadges();
   const s = badgeStats(), got = S.badges || {};
@@ -4313,7 +4504,7 @@ function progCard(){
     <div class="small mut" style="margin-top:4px">Los meses sin esfuerzos largos no tienen punto: no es que hayas bajado.</div></div>`;
 }
 function anaLogros(){
-  const top = funCard() + badgeCard();
+  const top = retosCard(false) + funCard() + badgeCard();
   const all = allTimeBest(null);
   const six = {}; ACTS.filter(a => a.date > now() - 182 * DAY && !a.noPR).forEach(a => BEST_D.forEach(d => { const v = a.best && a.best[d]; if (v && (!six[d] || v > six[d].w)) six[d] = {w:v, date:a.date}; }));
   if (!Object.keys(all).length){ $('anaBox').innerHTML = top + '<div class="empty">Aquí aparecerán tus récords de potencia cuando hagas sesiones.</div>'; return; }
