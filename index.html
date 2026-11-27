@@ -555,7 +555,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 5px;font-weigh
 
 <script>
 'use strict';
-const VER = '0.29.0';
+const VER = '0.30.0';
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => Date.now();
@@ -2891,8 +2891,9 @@ function showAct(id, fresh){
     <div class="grid2" style="margin-top:10px">
       ${a.strava ? `<a class="btn" style="text-align:center;text-decoration:none;color:#fc6a2c" href="https://www.strava.com/activities/${a.strava}" target="_blank">Ver en Strava</a>`
                  : `<button class="btn acc" id="upBtn" onclick="stravaUpload(${a.id})">Subir a Strava</button>`}
-      <button class="btn" onclick="downloadTCX(${a.id})">Descargar TCX</button>
+      <button class="btn" onclick="downloadFIT(${a.id})">Descargar .fit</button>
     </div>
+    <div class="small mut" style="text-align:center;margin-top:6px">¿Otra app no lee el .fit? <a href="#" onclick="downloadTCX(${a.id});return false" style="color:var(--acc)">Descarga el .tcx</a></div>
     <button class="btn block" style="margin-top:10px" onclick="shareCard(${a.id})">📸 Compartir imagen</button>
     ${a.noPR ? '' : `<button class="btn block" style="margin-top:10px" onclick="setNoPR(${a.id},true)">Vatios erróneos: no contar para récords ni FTP</button>`}
     <button class="btn red block" style="margin-top:10px" onclick="delAct(${a.id})">Borrar sesión</button>
@@ -3000,6 +3001,75 @@ function delAct(id){
   closeSheet(); renderAna(); renderHome(); toast('Sesión borrada');
 }
 
+// ================= FIT (v0.30) =================
+// Archivo FIT de actividad (perfil 21.x): file_id, eventos, un record por segundo (potencia, pulso, cadencia,
+// velocidad, distancia y, en trayectos, altitud y posición), vueltas, sesión (ciclismo en interior) y actividad.
+const FIT_CRC = [0x0000, 0xCC01, 0xD801, 0x1400, 0xF001, 0x3C00, 0x2800, 0xE401, 0xA001, 0x6C00, 0x7800, 0xB401, 0x5000, 0x9C01, 0x8801, 0x4400];
+function fitCrc(bytes, crc = 0){ for (const b of bytes){ let t = FIT_CRC[crc & 0xF]; crc = (crc >> 4) & 0x0FFF; crc ^= t ^ FIT_CRC[b & 0xF]; t = FIT_CRC[crc & 0xF]; crc = (crc >> 4) & 0x0FFF; crc ^= t ^ FIT_CRC[(b >> 4) & 0xF]; } return crc; }
+// tipos base: [código, bytes, inválido]
+const FT = {enum:[0x00, 1, 0xFF], u8:[0x02, 1, 0xFF], u16:[0x84, 2, 0xFFFF], u32:[0x86, 4, 0xFFFFFFFF], s32:[0x85, 4, 0x7FFFFFFF], u32z:[0x8C, 4, 0]};
+function FitWriter(){ this.b = []; this.defs = {}; }
+FitWriter.prototype.put = function(v, t){ const [, n] = FT[t]; for (let i = 0; i < n; i++) this.b.push((v >>> (8 * i)) & 0xFF); };
+// fields: [[número, tipo], …]; local: tipo local (0-15)
+FitWriter.prototype.def = function(local, global, fields){
+  this.b.push(0x40 | local, 0, 0, global & 0xFF, global >> 8, fields.length);
+  fields.forEach(([num, t]) => this.b.push(num, FT[t][1], FT[t][0])); this.defs[local] = fields;
+};
+FitWriter.prototype.msg = function(local, vals){
+  this.b.push(local); this.defs[local].forEach(([, t], i) => { let v = vals[i]; if (v == null || !isFinite(v)) v = FT[t][2]; else v = Math.round(v); if (t === 's32' && v < 0) v = v >>> 0; this.put(v, t); });
+};
+FitWriter.prototype.file = function(){
+  const data = this.b, h = [14, 0x20, 0x54, 0x08]; // cabecera 14 bytes, protocolo 2.0, perfil 21.32
+  for (let i = 0; i < 4; i++) h.push((data.length >>> (8 * i)) & 0xFF);
+  h.push(0x2E, 0x46, 0x49, 0x54); const hc = fitCrc(h); h.push(hc & 0xFF, hc >> 8);
+  const all = h.concat(data), c = fitCrc(all); all.push(c & 0xFF, c >> 8);
+  return new Uint8Array(all);
+};
+function buildFIT(a, rec){
+  const n = rec.p.length, T0 = Math.round(a.date / 1000) - 631065600, ts = i => T0 + (rec.t[i] != null ? rec.t[i] : i);
+  const rt = a.wkId && String(a.wkId).startsWith('route:') && rec.rd && rec.rd.length ? routeById(a.wkId.slice(6)) : null;
+  const semi = deg => Math.round(deg * 2147483648 / 180);
+  const W = new FitWriter();
+  W.def(0, 0, [[0, 'enum'], [1, 'u16'], [2, 'u16'], [3, 'u32z'], [4, 'u32']]);         // file_id
+  W.msg(0, [4, 255, 1, (a.id % 4e9) || 1, T0]);                                            // actividad, fabricante "desarrollo"
+  W.def(1, 21, [[253, 'u32'], [0, 'enum'], [1, 'enum']]);                                  // event
+  W.msg(1, [T0, 0, 0]);                                                                     // temporizador: inicio
+  const geo = rt && rt.la;
+  W.def(2, 20, [[253, 'u32'], [7, 'u16'], [3, 'u8'], [4, 'u8'], [6, 'u16'], [5, 'u32'], [2, 'u16']].concat(geo ? [[0, 's32'], [1, 's32']] : [])); // record
+  let d = 0, up = 0, lastE = null; const dd = [];
+  for (let i = 0; i < n; i++){
+    const ms = (rec.s[i] || 0) / 36; d += ms; dd.push(d);
+    let alt = null, la = null, lo = null;
+    if (rt){ const k = routeIdx(rt, rec.rd[i]); alt = rt.e[k]; if (geo){ la = semi(rt.la[k]); lo = semi(rt.lo[k]); } if (lastE != null && alt > lastE) up += alt - lastE; lastE = alt; }
+    const v = [ts(i), rec.p[i], rec.hr[i] > 0 ? rec.hr[i] : null, rec.c[i] > 0 ? rec.c[i] : null, ms * 1000, d * 100, alt != null ? (alt + 500) * 5 : null];
+    W.msg(2, geo ? v.concat([la, lo]) : v);
+  }
+  const lapDef = [[253, 'u32'], [254, 'u16'], [0, 'enum'], [1, 'enum'], [2, 'u32'], [7, 'u32'], [8, 'u32'], [9, 'u32'], [11, 'u16'], [15, 'u8'], [16, 'u8'], [19, 'u16'], [20, 'u16'], [33, 'u16']];
+  W.def(3, 19, lapDef);
+  const npOf = p => { if (p.length < 30) return avgArr(p); let r = 0, acc = 0, c = 0; for (let i = 0; i < p.length; i++){ r += p[i]; if (i >= 30) r -= p[i - 30]; if (i >= 29){ acc += (r / 30) ** 4; c++; } } return Math.pow(acc / c, .25); };
+  const laps = tcxLaps(a, rec);
+  laps.forEach(([i0, i1], k) => {
+    const p = rec.p.slice(i0, i1), hr = rec.hr.slice(i0, i1).filter(x => x > 0), dist = dd[i1 - 1] - (i0 ? dd[i0 - 1] : 0);
+    W.msg(3, [ts(i1 - 1), k, 9, 1, ts(i0), (i1 - i0) * 1000, (i1 - i0) * 1000, dist * 100, p.reduce((x, y) => x + y, 0) / 1000,
+      hr.length ? avgArr(hr) : null, hr.length ? Math.max(...hr) : null, avgArr(p), Math.max(...p), npOf(p)]);
+  });
+  const hrs = rec.hr.filter(x => x > 0), cads = rec.c.filter(x => x > 0), tEnd = ts(n - 1);
+  W.def(4, 18, [[253, 'u32'], [254, 'u16'], [0, 'enum'], [1, 'enum'], [2, 'u32'], [5, 'enum'], [6, 'enum'], [7, 'u32'], [8, 'u32'], [9, 'u32'], [11, 'u16'],
+    [14, 'u16'], [16, 'u8'], [17, 'u8'], [18, 'u8'], [20, 'u16'], [21, 'u16'], [22, 'u16'], [25, 'u16'], [26, 'u16'], [34, 'u16'], [35, 'u16'], [36, 'u16'], [45, 'u16']]);
+  W.msg(4, [tEnd, 0, 8, 1, T0, 2, 6, n * 1000, n * 1000, d * 100, rec.p.reduce((x, y) => x + y, 0) / 1000, n ? d / n * 1000 : 0,
+    hrs.length ? avgArr(hrs) : null, hrs.length ? Math.max(...hrs) : null, cads.length ? avgArr(cads) : null, avgArr(rec.p), Math.max(...rec.p),
+    rt ? up : null, 0, laps.length, a.np || npOf(rec.p), a.tss != null ? a.tss * 10 : null, a.ifv != null ? a.ifv * 1000 : null, a.ftp || S.ftp]);
+  W.msg(1, [tEnd, 0, 4]);                                                                   // temporizador: parada
+  W.def(5, 34, [[253, 'u32'], [0, 'u32'], [1, 'u16'], [2, 'enum'], [3, 'enum'], [4, 'enum'], [5, 'u32']]); // activity
+  W.msg(5, [tEnd, n * 1000, 1, 0, 26, 1, tEnd - new Date(a.date).getTimezoneOffset() * 60]);
+  return W.file();
+}
+const actFileName = (a, ext) => 'umbral_' + dkey(a.date) + '_' + ftime(a.date).replace(':', '') + '.' + ext;
+async function downloadFIT(id){
+  const a = ACTS.find(x => x.id === id), rec = await recLoad(id);
+  if (!a || !rec || !rec.p.length) return toast('No se encuentran los datos');
+  downloadBlob(new Blob([buildFIT(a, rec)], {type:'application/vnd.ant.fit'}), actFileName(a, 'fit'));
+}
 // ================= TCX =================
 // Vueltas: una por bloque del workout (rec.si); en sesiones antiguas, con los bloques del workout y rec.wt
 function tcxLaps(a, rec){
